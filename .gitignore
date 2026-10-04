@@ -1,0 +1,5 @@
+# generated data and raw datasets never go in git
+data/
+.tmp/
+__pycache__/
+*.pyc

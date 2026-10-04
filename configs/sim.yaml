@@ -1,0 +1,120 @@
+# =====================================================================
+# Simulator settings: the single source of truth for every number.
+# Each setting:  value  | source | strength | test (values for sensitivity runs)
+# strength:  sourced    = taken from a published figure
+#            derived    = our arithmetic on published figures
+#            samld      = measured from SAML-D (itself synthetic)
+#            assumption = no source exists; rerun at the `test` values
+#            modelling  = a shape/spread choice we make and state
+#            design     = a project decision, not a claim about the world
+# Decisions log: see the "Simulated Dataset: Logic, Assumptions and Use" doc.
+# =====================================================================
+
+meta:
+  version: v0
+  seed:      {value: 42, strength: design}
+  country:   {value: UK, source: "Team decision, 5 Oct 2026", strength: design}
+  currency:  {value: GBP, strength: design}
+  day0_date: {value: "2024-01-01", source: "BAF gives months 0-7 only; calendar is ours (needed for bonus months)", strength: modelling}
+
+paths:
+  baf_file: data/raw/BAF_Base.csv     # override with --baf
+  out_dir:  data/v0                    # override with --out
+
+size:
+  n_accounts:   {value: 50000, source: "v0 test size. Full run ~244,000 = 150 test launderers / (0.003 x 0.205 rows in months 6-7)", strength: design, test: [244000]}
+  observe_days: {value: 548, source: "18 months per account; no published precedent", strength: assumption, test: [365, 730]}
+  batch_size:   {value: 5000, strength: design}
+
+profiles:
+  launderer_share: {value: 0.003, source: "BioCatch 2022: 'up to 0.3 percent of accounts' (US)", strength: sourced, test: [0.001, 0.01]}
+  in_window_mix:
+    value: {fake: 0.733, witting: 0.1335, unwitting: 0.1335}
+    source: "Lloyds via Which? 2018 (~1/3 fake, inferred) + RUSI 2025 account ages, reading A (33/45)"
+    strength: derived
+    test: [{fake: 0.53, witting: 0.235, unwitting: 0.235}, {fake: 0.56, witting: 0.22, unwitting: 0.22}]
+  real_mule_age_weights:
+    value: {10: 0.17, 20: 0.40, 30: 0.24, 40plus: 0.19}
+    source: "Cifas Fraudscape 2026 (21-30 = 40%, 31-40 = 24%) and H1 2026 update (under-21 = 17%); mapped to BAF decades"
+    strength: sourced
+  fake_age_rule: {value: baf_own_ages, source: "Cifas: identity-fraud victims skew old (61+ = 25% in 2024); BAF fraud rows 50+ = 38.8%", strength: sourced, test: [young_weighted]}
+  hijacked:      {value: excluded, source: "No published share of hijacked mule accounts", strength: assumption, test: [own_scenario]}
+
+timing:
+  fake_start_days: {value: [60, 120], source: "~90 days after opening; no source. Uniform spread of +/-30 days is ours", strength: assumption, test: [[15, 45], [150, 210]]}
+  existing_start_bands:
+    value: [{share: 0.58, days: [0, 364]}, {share: 0.42, days: [365, 526]}]
+    source: "RUSI 2025: ~60% of mule accounts older than 1 year; cut so the burst and its forwarding (14 + 7 days) end inside the 18-month window; even spread inside each band"
+    strength: derived
+  burst_days:          {value: 14, source: "Synectics 2024: 'just 2 weeks between first and third offence'", strength: sourced}
+  incoming_per_burst:  {value: [3, 4], source: "Synectics 2024: 3.6 offences on average (counted across institutions)", strength: sourced}
+  bursts_per_launderer: {value: 1, strength: assumption, test: [repeat_until_closed]}
+
+networks:
+  big_network_share: {value: 0.25, source: "Vocalink 2017: c.25% of suspect mule accounts in one large connected network", strength: sourced}
+  chain_size:        {value: [2, 4], source: "Vocalink 2017: most networks 'short and linear'; exact length ours", strength: modelling}
+  internal_pieces_share: {value: 0.5, source: "Share of a networked launderer's outgoing pieces sent to its next network member (when active)", strength: modelling}
+
+income:
+  # BAF income takes values 0.1 ... 0.9. Anchors below are placed at 0.1, 0.5, 0.9 and joined by straight lines.
+  money_in_source: {value: ons_household, source: "Spending figures are household and after tax, so money in uses ONS household disposable income for consistency", strength: modelling, test: [hmrc_individual]}
+  ons_household_disposable_annual: {value: [18300, 39200, 77000], source: "ONS FYE 2025: poorest-fifth median, overall median, richest-fifth median", strength: sourced}
+  hmrc_individual_gross_annual:    {value: [15700, 29700, 67400], source: "HMRC 2023-24 p10, p50, p90 (taxpayers, before tax)", strength: sourced}
+  spend_weekly_household:          {value: [407.30, 676.60, 1083.60], source: "ONS Family Spending FYE 2025: poorest fifth, average, richest fifth", strength: sourced}
+  spend_cap_share_of_income: {value: 1.0, source: "Accounts do not run a long-term overdraft", strength: modelling}
+  personal_sigma: {value: 0.25, source: "Spread of each account's personal multiplier on spending and income", strength: modelling}
+  pay_frequency:
+    value: {monthly: 0.763, weekly: 0.126, four_weekly: 0.092, fortnightly: 0.019}
+    source: "ONS ASHE April 2019 via FCSA: weekly 3,911k, four-weekly 2,856k, fortnightly 590k of 31,041k jobs"
+    strength: sourced
+
+normal:
+  card_per_month:        {value: 38.6, source: "UK Finance 2026: 26.6bn debit card payments / 57.4m adults / 12", strength: derived}
+  card_avg_amount:       {value: 29.0, source: "UK Finance Nov 2025: GBP 66.7bn / 2.3bn transactions", strength: derived}
+  direct_debits_per_month: {value: 7.3, source: "UK Finance 2026: 5.0bn / 57.4m / 12 (payees per account)", strength: derived}
+  standing_order_share:  {value: 0.8, source: "UK Finance 2026: 551m / 57.4m / 12 (share of accounts with one monthly standing order)", strength: derived}
+  transfers_out_per_month: {value: 6.9, source: "Pay.UK 2025: 4.74bn single immediate payments / 57.4m / 12", strength: derived}
+  cheques_per_month:     {value: 0.1, source: "UK Finance 2026: 77m / 57.4m / 12", strength: derived}
+  non_card_value_weights:
+    value: {direct_debit: 2227, standing_order: 238, transfer_out: 5016}
+    source: "count x Pay.UK 2025 average value (305, 297, 727). Used only to split spending; published averages include business payments"
+    strength: derived
+  cash_withdrawals_per_month: {value: 2.0, source: "No published UK figure", strength: assumption, test: [1.0, 4.0]}
+  cash_withdrawal_amount: {value: {median: 139, max: 350}, source: "SAML-D normal cash withdrawals: median 139, max 350", strength: samld}
+  transfers_in_per_month: {value: 1.0, source: "Gifts and repayments from friends; no published figure", strength: assumption, test: [0.5, 2.0]}
+  transfer_in_median:    {value: 100, strength: assumption}
+  internal_share_of_transfers: {value: 0.10, source: "Some normal transfers go to other accounts in our data, so internal links are not a laundering giveaway", strength: assumption, test: [0.05, 0.2]}
+  abroad_sender_share:   {value: 0.07, source: "FCA Financial Lives 2022: 7% used an international money transfer service in 12 months", strength: sourced}
+  abroad_per_month:      {value: 0.5, source: "YouGov 2021: 20% of senders send at least monthly; rate ours", strength: modelling}
+  abroad_median:         {value: 450, source: "YouGov 2021: 54% send less than GBP 500", strength: modelling}
+  high_risk_share_of_abroad: {value: 0.159, source: "SAML-D normal: 1.56% of rows to MX/TR/MA/UAE out of 9.82% cross-border", strength: samld}
+  bonus_share:           {value: 0.30, source: "Share of accounts receiving a yearly bonus; no published figure", strength: assumption, test: [0.15, 0.6]}
+  bonus_avg:             {value: 1600, source: "ONS 2017: average bonus per employee just over GBP 1,600", strength: sourced}
+  bonus_dec_to_mar_share: {value: 0.528, source: "ONS 2017: 52.8% of bonuses paid December to March", strength: sourced}
+  cash_depositor_share:  {value: 0.06, source: "FCA Financial Lives 2022: 6% are heavy cash users", strength: sourced}
+  cash_deposits_per_month: {value: 2.0, strength: assumption, test: [1.0, 4.0]}
+  cash_deposit_median:   {value: 300, strength: assumption, test: [150, 600]}
+  large_cash_yearly_rate: {value: 0.002, source: "Share of accounts making one cash deposit >= GBP 10,000 per year; no published figure", strength: assumption, test: [0.001, 0.004]}
+  group_collection_yearly_rate: {value: 0.01, source: "Share of accounts receiving 8-15 small payments in one week per year (e.g. a shared gift); no published figure", strength: assumption, test: [0.005, 0.02]}
+  hour_weights:
+    value: [1.28, 1.28, 1.28, 1.28, 1.28, 1.28, 1.28, 1.50, 5.67, 5.67, 5.68, 5.68, 5.67, 5.69, 5.68, 5.68, 5.68, 5.67, 5.47, 5.46, 5.45, 5.45, 5.47, 5.46]
+    source: "SAML-D share of rows by hour (normal)"
+    strength: samld
+  amount_sigma: {value: 0.6, source: "Spread of individual payment amounts (log scale)", strength: modelling}
+
+laundering:
+  patterns:          {value: [Fan_In], source: "v0 uses one pattern; v1 adds the 15 approved SAML-D patterns", strength: design}
+  out_transfer_mean: {value: 532, source: "RUSI 2025 (Lloyds, 17 Jun-11 Aug 2024): 7,631 Faster Payments worth GBP 4.06m out of mule accounts", strength: sourced, test: [1500]}
+  out_pieces_mean:   {value: 2.0, source: "Each incoming payment is split into ~2 outgoing transfers", strength: modelling}
+  card_out:          {value: deferred, source: "RUSI: card out avg GBP 107. Deferred: single laundering card rows would stand out next to weekly normal card rows", strength: design}
+  holder_keeps:      {value: [0.0, 0.10], source: "Europol/FBI: mules keep 'a commission'; % only in news reports", strength: assumption}
+  forward_delay_shares:
+    value: {under_15min: 0.28, 15_to_60min: 0.25, 1_to_24h: 0.32, over_24h: 0.15}
+    source: "RUSI 2025: 28% left within 15 min, a further 25% within 1 h, under 15% remained after 24 h (1-24h share derived)"
+    strength: sourced
+  cross_border_share_out: {value: 0.31, source: "SAML-D laundering rows: 31.0% involve another country", strength: samld}
+  high_risk_share_of_cross_border: {value: 0.269, source: "SAML-D laundering: 8.33% to MX/TR/MA/UAE out of 30.95% cross-border", strength: samld}
+
+countries:
+  high_risk: {value: [Mexico, Turkey, Morocco, UAE], source: "SAML-D paper", strength: sourced}
+  other_abroad: {value: [Pakistan, Austria, Albania, Japan, Germany, France, Nigeria, Netherlands, Spain, India, USA, Italy, Switzerland], source: "SAML-D receiver countries", strength: samld}
