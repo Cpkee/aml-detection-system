@@ -1,9 +1,10 @@
-"""Step 5: plant laundering bursts on launderers (v0: one Fan_In-style pattern).
+"""Step 5: plant laundering bursts on launderers, in 15 SAML-D shapes.
 
-Each launderer gets one ~2-week burst from its start day: 3-4 payments come in from
-outside victims, and each is split into ~2 transfers that leave within minutes to days
-(RUSI timing). Networked launderers send part of the money to their next network member,
-who forwards it on.
+Each launderer gets one ~2-week burst from its start day. Its shape (drawn with SAML-D's
+weights) decides who pays in (how many payers, transfer or cash), and how the money leaves
+(how many receivers, transfers or cash withdrawals, how often abroad). Amounts are anchored to
+RUSI's GBP 532 average and leave at RUSI's speed. Networked launderers pass some pieces to their
+next network member, who forwards them on ("layered" shapes do this twice as often).
 """
 from __future__ import annotations
 import numpy as np
@@ -14,6 +15,14 @@ from .common import Rows, lognormal_mean, sample_seconds, ext_ids
 DELAY_BANDS = {  # minutes
     "under_15min": (1, 15), "15_to_60min": (15, 60), "1_to_24h": (60, 1440), "over_24h": (1440, 7 * 1440),
 }
+CASH_WITHDRAWAL_MAX = 300   # split cash-outs into pieces of at most ~GBP 300 (SAML-D withdrawals max out at 350)
+
+
+def abroad_share(cfg):
+    """Launderers' share of transfers sent abroad = SAML-D ratio x our normal accounts' share."""
+    abroad = cfg.get("normal.abroad_sender_share") * cfg.get("normal.abroad_per_month")
+    normal_share = abroad / (cfg.get("normal.transfers_out_per_month") + abroad)
+    return min(1.0, cfg.get("laundering.abroad_ratio_vs_normal") * normal_share)
 
 
 def _delays(rng, cfg, k):
@@ -25,65 +34,102 @@ def _delays(rng, cfg, k):
     return rng.uniform(lo, hi) * 60  # seconds
 
 
-def _destination(rng, cfg, k):
-    cross = rng.random(k) < cfg.get("laundering.cross_border_share_out")
+def _destination(rng, cfg, k, p_abroad):
+    cross = rng.random(k) < p_abroad
     hr = rng.random(k) < cfg.get("laundering.high_risk_share_of_cross_border")
     country = np.where(hr, rng.choice(cfg.get("countries.high_risk"), k),
                        rng.choice(cfg.get("countries.other_abroad"), k))
-    rloc = np.where(cross, country, "UK")
-    ptype = np.where(cross, "Cross-border", "ACH")
-    return rloc, ptype
+    return np.where(cross, country, "UK"), np.where(cross, "Cross-border", "ACH")
+
+
+def _payers(rng, spec, k):
+    if spec == "all":
+        return ext_ids(rng, k)
+    pool = ext_ids(rng, int(spec))
+    return pool[rng.permutation(np.arange(k) % len(pool))]
 
 
 def generate_laundering(cfg, truth: pd.DataFrame, internal: pd.DataFrame, open_day: np.ndarray,
-                        rng: np.random.Generator, pair_base: int) -> Rows:
+                        rng: np.random.Generator, pair_base: int) -> tuple[Rows, dict]:
     rows = Rows()
     days = cfg.get("size.observe_days")
     hw = cfg.get("normal.hour_weights")
-    label = cfg.get("laundering.patterns")[0]
+    shapes = cfg.get("laundering.shapes")
+    names = list(shapes)
+    weights = np.array([shapes[n]["weight"] for n in names], dtype=float)
     start = truth["launder_start_day"].fillna(-1).to_numpy().astype(int)
     successor = internal["successor"].to_numpy()
-    lmin, lmax = cfg.get("timing.incoming_per_burst")
     burst = cfg.get("timing.burst_days")
     keep_lo, keep_hi = cfg.get("laundering.holder_keeps")
     pieces_mean = cfg.get("laundering.out_pieces_mean")
     out_mean = cfg.get("laundering.out_transfer_mean")
-    share_internal = cfg.get("networks.internal_pieces_share")
+    base_internal = cfg.get("networks.internal_pieces_share")
+    base_abroad = abroad_share(cfg)
     pair = pair_base
+    shape_of = {}
+
+    def end_sec(j):
+        return (open_day[j] + days - 1) * 86400 + 86399
 
     def active(j, day):
         return j >= 0 and start[j] >= 0 and start[j] <= day <= open_day[j] + days - 1
 
+    def add_out(acct, t_sec, amount, cp, ptype, rloc, label, pair_id=-1, link=-1):
+        t_sec = np.minimum(np.asarray(t_sec, dtype=float), end_sec(acct))
+        rows.add(np.full(len(t_sec), acct), (t_sec // 86400).astype(int), (t_sec % 86400).astype(int), "out",
+                 cp, amount, ptype, label, rloc=rloc, is_l=1, pair=pair_id, link=link)
+
     for i in np.flatnonzero(start >= 0):
-        k_in = int(rng.integers(lmin, lmax + 1))
+        name = names[rng.choice(len(names), p=weights / weights.sum())]
+        sh = shapes[name]
+        shape_of[i] = name
+        lo, hi = sh["n_in"]
+        many_small = hi > 4
+        k_in = int(rng.integers(lo, hi + 1))
         in_days = start[i] + np.sort(np.concatenate([[0], rng.integers(0, burst, size=k_in - 1)]))
-        for d_in in in_days:
+        payers = _payers(rng, sh["senders"], k_in)
+        receivers = ext_ids(rng, int(sh["recipients"]))
+        piece_mean = out_mean * sh["amount_rel"]
+        p_abroad = min(1.0, base_abroad * sh["abroad_rel"])
+        p_internal = min(1.0, base_internal * (2 if sh["layered"] else 1))
+
+        for e, d_in in enumerate(in_days):
             s_in = int(sample_seconds(rng, 1, hw)[0])
-            n_p = 1 + rng.poisson(pieces_mean - 1)
-            piece = lognormal_mean(rng, out_mean, 0.6, n_p)
+            n_p = 1 if many_small else 1 + rng.poisson(pieces_mean - 1)
+            piece = lognormal_mean(rng, piece_mean, 0.6, n_p)
             keep = rng.uniform(keep_lo, keep_hi)
             amt_in = piece.sum() / (1 - keep)
-            rows.add([i], [d_in], [s_in], "in", ext_ids(rng, 1), [amt_in], "ACH", label, is_l=1)
-            t_out = d_in * 86400 + s_in + _delays(rng, cfg, n_p)
-            t_out = np.minimum(t_out, (open_day[i] + days - 1) * 86400 + 86399)
-            o_day, o_sec = (t_out // 86400).astype(int), (t_out % 86400).astype(int)
-            rloc, ptype = _destination(rng, cfg, n_p)
+            cash_in = sh["in_kind"] == "cash" or (sh["in_kind"] == "half_cash" and rng.random() < 0.5)
+            rows.add([i], [d_in], [s_in], "in", "CASH" if cash_in else payers[e:e + 1], [amt_in],
+                     "Cash Deposit" if cash_in else "ACH", name, is_l=1)
+            t0 = d_in * 86400 + s_in
+
+            if sh["out_kind"] == "cash_withdrawal":
+                total = piece.sum()
+                n_w = int(np.ceil(total / CASH_WITHDRAWAL_MAX))
+                add_out(i, t0 + _delays(rng, cfg, n_w), np.full(n_w, total / n_w), "CASH",
+                        "Cash Withdrawal", "UK", name)
+                continue
+
+            t_out = t0 + _delays(rng, cfg, n_p)
+            rloc, ptype = _destination(rng, cfg, n_p, p_abroad)
             for p in range(n_p):
+                o_day = int(min(t_out[p], end_sec(i)) // 86400)
                 j = successor[i]
-                if j >= 0 and rng.random() < share_internal and active(j, o_day[p]):
-                    # internal hop: i -> j, then j forwards it out after its own delay
-                    rows.add([i], [o_day[p]], [o_sec[p]], "out", np.array([j], dtype=object), [piece[p]],
-                             "ACH", label, is_l=1, pair=pair)
-                    rows.add([j], [o_day[p]], [o_sec[p]], "in", np.array([i], dtype=object), [piece[p]],
-                             "ACH", label, is_l=1, pair=pair)
-                    pair += 1
-                    t2 = o_day[p] * 86400 + o_sec[p] + _delays(rng, cfg, 1)[0]
-                    t2 = min(t2, (open_day[j] + days - 1) * 86400 + 86399)
+                if j >= 0 and rng.random() < p_internal and active(j, o_day):
+                    # internal hop i -> j (both rows share one transfer id), then j forwards it on
+                    t_p = min(t_out[p], end_sec(i))
+                    cp_j = np.array([j], dtype=object)
+                    cp_i = np.array([i], dtype=object)
+                    add_out(i, [t_p], [piece[p]], cp_j, "ACH", "UK", name, pair_id=pair)
+                    rows.add([j], [int(t_p // 86400)], [int(t_p % 86400)], "in", cp_i, [piece[p]], "ACH", name,
+                             is_l=1, pair=pair)
                     keep_j = rng.uniform(keep_lo, keep_hi)
-                    r2, p2 = _destination(rng, cfg, 1)
-                    rows.add([j], [int(t2 // 86400)], [int(t2 % 86400)], "out", ext_ids(rng, 1),
-                             [piece[p] * (1 - keep_j)], p2, label, rloc=r2, is_l=1)
+                    r2, p2 = _destination(rng, cfg, 1, p_abroad)
+                    add_out(j, [t_p + _delays(rng, cfg, 1)[0]], [piece[p] * (1 - keep_j)], ext_ids(rng, 1),
+                            p2, r2, name, link=pair)
+                    pair += 1
                 else:
-                    rows.add([i], [o_day[p]], [o_sec[p]], "out", ext_ids(rng, 1), [piece[p]],
-                             ptype[p], label, rloc=rloc[p:p + 1], is_l=1)
-    return rows
+                    cp = receivers[rng.integers(0, len(receivers)):][:1]
+                    add_out(i, t_out[p:p + 1], piece[p:p + 1], cp, ptype[p:p + 1], rloc[p:p + 1], name)
+    return rows, shape_of
