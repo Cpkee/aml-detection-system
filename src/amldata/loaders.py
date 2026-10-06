@@ -1,0 +1,88 @@
+"""Safe access to the simulated dataset.
+
+Three doors, so hidden answers never reach a model by accident:
+
+  public(out)               model inputs only: `accounts` and `transactions`
+  labels(out, ...)          the training answer `is_launderer`, for training/calibration accounts only
+  evaluation(out)           every table; for scoring code in src/evaluation/ only
+
+Feature and model code must only use `public()` and `labels()`. tests/test_hidden_files.py fails if any
+code outside src/sim, src/amldata or src/evaluation names a hidden file.
+
+Example
+-------
+    from amldata import public, labels
+    con = public()                                   # DuckDB connection, two views
+    week = con.sql("SELECT * FROM transactions WHERE day <= 377").df()
+    y = labels(as_of_day=377)                        # months 0-5 only
+"""
+from __future__ import annotations
+import os
+
+import duckdb
+import pandas as pd
+
+PUBLIC = ["accounts", "transactions"]
+HIDDEN = ["accounts_truth", "aml_alerts", "aml_outcomes", "transactions_truth"]
+TRAIN_MONTHS = (0, 1, 2, 3, 4, 5)   # 0-4 train, 5 calibrate
+TEST_MONTHS = (6, 7)                # stay closed until scoring
+DEFAULT_OUT = "data/v1"
+
+
+def _file(out: str, name: str) -> str:
+    path = os.path.join(out, f"{name}.parquet")
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"{path} not found - run the simulator first (see README)")
+    return path
+
+
+def _connect() -> duckdb.DuckDBPyConnection:
+    con = duckdb.connect()
+    con.execute("PRAGMA memory_limit='2GB'")
+    return con
+
+
+def public(out: str = DEFAULT_OUT) -> duckdb.DuckDBPyConnection:
+    """Connection with ONLY the model inputs: views `accounts` and `transactions`."""
+    con = _connect()
+    for name in PUBLIC:
+        con.execute(f"CREATE VIEW {name} AS SELECT * FROM read_parquet('{_file(out, name)}')")
+    return con
+
+
+def accounts(out: str = DEFAULT_OUT) -> pd.DataFrame:
+    """The application table (32 columns) as a DataFrame."""
+    return public(out).execute("SELECT * FROM accounts").df()
+
+
+def labels(out: str = DEFAULT_OUT, months=TRAIN_MONTHS, as_of_day: int | None = None,
+           allow_test: bool = False) -> pd.DataFrame:
+    """Training answers for accounts opened in `months`.
+
+    Returns account_id, open_month, is_launderer and, if `as_of_day` is given, started_by_day:
+    1 if the account is a launderer whose laundering had started on or before that day (the
+    'has it started by this week?' label). Nothing else from the hidden files is returned.
+    Test months (6-7) are refused unless allow_test=True, which only evaluation code should use.
+    """
+    months = tuple(int(m) for m in months)
+    if not allow_test and set(months) & set(TEST_MONTHS):
+        raise ValueError("labels for test months 6-7 stay closed; use amldata.evaluation() in scoring code")
+    con = _connect()
+    m = ", ".join(str(x) for x in months)
+    df = con.execute(f"""
+        SELECT a.account_id, a.open_month, t.is_launderer, t.launder_start_day
+        FROM read_parquet('{_file(out, 'accounts')}') a
+        JOIN read_parquet('{_file(out, 'accounts_truth')}') t USING (account_id)
+        WHERE a.open_month IN ({m})""").df()
+    if as_of_day is not None:
+        start = df["launder_start_day"]
+        df["started_by_day"] = ((df["is_launderer"] == 1) & start.notna() & (start <= as_of_day)).astype(int)
+    return df.drop(columns=["launder_start_day"])
+
+
+def evaluation(out: str = DEFAULT_OUT) -> duckdb.DuckDBPyConnection:
+    """Every table, including hidden answers. ONLY for scoring code in src/evaluation/."""
+    con = _connect()
+    for name in PUBLIC + HIDDEN:
+        con.execute(f"CREATE VIEW {name} AS SELECT * FROM read_parquet('{_file(out, name)}')")
+    return con

@@ -11,7 +11,7 @@
 # =====================================================================
 
 meta:
-  version: v0
+  version: v1
   seed:      {value: 42, strength: design}
   country:   {value: UK, source: "Team decision, 5 Oct 2026", strength: design}
   currency:  {value: GBP, strength: design}
@@ -19,7 +19,7 @@ meta:
 
 paths:
   baf_file: data/raw/BAF_Base.csv     # override with --baf
-  out_dir:  data/v0                    # override with --out
+  out_dir:  data/v1                    # override with --out
 
 size:
   n_accounts:   {value: 50000, source: "v0 test size. Full run ~244,000 = 150 test launderers / (0.003 x 0.205 rows in months 6-7)", strength: design, test: [244000]}
@@ -57,7 +57,7 @@ networks:
 
 income:
   # BAF income takes values 0.1 ... 0.9. Anchors below are placed at 0.1, 0.5, 0.9 and joined by straight lines.
-  money_in_source: {value: ons_household, source: "Spending figures are household and after tax, so money in uses ONS household disposable income for consistency", strength: modelling, test: [hmrc_individual]}
+  money_in_source: {value: ons_household, source: "Spending figures are household and after tax, so money in uses ONS household disposable income for consistency. Approved 6 Oct 2026", strength: modelling, test: [hmrc_individual]}
   ons_household_disposable_annual: {value: [18300, 39200, 77000], source: "ONS FYE 2025: poorest-fifth median, overall median, richest-fifth median", strength: sourced}
   hmrc_individual_gross_annual:    {value: [15700, 29700, 67400], source: "HMRC 2023-24 p10, p50, p90 (taxpayers, before tax)", strength: sourced}
   spend_weekly_household:          {value: [407.30, 676.60, 1083.60], source: "ONS Family Spending FYE 2025: poorest fifth, average, richest fifth", strength: sourced}
@@ -93,7 +93,7 @@ normal:
   bonus_dec_to_mar_share: {value: 0.528, source: "ONS 2017: 52.8% of bonuses paid December to March", strength: sourced}
   cash_depositor_share:  {value: 0.06, source: "FCA Financial Lives 2022: 6% are heavy cash users", strength: sourced}
   cash_deposits_per_month: {value: 2.0, strength: assumption, test: [1.0, 4.0]}
-  cash_deposit_median:   {value: 300, strength: assumption, test: [150, 600]}
+  cash_deposit_median:   {value: 150, source: "No published figure. Set to the low test value: at 300, 40% of cash depositors passed GBP 10,000 a year, contradicting the FCA premise that legitimate personal customers rarely need more (changed 6 Oct)", strength: assumption, test: [75, 300]}
   large_cash_yearly_rate: {value: 0.002, source: "Share of accounts making one cash deposit >= GBP 10,000 per year; no published figure", strength: assumption, test: [0.001, 0.004]}
   group_collection_yearly_rate: {value: 0.01, source: "Share of accounts receiving 8-15 small payments in one week per year (e.g. a shared gift); no published figure", strength: assumption, test: [0.005, 0.02]}
   hour_weights:
@@ -103,7 +103,34 @@ normal:
   amount_sigma: {value: 0.6, source: "Spread of individual payment amounts (log scale)", strength: modelling}
 
 laundering:
-  patterns:          {value: [Fan_In], source: "v0 uses one pattern; v1 adds the 15 approved SAML-D patterns", strength: design}
+  # 15 approved SAML-D shapes (Over-Invoicing and Single_large dropped). Seen from OUR launderer account:
+  #   weight      = SAML-D accounts using the shape (measured, analysis/q9_typology_shapes.py + q8)
+  #   senders     = distinct payers into the account during the burst ("all" = every payment from a new payer)
+  #   recipients  = distinct receivers the account sends to
+  #   in_kind     = transfer | cash | half_cash ; out_kind = transfer | cash_withdrawal
+  #   amount_rel  = SAML-D median amount for the shape / 7,541 (SAML-D laundering ACH median); x GBP 532 (RUSI)
+  #   abroad_rel  = SAML-D share of the shape's rows touching another country / 31% (all laundering)
+  #   n_in        = incoming payments per burst (Synectics 3-4; many-small-payment shapes use more)
+  #   layered     = true -> twice the usual share of pieces passed to the next network member
+  shapes:
+    value:
+      Structuring:          {weight: 1945, senders: all, recipients: 1, in_kind: transfer,  out_kind: transfer,        amount_rel: 0.64, abroad_rel: 1.26, n_in: [8, 15], layered: false}
+      Deposit-Send:         {weight: 1035, senders: 1,   recipients: 2, in_kind: half_cash, out_kind: transfer,        amount_rel: 0.84, abroad_rel: 1.16, n_in: [3, 4],  layered: false}
+      Layered_Fan_Out:      {weight: 581,  senders: 1,   recipients: 2, in_kind: transfer,  out_kind: transfer,        amount_rel: 0.89, abroad_rel: 0.81, n_in: [3, 4],  layered: true}
+      Layered_Fan_In:       {weight: 547,  senders: 3,   recipients: 1, in_kind: transfer,  out_kind: transfer,        amount_rel: 1.42, abroad_rel: 0.65, n_in: [3, 4],  layered: true}
+      Behavioural_Change_1: {weight: 447,  senders: 1,   recipients: 8, in_kind: transfer,  out_kind: transfer,        amount_rel: 0.41, abroad_rel: 2.10, n_in: [3, 4],  layered: false}
+      Fan_In:               {weight: 404,  senders: all, recipients: 1, in_kind: transfer,  out_kind: transfer,        amount_rel: 1.13, abroad_rel: 0.42, n_in: [3, 4],  layered: false}
+      Behavioural_Change_2: {weight: 404,  senders: 1,   recipients: 6, in_kind: transfer,  out_kind: transfer,        amount_rel: 0.46, abroad_rel: 3.23, n_in: [3, 4],  layered: false}
+      Gather-Scatter:       {weight: 392,  senders: 4,   recipients: 4, in_kind: transfer,  out_kind: transfer,        amount_rel: 1.13, abroad_rel: 0.45, n_in: [3, 4],  layered: false}
+      Cycle:                {weight: 384,  senders: 1,   recipients: 1, in_kind: transfer,  out_kind: transfer,        amount_rel: 2.85, abroad_rel: 1.36, n_in: [3, 4],  layered: true}
+      Stacked Bipartite:    {weight: 309,  senders: 2,   recipients: 2, in_kind: transfer,  out_kind: transfer,        amount_rel: 1.05, abroad_rel: 0.48, n_in: [3, 4],  layered: true}
+      Bipartite:            {weight: 266,  senders: 2,   recipients: 5, in_kind: transfer,  out_kind: transfer,        amount_rel: 1.18, abroad_rel: 0.81, n_in: [3, 4],  layered: false}
+      Fan_Out:              {weight: 266,  senders: 1,   recipients: 8, in_kind: transfer,  out_kind: transfer,        amount_rel: 1.20, abroad_rel: 1.23, n_in: [3, 4],  layered: false}
+      Scatter-Gather:       {weight: 244,  senders: 1,   recipients: 1, in_kind: transfer,  out_kind: transfer,        amount_rel: 1.04, abroad_rel: 1.26, n_in: [3, 4],  layered: false}
+      Cash_Withdrawal:      {weight: 176,  senders: 1,   recipients: 1, in_kind: transfer,  out_kind: cash_withdrawal, amount_rel: 1.00, abroad_rel: 0.00, n_in: [3, 4],  layered: false}
+      Smurfing:             {weight: 126,  senders: 1,   recipients: 1, in_kind: cash,      out_kind: transfer,        amount_rel: 0.35, abroad_rel: 0.03, n_in: [6, 10], layered: false}
+    source: "Shape structure measured from SAML-D (payment types, payers/receivers per account, abroad share, median amount); amounts re-anchored to RUSI GBP 532. Structuring and Smurfing use more, smaller payments than Synectics' 3-4 by definition"
+    strength: samld
   out_transfer_mean: {value: 532, source: "RUSI 2025 (Lloyds, 17 Jun-11 Aug 2024): 7,631 Faster Payments worth GBP 4.06m out of mule accounts", strength: sourced, test: [1500]}
   out_pieces_mean:   {value: 2.0, source: "Each incoming payment is split into ~2 outgoing transfers", strength: modelling}
   card_out:          {value: deferred, source: "RUSI: card out avg GBP 107. Deferred: single laundering card rows would stand out next to weekly normal card rows", strength: design}
@@ -112,9 +139,29 @@ laundering:
     value: {under_15min: 0.28, 15_to_60min: 0.25, 1_to_24h: 0.32, over_24h: 0.15}
     source: "RUSI 2025: 28% left within 15 min, a further 25% within 1 h, under 15% remained after 24 h (1-24h share derived)"
     strength: sourced
-  cross_border_share_out: {value: 0.31, source: "SAML-D laundering rows: 31.0% involve another country", strength: samld}
+  abroad_ratio_vs_normal: {value: 3.15, source: "SAML-D: 30.95% of laundering rows go abroad vs 9.82% of normal rows. Applied to OUR normal rate of transfers abroad (~0.5%), so launderers send ~1.6% of transfers abroad. Approved 6 Oct 2026", strength: samld, test: [1.0, 6.0]}
   high_risk_share_of_cross_border: {value: 0.269, source: "SAML-D laundering: 8.33% to MX/TR/MA/UAE out of 30.95% cross-border", strength: samld}
 
 countries:
   high_risk: {value: [Mexico, Turkey, Morocco, UAE], source: "SAML-D paper", strength: sourced}
   other_abroad: {value: [Pakistan, Austria, Albania, Japan, Germany, France, Nigeria, Netherlands, Spain, India, USA, Italy, Switzerland], source: "SAML-D receiver countries", strength: samld}
+
+rules:
+  # The bank's existing rule system (the benchmark). Runs once a week on transactions only.
+  R1_large_cash:     {value: 10000, source: "MLR 2017 reg 14(1)(a): cash of at least GBP 10,000 (since 30 Jun 2026)", strength: sourced}
+  R2_cash_per_day:   {value: 1000,  source: "FCA proposed personal limit: GBP 1,000 per 24 hours", strength: sourced}
+  R2_days_in_2wk:    {value: 2,     source: "Days over the daily limit within 2 weeks; count is ours", strength: modelling}
+  R2_cash_per_year:  {value: 10000, source: "FCA proposed personal limit: GBP 10,000 per 12 months", strength: sourced}
+  R3_senders_week:   {value: 8,     source: "FFIEC: 'many small, incoming transfers'; 8 is the starting value, then tuned", strength: partly_sourced}
+  R4_out_share:      {value: 0.8,   source: "FFIEC: 'all or most ... wired' onward; 80% of the week's money in leaves the same week", strength: partly_sourced}
+  R4_min_in:         {value: 2000,  source: "Week's money in must exceed this; starting value ours, then tuned", strength: modelling}
+  R5_high_risk_4wk:  {value: 5000,  source: "FFIEC: transfers to higher-risk locations; GBP 5,000 over 4 weeks, then tuned", strength: partly_sourced}
+  R6_multiple:       {value: 10,    source: "FFIEC/FinCEN: sudden change; money in >= 10x the account's usual week, then tuned", strength: partly_sourced}
+  R6_history_weeks:  {value: [4, 8], source: "Usual = average of the previous 8 weeks; needs at least 4 weeks of history", strength: modelling}
+  R6_min_in:         {value: 1000,  source: "Floor so tiny accounts don't trigger; ours", strength: modelling}
+  R6_min_usual:      {value: 100,   source: "The usual week must have at least GBP 100 coming in, so a first salary after quiet weeks is not a sudden change; ours", strength: modelling}
+  pause_days:        {value: 28,    source: "Alert suppression is standard (Oracle); 28 days is ours", strength: partly_sourced}
+  review_days:       {value: [3, 30], source: "FinCEN: report within 30 days of detection; 3-day minimum ours", strength: partly_sourced}
+  confirm_share:     {value: 0.8,   source: "Share of true alerts the investigator confirms; no source", strength: assumption, test: [0.6, 1.0]}
+  false_alarm_target: {value: [0.90, 0.95], source: "Oztas et al. 2024: practitioners estimate 90-95% of alerts are false. Not reachable by tuning R3-R6 together; best achieved 97.2% at 50k accounts, accepted and reported (decision 6 Oct 2026)", strength: sourced}
+  tune_rules:        {value: [R3, R4, R5, R6], source: "R1 and R2 are legal limits and stay fixed; R3-R6 thresholds are scaled together until false alarms hit the target", strength: design}

@@ -57,7 +57,9 @@ def run_checks(con, cfg, baf_path):
     # 3. timing
     bad_t = q(f"""SELECT count(*) FROM transactions t JOIN accounts a USING (account_id)
                   WHERE t.day < a.open_day OR t.day > a.open_day + {days - 1}""")
-    check("3 timing", bad_t == 0, f"rows outside window: {bad_t}")
+    after_exit = q("""SELECT count(*) FROM transactions t JOIN aml_outcomes o USING (account_id)
+                      WHERE o.aml_exit_day IS NOT NULL AND t.day > o.aml_exit_day""")
+    check("3 timing", bad_t == 0 and after_exit == 0, f"rows outside window: {bad_t}, rows after closure: {after_exit}")
 
     # 4. laundering only on launderers, on/after start
     bad_l = q("""SELECT count(*) FROM transactions t JOIN transactions_truth r USING (txn_id)
@@ -91,7 +93,56 @@ def run_checks(con, cfg, baf_path):
                       JOIN (SELECT *, row_number() OVER () - 1 AS baf_row FROM read_csv_auto('{baf_path}')) b
                       ON b.baf_row = i.baf_row WHERE NOT ({cols})""")
         check("8 BAF unchanged", bad_b == 0, f"rows differing from BAF: {bad_b}")
+    # 9. the bank's rules behaved as specified
+    pause = cfg.get("rules.pause_days")
+    r_lo, r_hi = cfg.get("rules.review_days")
+    too_close = q(f"""SELECT count(*) FROM (SELECT alert_day - lag(alert_day) OVER (PARTITION BY account_id ORDER BY alert_day) gap
+                     FROM aml_alerts) WHERE gap < {pause}""")
+    bad_rev = q(f"SELECT count(*) FROM aml_alerts WHERE review_days < {r_lo} OR review_days > {r_hi}")
+    bad_conf = q("""SELECT count(*) FROM aml_alerts a JOIN accounts_truth t USING (account_id)
+                    WHERE a.confirmed = 1 AND (t.is_launderer = 0 OR t.launder_start_day > a.alert_day)""")
+    bad_exit = q("""SELECT count(*) FROM aml_outcomes o LEFT JOIN
+                    (SELECT account_id, min(alert_day + review_days) e FROM aml_alerts WHERE confirmed = 1 GROUP BY 1) c
+                    USING (account_id) WHERE o.aml_exit_day IS DISTINCT FROM c.e""")
+    check("9 rules", too_close == 0 and bad_rev == 0 and bad_conf == 0 and bad_exit == 0,
+          f"alerts closer than {pause} days {too_close}, bad review {bad_rev}, wrong confirmations {bad_conf}, exit mismatches {bad_exit}")
     return res
+
+
+def rules_card(con, out):
+    lines = []
+    tot = con.execute("""SELECT count(*) n, sum(CASE WHEN t.is_launderer = 1 AND t.launder_start_day <= a.alert_day THEN 1 ELSE 0 END) tp
+                         FROM aml_alerts a JOIN accounts_truth t USING (account_id)""").fetchone()
+    n, tp = tot
+    caught = con.execute("""SELECT count(DISTINCT a.account_id) FROM aml_alerts a JOIN accounts_truth t USING (account_id)
+                            WHERE t.is_launderer = 1 AND t.launder_start_day <= a.alert_day""").fetchone()[0]
+    n_l = con.execute("SELECT sum(is_launderer) FROM accounts_truth").fetchone()[0]
+    closed = con.execute("SELECT count(aml_exit_day) FROM aml_outcomes").fetchone()[0]
+    lines.append(f"- Alerts: {n:,}; true {tp} -> false alarm share {1 - tp / max(n, 1):.1%} (target 90-95%)")
+    lines.append(f"- Launderers alerted after their start: {caught} of {n_l} ({caught / n_l:.0%}); accounts closed: {closed}")
+    t = con.execute("""WITH a AS (SELECT a.*, t.is_launderer = 1 AND t.launder_start_day <= a.alert_day AS tru
+                       FROM aml_alerts a JOIN accounts_truth t USING (account_id)),
+                   r AS (SELECT unnest(string_split(rules_fired, ';')) AS rule_id, tru FROM a)
+                   SELECT rule_id AS rule, count(*) alerts, sum(tru::int) true_alerts FROM r GROUP BY 1 ORDER BY 1""").df()
+    lines += ["", t.to_markdown(index=False), ""]
+    t = con.execute("""WITH f AS (SELECT a.account_id, min(a.alert_day) d FROM aml_alerts a JOIN accounts_truth t USING (account_id)
+                         WHERE t.is_launderer = 1 AND t.launder_start_day <= a.alert_day GROUP BY 1)
+                   SELECT round(median(d - t.launder_start_day)) median_days_to_catch, min(d - t.launder_start_day) min_days,
+                          max(d - t.launder_start_day) max_days FROM f JOIN accounts_truth t USING (account_id)""").df()
+    lines += ["Days from laundering start to the rules' first true alert:", "", t.to_markdown(index=False), ""]
+    t = con.execute("""SELECT round(avg(c), 1) mean_alerts_per_week, median(c) median_per_week, max(c) max_per_week
+                       FROM (SELECT alert_day // 7 w, count(*) c FROM aml_alerts GROUP BY 1)""").df()
+    lines += ["Weekly alert budget (what every model gets):", "", t.to_markdown(index=False), ""]
+    shp = os.path.join(out, "_internal/launderer_shapes.parquet")
+    if os.path.exists(shp):
+        con.execute(f"CREATE OR REPLACE VIEW shapes AS SELECT * FROM read_parquet('{shp}')")
+        t = con.execute("""SELECT s.shape, count(*) launderers,
+                   sum(CASE WHEN o.aml_alert_day IS NOT NULL AND o.aml_alert_day >= t.launder_start_day THEN 1 ELSE 0 END) alerted,
+                   count(o.aml_exit_day) closed
+                   FROM shapes s JOIN accounts_truth t USING (account_id) JOIN aml_outcomes o USING (account_id)
+                   GROUP BY 1 ORDER BY 2 DESC""").df()
+        lines += ["Launderers by shape (alerted = first alert on or after start):", "", t.to_markdown(index=False), ""]
+    return "\n".join(lines)
 
 
 def data_card(con, cfg):
@@ -181,6 +232,7 @@ def main():
     for name, ok, detail in res:
         print(f"{'PASS' if ok else 'FAIL'}  {name:24s} {detail}")
     card = data_card(con, cfg)
+    card += "\n## The bank's rules (benchmark)\n\n" + rules_card(con, out) + "\n"
     te = too_easy(con, out)
     card += "\n## Too-easy check (5-fold, whole-window totals)\n\n"
     card += f"- Activity model AUC: {te['activity_auc']:.3f} (average precision {te['activity_ap']:.3f}, base rate {te['base_rate']:.4f})\n"

@@ -47,13 +47,13 @@ class Rows:
     """Collects transaction rows as column arrays (fast, no per-row Python)."""
 
     COLS = ["acct", "day", "sec", "direction", "cp", "amount", "item_count",
-            "ptype", "sloc", "rloc", "label", "is_l", "pair"]
+            "ptype", "sloc", "rloc", "label", "is_l", "pair", "link"]
 
     def __init__(self):
         self.parts = []
 
     def add(self, acct, day, sec, direction, cp, amount, ptype, label, *,
-            item_count=1, sloc="UK", rloc="UK", is_l=0, pair=-1):
+            item_count=1, sloc="UK", rloc="UK", is_l=0, pair=-1, link=-1):
         n = len(acct)
         if n == 0:
             return
@@ -64,7 +64,7 @@ class Rows:
             cp=full(cp, object), amount=np.asarray(amount, dtype=float),
             item_count=full(item_count, np.int64), ptype=full(ptype, object),
             sloc=full(sloc, object), rloc=full(rloc, object), label=full(label, object),
-            is_l=full(is_l, np.int8), pair=full(pair, np.int64)))
+            is_l=full(is_l, np.int8), pair=full(pair, np.int64), link=full(link, np.int64)))
 
     def frame(self) -> pd.DataFrame:
         if not self.parts:
@@ -103,4 +103,10 @@ def to_output(df: pd.DataFrame, account_ids: np.ndarray, prefix: str):
     })
     truth = pd.DataFrame({"txn_id": txn_id, "is_laundering": df["is_l"].to_numpy(),
                           "laundering_type": df["label"].to_numpy()}).drop_duplicates("txn_id")
+    # forward links: a row that forwards money received through an internal hop -> that hop's txn_id
+    link = df["link"].to_numpy()
+    pair_to_id = pd.Series(txn_id[df["pair"].to_numpy() >= 0], index=df["pair"].to_numpy()[df["pair"].to_numpy() >= 0])
+    pair_to_id = pair_to_id[~pair_to_id.index.duplicated()]
+    has = link >= 0
+    tx.attrs["links"] = pd.DataFrame({"txn_id": txn_id[has], "hop_txn_id": pair_to_id.reindex(link[has]).to_numpy()})
     return tx, truth
