@@ -75,8 +75,9 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
 - No SAML-D rows are copied; SAML-D supplies labels, shapes and a few shares only. BAF's country is unstated;
   the simulation is UK-calibrated. Results are relative comparisons, not real detection times.
 - Laundering card spending is deferred (single card rows would stand out next to weekly card rows).
-- `src/sim/eda/eda_sim_v0.py` still points at `data/v0`; output moved to `data/v1` — update and rerun
-  (v1 now has the rules and all 15 shapes).
+- EDA: `src/sim/eda/eda_sim_v0.py` + `outputs/eda/eda_report.md` are the v0 record; leave them unchanged.
+  `src/sim/eda/eda_sim_v1.py` (heavy parts in DuckDB; 244k: 82 s, 11.9 GB peak) reads `data/v1_full` -> `outputs/eda/v1_full/`;
+  other runs via `EDA_DATA=data/v1 EDA_OUT=outputs/eda/v1_50k`. Needs matplotlib.
 - On Windows set `PYTHONPATH=src` with `set` / `$env:`; paths in DuckDB SQL work with forward slashes.
 
 ## Git
