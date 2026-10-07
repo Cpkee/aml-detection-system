@@ -5,6 +5,7 @@ Exits with code 1 if any check fails. Writes <out>/data_card.md.
 """
 from __future__ import annotations
 import argparse
+import json
 import os
 import sys
 import tempfile
@@ -132,6 +133,12 @@ def rules_card(con, out):
                             WHERE t.is_launderer = 1 AND t.launder_start_day <= a.alert_day""").fetchone()[0]
     n_l = con.execute("SELECT sum(is_launderer) FROM accounts_truth").fetchone()[0]
     closed = con.execute("SELECT count(aml_exit_day) FROM aml_outcomes").fetchone()[0]
+    state = os.path.join(out, "_internal/rules_state.json")
+    if os.path.exists(state):
+        with open(state) as fh:
+            st = json.load(fh)
+        how = "frozen (rules.fixed_scale, not tuned on this run)" if st.get("frozen") else "tuned on this run"
+        lines.append(f"- Threshold scale for R3-R6: {st['scale']} ({how})")
     lines.append(f"- Alerts: {n:,}; true {tp} -> false alarm share {1 - tp / max(n, 1):.1%} (target 90-95%)")
     lines.append(f"- Launderers alerted after their start: {caught} of {n_l} ({caught / n_l:.0%}); accounts closed: {closed}")
     t = con.execute("""WITH a AS (SELECT a.*, t.is_launderer = 1 AND t.launder_start_day <= a.alert_day AS tru
