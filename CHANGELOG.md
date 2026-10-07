@@ -4,6 +4,15 @@ Changes to the simulator and the data it generates, newest first. Settings chang
 `source` of each value in `configs/sim.yaml`; decisions are recorded in the "Simulated Dataset: Logic,
 Assumptions and Use" doc.
 
+## 7 Oct 2026 — sensitivity runner, young-weighted fake ages, guard on unread settings
+
+- `python -m sim.sensitivity`: one run per `test` value in the config (244k, seed 42, rules frozen at the
+  main run's scale), plus seeds 43/44 and prevalence 0.1% (732k) / 1% (244k): 39 runs. Large files are
+  deleted after the checks; summaries go to `outputs/sensitivity/`. Resumes where it stopped.
+- `profiles.fake_age_rule = young_weighted` is now built (default unchanged: rebuilt accounts identical).
+- `--set` refuses settings the code does not read (`sim.config.NOT_READ`), and `tests/test_config.py` fails
+  if any setting is neither read nor listed there.
+
 ## 7 Oct 2026 — BAF Variants II and IV (`data/variant_II`, `data/variant_IV`)
 
 No code change. 244k accounts, seed 42, rules frozen (`--set rules.fixed_scale=1.741`), BAF Variant II / IV files;
