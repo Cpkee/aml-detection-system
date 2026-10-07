@@ -14,6 +14,9 @@ pip install -r requirements.txt
 PYTHONPATH=src python -m sim.run all --baf data/raw/BAF_Base.csv     # ~2 min for 50,000 accounts
 PYTHONPATH=src python -m sim.checks --baf data/raw/BAF_Base.csv      # 10 checks + data card
 ```
+Change a setting for one run without editing the YAML: `--set size.n_accounts=244000 --out data/v1_full`
+(repeatable). Each run records its settings in `<out>/run_manifest.json`; `sim.checks` reads them back.
+
 Low on memory (under ~4 GB)? Run `normal` one batch per process: `--batches 3-3`, or lower `size.batch_size`.
 
 Output in `data/v1/`:
