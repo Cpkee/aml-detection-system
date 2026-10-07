@@ -11,7 +11,7 @@ pytestmark = pytest.mark.skipif(not os.path.exists(os.path.join(OUT, "transactio
 
 @pytest.fixture(scope="module")
 def results():
-    cfg = Cfg("configs/sim.yaml")
+    cfg = Cfg.for_run(OUT)          # applies the run's --set overrides, if it has a manifest
     return run_checks(connect(OUT), cfg, os.environ.get("BAF_PATH"))
 
 

@@ -13,7 +13,7 @@ import duckdb
 import numpy as np
 import pandas as pd
 
-from .config import Cfg
+from .config import Cfg, read_manifest
 from .common import BAF_FEATURES
 
 PUBLIC_ACCOUNTS = ["account_id", "open_month", "open_day"] + BAF_FEATURES
@@ -113,10 +113,13 @@ def run_checks(con, cfg, baf_path):
     bad_id = q("SELECT count(*) FROM transactions_truth WHERE NOT regexp_full_match(txn_id, 'T[0-9a-f]{16}')")
     l_pos = q("""SELECT coalesce(avg(TRY_CAST(('0x' || substr(txn_id, 2, 8)) AS BIGINT)) / 4294967296, -1)
                  FROM transactions_truth WHERE is_laundering = 1""")
+    n_lid = q("SELECT count(*) FROM transactions_truth WHERE is_laundering = 1")
+    tol = max(0.05, 4 * 0.2887 / max(n_lid, 1) ** 0.5)   # 4 standard deviations of a mean of n uniform ids
     unsorted = q("""SELECT count(*) FROM (SELECT day, time, lag(day) OVER w pd, lag(time) OVER w pt FROM tx_order
                     WINDOW w AS (ORDER BY file_row_number)) WHERE day < pd OR (day = pd AND time < pt)""")
-    check("10 anonymous ids", bad_id == 0 and abs(l_pos - 0.5) < 0.05 and unsorted == 0,
-          f"ids not T+16 hex {bad_id}, laundering ids' mean position {l_pos:.3f} (0.5 = random), rows out of time order {unsorted}")
+    check("10 anonymous ids", bad_id == 0 and abs(l_pos - 0.5) < tol and unsorted == 0,
+          f"ids not T+16 hex {bad_id}, laundering ids' mean position {l_pos:.3f} (0.5 = random, allowed +/-{tol:.3f}), "
+          f"rows out of time order {unsorted}")
     return res
 
 
@@ -151,16 +154,16 @@ def rules_card(con, out):
                    sum(CASE WHEN o.aml_alert_day IS NOT NULL AND o.aml_alert_day >= t.launder_start_day THEN 1 ELSE 0 END) alerted,
                    count(o.aml_exit_day) closed
                    FROM shapes s JOIN accounts_truth t USING (account_id) JOIN aml_outcomes o USING (account_id)
-                   GROUP BY 1 ORDER BY 2 DESC""").df()
+                   GROUP BY 1 ORDER BY 2 DESC, 1""").df()
         lines += ["Launderers by shape (alerted = first alert on or after start):", "", t.to_markdown(index=False), ""]
     return "\n".join(lines)
 
 
-def data_card(con, cfg):
+def data_card(con, cfg, manifest=None):
     days = cfg.get("size.observe_days")
     months = days / 30.4375
     parts = []
-    t = con.execute("SELECT profile, count(*) n, sum(baf_fraud_bool) fraud_rows FROM accounts_truth GROUP BY 1 ORDER BY 2 DESC").df()
+    t = con.execute("SELECT profile, count(*) n, sum(baf_fraud_bool) fraud_rows FROM accounts_truth GROUP BY 1 ORDER BY 2 DESC, 1").df()
     parts.append(("Accounts by profile", t))
     t = con.execute(f"""WITH x AS (SELECT t.account_id, a.profile, sum(item_count) items, count(*) rows_,
             sum(CASE WHEN direction='in' THEN amount ELSE 0 END) i, sum(CASE WHEN direction='out' THEN amount ELSE 0 END) o
@@ -171,27 +174,34 @@ def data_card(con, cfg):
     parts.append(("Activity per account (medians)", t))
     t = con.execute("""SELECT r.laundering_type, count(*) rows_, round(100.0*count(*)/sum(count(*)) OVER (),3) pct_rows,
             round(median(amount),2) median_amount FROM transactions t JOIN transactions_truth r USING (txn_id)
-            GROUP BY 1 ORDER BY 2 DESC""").df()
+            GROUP BY 1 ORDER BY 2 DESC, 1""").df()
     parts.append(("Rows by type", t))
     t = con.execute("""SELECT profile, count(*) n, min(launder_start_day - a.open_day) min_rel,
             round(median(launder_start_day - a.open_day)) median_rel, max(launder_start_day - a.open_day) max_rel,
             round(100.0*avg(CASE WHEN launder_start_day - a.open_day < 365 THEN 1 ELSE 0 END),1) pct_year1
-            FROM accounts_truth JOIN accounts a USING (account_id) WHERE is_launderer = 1 GROUP BY 1""").df()
+            FROM accounts_truth JOIN accounts a USING (account_id) WHERE is_launderer = 1 GROUP BY 1 ORDER BY 1""").df()
     parts.append(("Laundering start (days after opening)", t))
     t = con.execute("""SELECT CASE WHEN network_id = 'NET_BIG' THEN 'big network' WHEN network_id IS NULL THEN 'none'
-            ELSE 'chain' END net, count(*) n FROM accounts_truth WHERE is_launderer = 1 GROUP BY 1""").df()
+            ELSE 'chain' END net, count(*) n FROM accounts_truth WHERE is_launderer = 1 GROUP BY 1 ORDER BY 1""").df()
     parts.append(("Launderer networks", t))
     t = con.execute("""SELECT r.is_laundering,
             round(100.0*avg(CASE WHEN receiver_bank_location <> 'UK' THEN 1 ELSE 0 END),2) pct_abroad,
             round(100.0*avg(CASE WHEN receiver_bank_location IN ('Mexico','Turkey','Morocco','UAE') THEN 1 ELSE 0 END),2) pct_high_risk,
             round(100.0*avg(CASE WHEN counterparty_id LIKE 'A%' THEN 1 ELSE 0 END),2) pct_internal
-            FROM transactions t JOIN transactions_truth r USING (txn_id) WHERE direction = 'out' GROUP BY 1""").df()
+            FROM transactions t JOIN transactions_truth r USING (txn_id) WHERE direction = 'out' GROUP BY 1 ORDER BY 1""").df()
     parts.append(("Outgoing rows: abroad, high-risk, internal (%)", t))
     t = con.execute("""SELECT a.profile, round(median(laundered_in)) median_in, round(median(laundered_out)) median_out,
-            round(sum(laundered_in)) total_in FROM accounts_truth a WHERE is_launderer = 1 GROUP BY 1""").df()
+            round(sum(laundered_in)) total_in FROM accounts_truth a WHERE is_launderer = 1 GROUP BY 1 ORDER BY 1""").df()
     parts.append(("Laundered money per launderer (GBP)", t))
     lines = ["# Data card", "", f"Run: {cfg.get('meta.version')}, seed {cfg.get('meta.seed')}, "
              f"{cfg.get('size.n_accounts'):,} accounts, {days} days each.", ""]
+    if manifest:
+        lines += [f"Overrides (--set): {', '.join(manifest['set']) or 'none'}. "
+                  f"Code: {(manifest['git_commit'] or 'unknown')[:7]}"
+                  f"{' + uncommitted changes' if manifest['git_uncommitted_changes'] else ''}. "
+                  f"BAF file: {manifest['baf_file']} (sha256 {manifest['baf_sha256'][:12]}). See run_manifest.json.", ""]
+    else:
+        lines += ["No run_manifest.json: run made before manifests (7 Oct 2026); overrides unknown.", ""]
     for title, df in parts:
         lines += [f"## {title}", "", df.to_markdown(index=False), ""]
     return "\n".join(lines)
@@ -215,13 +225,14 @@ def too_easy(con, out):
                      avg(CASE WHEN direction='out' AND receiver_bank_location <> 'UK' THEN 1.0 ELSE 0 END) share_abroad,
                      sum(CASE WHEN counterparty_id LIKE 'A%' THEN 1 ELSE 0 END) n_internal
                    FROM transactions GROUP BY 1)
-        SELECT t.*, s.spike, a.is_launderer FROM t JOIN s USING (account_id) JOIN accounts_truth a USING (account_id)""").df()
+        SELECT t.*, s.spike, a.is_launderer FROM t JOIN s USING (account_id) JOIN accounts_truth a USING (account_id)
+        ORDER BY account_id""").df()
     y = f.pop("is_launderer").to_numpy()
     X = f.drop(columns=["account_id"]).fillna(0).to_numpy()
     cv = StratifiedKFold(5, shuffle=True, random_state=0)
-    p = cross_val_predict(HistGradientBoostingClassifier(max_iter=200), X, y, cv=cv, method="predict_proba")[:, 1]
+    p = cross_val_predict(HistGradientBoostingClassifier(max_iter=200, random_state=0), X, y, cv=cv, method="predict_proba")[:, 1]
     single = {c: roc_auc_score(y, f[c].fillna(0)) for c in f.columns if c != "account_id"}
-    acc = con.execute("SELECT a.*, t.is_launderer FROM accounts a JOIN accounts_truth t USING (account_id)").df()
+    acc = con.execute("SELECT a.*, t.is_launderer FROM accounts a JOIN accounts_truth t USING (account_id) ORDER BY account_id").df()
     num = acc[BAF_FEATURES].select_dtypes("number").fillna(0).to_numpy()
     pa = cross_val_predict(LogisticRegression(max_iter=2000), (num - num.mean(0)) / (num.std(0) + 1e-9),
                            acc["is_launderer"].to_numpy(), cv=cv, method="predict_proba")[:, 1]
@@ -236,13 +247,13 @@ def main():
     ap.add_argument("--out")
     ap.add_argument("--baf")
     a = ap.parse_args()
-    cfg = Cfg(a.config)
-    out = a.out or cfg.get("paths.out_dir")
+    out = a.out or Cfg(a.config).get("paths.out_dir")
+    cfg = Cfg.for_run(out, a.config)          # the run's own settings, incl. its --set overrides
     con = connect(out)
     res = run_checks(con, cfg, a.baf or cfg.get("paths.baf_file"))
     for name, ok, detail in res:
         print(f"{'PASS' if ok else 'FAIL'}  {name:24s} {detail}")
-    card = data_card(con, cfg)
+    card = data_card(con, cfg, read_manifest(out))
     card += "\n## The bank's rules (benchmark)\n\n" + rules_card(con, out) + "\n"
     te = too_easy(con, out)
     card += "\n## Too-easy check (5-fold, whole-window totals)\n\n"

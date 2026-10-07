@@ -7,6 +7,10 @@
   PYTHONPATH=src python -m sim.run all       --baf PATH     # everything
   PYTHONPATH=src python -m sim.run rules                    # step 6: tune the bank's rules, find closures
   (finalize then removes activity after closure and writes the alert files)
+
+Override settings for one run without editing configs/sim.yaml (repeatable, value read as YAML):
+  PYTHONPATH=src python -m sim.run all --out data/v1_full --set size.n_accounts=244000
+The first step records the overrides in <out>/run_manifest.json; later steps must pass the same --set values.
 """
 from __future__ import annotations
 import argparse
@@ -22,7 +26,7 @@ import duckdb
 import numpy as np
 import pandas as pd
 
-from .config import Cfg
+from .config import Cfg, check_manifest, write_manifest
 from .accounts import load_baf, build_accounts
 from .normal import generate_normal
 from .laundering import generate_laundering
@@ -209,10 +213,19 @@ def main():
     ap.add_argument("--out")
     ap.add_argument("--batches", default="all")
     ap.add_argument("--in-process", action="store_true", help="run all normal batches in this process (needs more memory)")
+    ap.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
+                    help="override a setting for this run only, e.g. --set size.n_accounts=244000 (repeatable; "
+                         "value read as YAML). Recorded in <out>/run_manifest.json")
     a = ap.parse_args()
-    cfg = Cfg(a.config)
+    cfg = Cfg(a.config, set_args=a.set)
     out = a.out or cfg.get("paths.out_dir")
     baf = a.baf or cfg.get("paths.baf_file")
+    if a.step in ("accounts", "all"):
+        write_manifest(cfg, out, baf)
+        if cfg.overrides:
+            print(f"overrides: {cfg.overrides}")
+    else:
+        check_manifest(cfg, out)
     if a.batches == "all":
         n_b = int(np.ceil(cfg.get("size.n_accounts") / cfg.get("size.batch_size")))
         batches = range(n_b)
@@ -226,7 +239,7 @@ def main():
             # one process per batch: memory is fully released between batches (~2.7 GB peak per 5,000 accounts)
             for b in batches:
                 cmd = [sys.executable, "-m", "sim.run", "normal", "--config", a.config, "--out", out,
-                       "--batches", f"{b}-{b}"]
+                       "--batches", f"{b}-{b}"] + [x for s in a.set for x in ("--set", s)]
                 subprocess.run(cmd, check=True, env={**os.environ, "PYTHONPATH": os.pathsep.join(sys.path)})
         else:
             step_normal(cfg, out, batches)

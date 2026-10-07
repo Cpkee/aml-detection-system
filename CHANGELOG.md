@@ -4,6 +4,23 @@ Changes to the simulator and the data it generates, newest first. Settings chang
 `source` of each value in `configs/sim.yaml`; decisions are recorded in the "Simulated Dataset: Logic,
 Assumptions and Use" doc.
 
+## 7 Oct 2026 — `--set` overrides and run manifests
+
+**Change.**
+- `sim.run` takes `--set key=value` (repeatable; value read as YAML) to change a setting for one run without
+  editing `configs/sim.yaml`. Unknown keys and malformed values are refused before anything is written.
+- The `accounts` step writes `<out>/run_manifest.json`: config file + hash, `--set` values, seed, BAF file +
+  hash, git commit (and whether there were uncommitted changes), Python and package versions. Later steps refuse
+  to run with different settings. `sim.checks`, the data card and `tests/test_data.py` re-apply the overrides.
+- The data card shows the overrides, code version and BAF file, and its tables have a fixed order.
+- The too-easy check is now repeatable (seeded model, rows sorted). It read 0.714 / 0.721 on earlier runs of
+  the same data; it now reads AUC 0.741, average precision 0.103 every time on `data/v1`.
+- `pytest` added to `requirements.txt`.
+
+**Effect on results: none.** The generated data does not change; `data/v1` was made before manifests, so its
+data card says "overrides unknown". All 10 checks and 5 tests pass on `data/v1` and on 2,000- and 6,000-account
+test runs made with `--set`.
+
 ## 7 Oct 2026 — anonymous transaction ids (fixes a label leak)
 
 **Problem.** `txn_id` in the public `transactions` file started with `L_` for every laundering transfer and

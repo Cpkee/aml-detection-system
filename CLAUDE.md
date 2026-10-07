@@ -24,6 +24,10 @@ PYTHONPATH=src BAF_PATH=data/raw/BAF_Base.csv python -m pytest -q tests  # must 
 ```
 Single steps: `accounts`, `normal --batches 3-3`, `laundering`, `rules`, `finalize`. Use `--out` for another
 output folder (e.g. `--out data/variant_II --baf data/raw/Variant_II.csv`). Run `sim.checks` after every run.
+Change a setting for one run with `--set key=value` (repeatable, value read as YAML), never by editing the YAML:
+`--out data/v1_full --set size.n_accounts=244000`. The `accounts` step writes `<out>/run_manifest.json`
+(config hash, overrides, BAF hash, git commit, package versions); later steps refuse different `--set` values;
+`sim.checks`, the data card and `tests/test_data.py` re-apply the manifest's overrides automatically.
 
 ## Repo map
 - `configs/sim.yaml` — **single source of truth** for every number: `value`, `source`, `strength`
@@ -77,8 +81,7 @@ output folder (e.g. `--out data/variant_II --baf data/raw/Variant_II.csv`). Run 
 - Branch per change, PR into `main`. Never commit `data/`. Run checks + pytest before committing.
 
 ## Next tasks
-1. Add a `--set key=value` CLI override (Cfg already supports overrides) so full-size and sensitivity
-   runs don't edit `configs/sim.yaml`.
+1. ~~`--set key=value` override~~ done 7 Oct 2026 (with run manifest).
 2. Full-size run (~244,000 accounts, `--out data/v1_full`); confirm rules still land near 97%.
 3. Modelling (week 2): decide the weekly label ("ever launders" vs `started_by_day`), build weekly
    features via `amldata`, application-only / activity-only / combined models, same weekly alert budget.
