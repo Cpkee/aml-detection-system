@@ -4,6 +4,15 @@ Changes to the simulator and the data it generates, newest first. Settings chang
 `source` of each value in `configs/sim.yaml`; decisions are recorded in the "Simulated Dataset: Logic,
 Assumptions and Use" doc.
 
+## 8 Oct 2026 — repeated bursts and window-scaled start bands (team decisions 8 Oct 2026)
+
+- `timing.bursts_per_launderer = repeat_until_closed` is now built: a new burst starts `timing.repeat_gap_days`
+  (30, new setting, assumption) after each burst ends, until the window ends; the bank's closure removes the rest.
+- `size.observe_days` shorter than 548: existing customers' start bands shrink in proportion, so every burst and
+  its forwarding still end inside the window (365 days: starts up to day ~343). 548 and longer: unchanged.
+- The sensitivity runner now includes `observe_days` (365, 730) and repeated bursts: 42 runs.
+- Default unchanged: rebuilding `data/v1` is identical. 6,000-account smoke runs of all three pass 10/10 checks.
+
 ## 7 Oct 2026 — sensitivity runner, young-weighted fake ages, guard on unread settings
 
 - `python -m sim.sensitivity`: one run per `test` value in the config (244k, seed 42, rules frozen at the
