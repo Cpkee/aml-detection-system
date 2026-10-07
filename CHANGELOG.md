@@ -4,6 +4,13 @@ Changes to the simulator and the data it generates, newest first. Settings chang
 `source` of each value in `configs/sim.yaml`; decisions are recorded in the "Simulated Dataset: Logic,
 Assumptions and Use" doc.
 
+## 7 Oct 2026 — rule-tuning scales moved into the config
+
+The list of scales tried when tuning R3–R6 was fixed in `rules.py` (`np.geomspace(0.25, 8, 26)`). It is now
+`rules.tune_scales` in `configs/sim.yaml` (low 0.25, high 8, 26 steps) with its source note, so it can be cited
+and changed with `--set`. Same values: rebuilding `data/v1` gives identical files, tuning table and chosen
+scale (1.516); 10 checks and 5 tests pass.
+
 ## 7 Oct 2026 — first full-size run (`data/v1_full`)
 
 No code change. `sim.run all --out data/v1_full --set size.n_accounts=244000` at commit `e81d984` (seed 42):

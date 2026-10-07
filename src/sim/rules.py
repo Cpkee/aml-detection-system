@@ -118,8 +118,9 @@ def decide(h: pd.DataFrame, cfg, start_day: np.ndarray, is_l: np.ndarray, seed: 
 
 def tune(f, cfg, start_day, is_l, seed):
     lo, hi = cfg.get("rules.false_alarm_target")
+    grid = cfg.get("rules.tune_scales")
     rows = []
-    for s in np.geomspace(0.25, 8, 26):
+    for s in np.geomspace(grid["low"], grid["high"], grid["steps"]):
         al, _ = decide(hits(f, cfg, s), cfg, start_day, is_l, seed)
         n = len(al)
         tp = int(al["true_alert"].sum())

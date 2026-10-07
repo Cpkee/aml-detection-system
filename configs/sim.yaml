@@ -165,3 +165,7 @@ rules:
   confirm_share:     {value: 0.8,   source: "Share of true alerts the investigator confirms; no source", strength: assumption, test: [0.6, 1.0]}
   false_alarm_target: {value: [0.90, 0.95], source: "Oztas et al. 2024: practitioners estimate 90-95% of alerts are false. Not reachable by tuning R3-R6 together; best achieved 97.2% at 50k accounts, accepted and reported (decision 6 Oct 2026)", strength: sourced}
   tune_rules:        {value: [R3, R4, R5, R6], source: "R1 and R2 are legal limits and stay fixed; R3-R6 thresholds are scaled together until false alarms hit the target", strength: design}
+  tune_scales:
+    value: {low: 0.25, high: 8.0, steps: 26}
+    source: "Scales tried when tuning R3-R6: 26 values evenly spaced on a log scale from 0.25x to 8x the starting thresholds (each ~15% above the last). If none reaches false_alarm_target, the scale closest to its midpoint (92.5%) is used; otherwise the one catching the most launderers. Range and step count are ours. Moved here from rules.py on 7 Oct 2026, same values (results unchanged). Chosen: 1.516 at 50k, 1.741 at 244k"
+    strength: design
