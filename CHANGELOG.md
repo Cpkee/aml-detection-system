@@ -4,6 +4,14 @@ Changes to the simulator and the data it generates, newest first. Settings chang
 `source` of each value in `configs/sim.yaml`; decisions are recorded in the "Simulated Dataset: Logic,
 Assumptions and Use" doc.
 
+## 7 Oct 2026 — BAF Variants II and IV (`data/variant_II`, `data/variant_IV`)
+
+No code change. 244k accounts, seed 42, rules frozen (`--set rules.fixed_scale=1.741`), BAF Variant II / IV files;
+all 10 checks pass on both. Rules: 96.9% / 96.8% false alarms, 25% / 26% of launderers caught, median 8 days,
+weekly budget 54.3 / 55.3. Launderer rate age 50+ vs under 50: Variant II 0.34% vs 0.23% (train) and 0.47% vs
+0.20% (test); Variant IV 0.40% vs 0.21% (train) and 0.26% vs 0.32% (test), the planted drift. EDA reports in
+`outputs/eda/variant_II/` and `outputs/eda/variant_IV/`.
+
 ## 7 Oct 2026 — frozen rules option (`rules.fixed_scale`)
 
 Team decision: the bank's rules are frozen for variant and sensitivity runs. New setting `rules.fixed_scale`
