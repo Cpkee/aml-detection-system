@@ -105,7 +105,7 @@ def step_laundering(cfg, out):
 def _con():
     con = duckdb.connect()
     con.execute("PRAGMA memory_limit='1500MB'")
-    con.execute(f"PRAGMA temp_directory='{tempfile.gettempdir()}/sim_duckdb'")
+    con.execute(f"PRAGMA temp_directory='{tempfile.gettempdir()}/sim_duckdb_{os.getpid()}'")
     con.execute("PRAGMA preserve_insertion_order=false")
     return con
 
