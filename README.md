@@ -36,7 +36,10 @@ Steps: `accounts` -> `normal` -> `laundering` (15 SAML-D shapes) -> `rules` (tun
 `txn_id` is an anonymous id (`T` + 16 hex characters) and `transactions` is sorted by `day`, `time`; neither
 says anything about laundering (check 10). Changes to the data are listed in `CHANGELOG.md`.
 
-Known limits: laundering card spending deferred; rules reach 97.2% false alarms at best (target 90-95%); accepted and reported as a finding.
+Full-size run (main modelling dataset): `--out data/v1_full --set size.n_accounts=244000` (~11 min, 7.2 GB,
+109M transactions, 732 launderers).
+
+Known limits: laundering card spending deferred; rules reach 96.9-97.2% false alarms at best (target 90-95%); accepted and reported as a finding.
 
 ## Using the data in model code
 
