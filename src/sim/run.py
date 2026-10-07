@@ -116,23 +116,28 @@ def _truth_arrays(p):
 
 
 def step_rules(cfg, out):
-    """Tune R3-R6 on the full simulated data, then record which accounts the bank closes."""
+    """Tune R3-R6 on the full simulated data (or use rules.fixed_scale), then record which accounts the bank closes."""
     p = _paths(out)
     con = _con()
     tx_rel = f"read_parquet('{os.path.join(p['parts'], 'tx_*.parquet')}')"
     f = weekly_features(con, tx_rel, p["accounts"], cfg)
     start, is_l = _truth_arrays(p)
     seed = cfg.get("meta.seed")
-    scale, table = tune(f, cfg, start, is_l, seed)
-    table.to_csv(os.path.join(out, "_internal/rules_tuning.csv"), index=False)
+    fixed = cfg.get("rules.fixed_scale")
+    if fixed is None:
+        scale, table = tune(f, cfg, start, is_l, seed)
+        table.to_csv(os.path.join(out, "_internal/rules_tuning.csv"), index=False)
+        print(table.to_string(index=False))
+    else:   # frozen rules: thresholds set elsewhere, never tuned on this run's labels
+        scale = float(fixed)
+        print(f"rules frozen at scale {scale} (rules.fixed_scale): not tuned on this run")
     _, exits = decide(hits(f, cfg, scale), cfg, start, is_l, seed)
     ids = pd.read_parquet(p["accounts"], columns=["account_id"])["account_id"].to_numpy()
     pd.DataFrame({"account_id": ids[list(exits)], "exit_day": list(exits.values())}).to_parquet(
         os.path.join(out, "_internal/exits.parquet"), index=False)
     with open(os.path.join(out, "_internal/rules_state.json"), "w") as fh:
-        json.dump({"scale": scale}, fh)
-    print(table.to_string(index=False))
-    print(f"chosen scale {scale}: closures {len(exits)}")
+        json.dump({"scale": scale, "frozen": fixed is not None}, fh)
+    print(f"{'frozen' if fixed is not None else 'chosen'} scale {scale}: closures {len(exits)}")
 
 
 def _write_final(con, p, exits_path, seed):

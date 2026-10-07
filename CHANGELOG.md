@@ -4,6 +4,13 @@ Changes to the simulator and the data it generates, newest first. Settings chang
 `source` of each value in `configs/sim.yaml`; decisions are recorded in the "Simulated Dataset: Logic,
 Assumptions and Use" doc.
 
+## 7 Oct 2026 — frozen rules option (`rules.fixed_scale`)
+
+Team decision: the bank's rules are frozen for variant and sensitivity runs. New setting `rules.fixed_scale`
+(null = tune as before; a number = use that scale and skip tuning). Variant and sensitivity runs use
+`--set rules.fixed_scale=1.741`, the scale tuned on `data/v1_full`. The data card states the scale and whether it
+was frozen. Check: the 50k run with the scale fixed at its tuned value (1.516) reproduces `data/v1` exactly.
+
 ## 7 Oct 2026 — 23 hidden numbers moved into the config; R6 window bug fixed
 
 An audit of the simulator code found 23 numbers that change results but were written into the code instead of
