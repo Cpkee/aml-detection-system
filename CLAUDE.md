@@ -51,7 +51,7 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
   `N###_`/`L_` ids exist only in `_internal/parts` and must never reach public files (check 10).
 - Time split by `open_month`: train 0–4, calibrate 5, test 6–7.
 - Weekly scoring: features for week w use only rows with `day <= ` that week's cut-off. No peeking ahead.
-- `transactions` is ~22M rows (50k accounts) / ~95M (244k). Query it with **DuckDB**, never load it
+- `transactions` is ~22M rows (50k accounts) / ~109M (244k, 7.2 GB on disk). Query it with **DuckDB**, never load it
   whole into pandas. Each 5,000-account batch peaks ~2.7 GB RAM; `run` uses one process per batch.
 
 ## How the simulator works (short)
@@ -66,6 +66,9 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
   review, 80% of true alerts confirmed, closure removes later activity. R3–R6 tuned together.
 - v1 result (50k, seed 42): 97.2% false alarms (target 90–95% unreachable; **accepted, report as a
   finding**), 30% of launderers alerted, median 7 days after start; weekly alert budget ~15.
+- v1_full result (244k, seed 42, `--set size.n_accounts=244000`, 11 min): 96.9% false alarms; 25% of 732
+  launderers alerted, median 9 days; weekly alert budget mean 54.4 / median 28; rule scale 1.741 (50k: 1.516);
+  180 launderers in test months 6–7. **This is the main dataset for modelling.**
 - Everything is seeded and deterministic: same config + seed = identical data.
 
 ## Known limits / gotchas
@@ -82,7 +85,7 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
 
 ## Next tasks
 1. ~~`--set key=value` override~~ done 7 Oct 2026 (with run manifest).
-2. Full-size run (~244,000 accounts, `--out data/v1_full`); confirm rules still land near 97%.
+2. ~~Full-size run~~ done 7 Oct 2026: `data/v1_full`, rules at 96.9% (see v1_full result above).
 3. Modelling (week 2): decide the weekly label ("ever launders" vs `started_by_day`), build weekly
    features via `amldata`, application-only / activity-only / combined models, same weekly alert budget.
 4. Week 3: BAF Variants II (fairness) and IV (drift) with identical settings; sensitivity runs from
