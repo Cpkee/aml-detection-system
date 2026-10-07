@@ -21,7 +21,15 @@ ignored because the SQL had 8 written in. Changing it did nothing; now it works 
 instead of 8 gives 251 alerts instead of 91).
 
 **Effect on results: none.** Same values: rebuilding `data/v1` gives identical files, rows, labels, alerts and
-tuning table. 10 checks and 5 tests pass. New `assumption` settings have no `test` values yet (team decision).
+tuning table. 10 checks and 5 tests pass.
+
+**Test values and sources (approved 7 Oct 2026; main values unchanged):**
+- `group_collection`: 8–15 payers matches Collection Pot's leaving collections (11.4 contributors). Tests: 15–22 payers
+  (retirement size, 18.3), 4–8 payers, median £11 (source's £12.89 average) and £40. Main median stays £20 (team
+  decision). Strength now `partly_sourced`. These collections cause 328 of the 329 R3 alerts at 244k.
+- `large_cash_amount`: tests £10k–15k and £10k–30k; upper end consistent with Barclays/HSBC £20k-a-year caps.
+- `cheque_amount`: tests median £50 and £200; Pay.UK's all-cheque average (£1,431, 2025) includes business cheques,
+  so no personal figure exists.
 
 ## 7 Oct 2026 — rule-tuning scales moved into the config
 
