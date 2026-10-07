@@ -12,7 +12,7 @@ with its source and strength (sourced / derived / samld / assumption / modelling
 pip install -r requirements.txt
 # put BAF Base at data/raw/BAF_Base.csv, or pass --baf
 PYTHONPATH=src python -m sim.run all --baf data/raw/BAF_Base.csv     # ~2 min for 50,000 accounts
-PYTHONPATH=src python -m sim.checks --baf data/raw/BAF_Base.csv      # 8 checks + data card
+PYTHONPATH=src python -m sim.checks --baf data/raw/BAF_Base.csv      # 10 checks + data card
 ```
 Low on memory (under ~4 GB)? Run `normal` one batch per process: `--batches 3-3`, or lower `size.batch_size`.
 
@@ -28,7 +28,10 @@ Output in `data/v1/`:
 | `data_card.md` | summary of the run; read it before training |
 
 Steps: `accounts` -> `normal` -> `laundering` (15 SAML-D shapes) -> `rules` (tune R3-R6, find closures) -> `finalize`
-(remove activity after closure, write alerts) -> `sim.checks` (9 checks + data card).
+(remove activity after closure, give transactions anonymous ids, write alerts) -> `sim.checks` (10 checks + data card).
+
+`txn_id` is an anonymous id (`T` + 16 hex characters) and `transactions` is sorted by `day`, `time`; neither
+says anything about laundering (check 10). Changes to the data are listed in `CHANGELOG.md`.
 
 Known limits: laundering card spending deferred; rules reach 97.2% false alarms at best (target 90-95%); accepted and reported as a finding.
 

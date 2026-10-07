@@ -363,7 +363,7 @@ else:
         internal = cp.str.fullmatch(r"A\d+").fillna(False).to_numpy()
         cross = (ch["sender_bank_location"] != ch["receiver_bank_location"]).to_numpy()
 
-        # the simulator prefixes laundering txn_ids with "L" -- see the leakage check in §12
+        # v0/early-v1 data prefixed laundering txn_ids with "L"; since 7 Oct 2026 ids are anonymous (all "T")
         lead = ch["txn_id"].str.slice(0, 1)
         for k, v in lead.value_counts().items():
             lead_counts[k] = lead_counts.get(k, 0) + int(v)
@@ -611,8 +611,8 @@ log("\n  laundered_in / laundered_out are the amounts the simulator laundered th
 log("  account. They are a perfect giveaway. profile and network_id likewise.")
 
 log("\nID-based leakage:")
-log("  txn_id prefix encodes provenance: 'N###_' = normal generator batch, 'L' = laundering.")
-log("  Any feature derived from txn_id (or a join key built from it) leaks the label.")
+log("  txn_id: anonymous since 7 Oct 2026 ('T' + 16 hex); older runs used 'N###_' / 'L_' prefixes")
+log("  that leaked the label. Still never build features from txn_id; it only joins pair rows.")
 log("  counterparty_id: 'EXT_*' external, 'CARD_MERCHANTS'/'CASH_*' synthetic sinks,")
 log("  'A#######' internal accounts. Only the internal ones carry real graph signal.")
 

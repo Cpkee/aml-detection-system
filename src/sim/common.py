@@ -75,7 +75,8 @@ class Rows:
 def to_output(df: pd.DataFrame, account_ids: np.ndarray, prefix: str):
     """Turn internal rows into the public `transactions` and hidden `transactions_truth` frames."""
     df = df.reset_index(drop=True)
-    # One txn_id per transfer: rows sharing a pair key share an id.
+    # One txn_id per transfer: rows sharing a pair key share an id. These ids are provisional (the prefix
+    # names the generator); run.py replaces them with anonymous ids when it writes the public files.
     key = np.where(df["pair"].to_numpy() >= 0, df["pair"].to_numpy(), -(np.arange(len(df)) + 1))
     codes, _ = pd.factorize(key)
     txn_id = (prefix + pd.Series(codes).astype(str)).to_numpy()
