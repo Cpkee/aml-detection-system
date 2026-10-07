@@ -12,11 +12,6 @@ import pandas as pd
 
 from .common import Rows, lognormal_mean, sample_seconds, ext_ids
 
-DELAY_BANDS = {  # minutes
-    "under_15min": (1, 15), "15_to_60min": (15, 60), "1_to_24h": (60, 1440), "over_24h": (1440, 7 * 1440),
-}
-CASH_WITHDRAWAL_MAX = 300   # split cash-outs into pieces of at most ~GBP 300 (SAML-D withdrawals max out at 350)
-
 
 def abroad_share(cfg):
     """Launderers' share of transfers sent abroad = SAML-D ratio x our normal accounts' share."""
@@ -28,9 +23,10 @@ def abroad_share(cfg):
 def _delays(rng, cfg, k):
     shares = cfg.get("laundering.forward_delay_shares")
     names = list(shares)
+    bands = cfg.get("laundering.forward_delay_bands_minutes")
     pick = rng.choice(len(names), size=k, p=np.array(list(shares.values())) / sum(shares.values()))
-    lo = np.array([DELAY_BANDS[names[i]][0] for i in pick])
-    hi = np.array([DELAY_BANDS[names[i]][1] for i in pick])
+    lo = np.array([bands[names[i]][0] for i in pick])
+    hi = np.array([bands[names[i]][1] for i in pick])
     return rng.uniform(lo, hi) * 60  # seconds
 
 
@@ -65,6 +61,11 @@ def generate_laundering(cfg, truth: pd.DataFrame, internal: pd.DataFrame, open_d
     out_mean = cfg.get("laundering.out_transfer_mean")
     base_internal = cfg.get("networks.internal_pieces_share")
     base_abroad = abroad_share(cfg)
+    piece_sigma = cfg.get("laundering.piece_sigma")
+    split_max = cfg.get("laundering.split_max_n_in")
+    half_cash = cfg.get("laundering.half_cash_share")
+    layered_x = cfg.get("laundering.layered_internal_multiplier")
+    cash_piece_max = cfg.get("laundering.cash_out_piece_max")
     pair = pair_base
     shape_of = {}
 
@@ -84,29 +85,29 @@ def generate_laundering(cfg, truth: pd.DataFrame, internal: pd.DataFrame, open_d
         sh = shapes[name]
         shape_of[i] = name
         lo, hi = sh["n_in"]
-        many_small = hi > 4
+        many_small = hi > split_max
         k_in = int(rng.integers(lo, hi + 1))
         in_days = start[i] + np.sort(np.concatenate([[0], rng.integers(0, burst, size=k_in - 1)]))
         payers = _payers(rng, sh["senders"], k_in)
         receivers = ext_ids(rng, int(sh["recipients"]))
         piece_mean = out_mean * sh["amount_rel"]
         p_abroad = min(1.0, base_abroad * sh["abroad_rel"])
-        p_internal = min(1.0, base_internal * (2 if sh["layered"] else 1))
+        p_internal = min(1.0, base_internal * (layered_x if sh["layered"] else 1))
 
         for e, d_in in enumerate(in_days):
             s_in = int(sample_seconds(rng, 1, hw)[0])
             n_p = 1 if many_small else 1 + rng.poisson(pieces_mean - 1)
-            piece = lognormal_mean(rng, piece_mean, 0.6, n_p)
+            piece = lognormal_mean(rng, piece_mean, piece_sigma, n_p)
             keep = rng.uniform(keep_lo, keep_hi)
             amt_in = piece.sum() / (1 - keep)
-            cash_in = sh["in_kind"] == "cash" or (sh["in_kind"] == "half_cash" and rng.random() < 0.5)
+            cash_in = sh["in_kind"] == "cash" or (sh["in_kind"] == "half_cash" and rng.random() < half_cash)
             rows.add([i], [d_in], [s_in], "in", "CASH" if cash_in else payers[e:e + 1], [amt_in],
                      "Cash Deposit" if cash_in else "ACH", name, is_l=1)
             t0 = d_in * 86400 + s_in
 
             if sh["out_kind"] == "cash_withdrawal":
                 total = piece.sum()
-                n_w = int(np.ceil(total / CASH_WITHDRAWAL_MAX))
+                n_w = int(np.ceil(total / cash_piece_max))
                 add_out(i, t0 + _delays(rng, cfg, n_w), np.full(n_w, total / n_w), "CASH",
                         "Cash Withdrawal", "UK", name)
                 continue

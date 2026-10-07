@@ -3,7 +3,6 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-ANCHOR_X = np.array([0.1, 0.5, 0.9])   # BAF income values where published anchors sit
 MONTH = 30.4375                        # average days per month
 
 BAF_FEATURES = [
@@ -16,9 +15,9 @@ BAF_FEATURES = [
 ]
 
 
-def interp_anchor(x, anchors):
-    """Straight lines between the anchors at income 0.1, 0.5, 0.9 (flat outside)."""
-    return np.interp(x, ANCHOR_X, np.asarray(anchors, dtype=float))
+def interp_anchor(x, anchors, anchor_x):
+    """Straight lines between the anchors placed at BAF income values anchor_x (flat outside)."""
+    return np.interp(x, np.asarray(anchor_x, dtype=float), np.asarray(anchors, dtype=float))
 
 
 def lognormal_mean(rng, mean, sigma, size):

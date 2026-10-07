@@ -120,8 +120,7 @@ def step_rules(cfg, out):
     p = _paths(out)
     con = _con()
     tx_rel = f"read_parquet('{os.path.join(p['parts'], 'tx_*.parquet')}')"
-    f = weekly_features(con, tx_rel, p["accounts"], cfg.get("size.observe_days"),
-                        cfg.get("countries.high_risk"), cfg.get("rules.R2_cash_per_day"))
+    f = weekly_features(con, tx_rel, p["accounts"], cfg)
     start, is_l = _truth_arrays(p)
     seed = cfg.get("meta.seed")
     scale, table = tune(f, cfg, start, is_l, seed)
@@ -172,8 +171,7 @@ def step_finalize(cfg, out):
     seed = cfg.get("meta.seed")
     for it in range(4):
         removed = _write_final(con, p, exits_path, seed)
-        f = weekly_features(con, f"read_parquet('{p['tx']}')", p["accounts"], cfg.get("size.observe_days"),
-                            cfg.get("countries.high_risk"), cfg.get("rules.R2_cash_per_day"))
+        f = weekly_features(con, f"read_parquet('{p['tx']}')", p["accounts"], cfg)
         al, exits = decide(hits(f, cfg, scale), cfg, start, is_l, seed)
         old = pd.read_parquet(exits_path)
         new = pd.DataFrame({"account_id": ids[list(exits)], "exit_day": list(exits.values())})

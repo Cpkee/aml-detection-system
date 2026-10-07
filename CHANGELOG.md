@@ -4,6 +4,25 @@ Changes to the simulator and the data it generates, newest first. Settings chang
 `source` of each value in `configs/sim.yaml`; decisions are recorded in the "Simulated Dataset: Logic,
 Assumptions and Use" doc.
 
+## 7 Oct 2026 — 23 hidden numbers moved into the config; R6 window bug fixed
+
+An audit of the simulator code found 23 numbers that change results but were written into the code instead of
+`configs/sim.yaml`. All are now settings with a source note (most honestly `modelling` or `assumption`: our
+choice, no published figure), so they can be cited in the report and changed with `--set`:
+- income: `anchor_points` (0.1/0.5/0.9); the average weekly spend now reads `spend_weekly_household` instead of a copy.
+- normal: `card_split_exponent`, `card_week_sigma`, `dd_split_gamma_shape`, `transfer_in_sigma`, `cheque_amount`,
+  `cash_withdrawal_sigma`, `cash_deposit_sigma`, `large_cash_amount`, `abroad_sigma`, `group_collection`.
+- laundering: `piece_sigma`, `split_max_n_in`, `half_cash_share`, `layered_internal_multiplier`,
+  `cash_out_piece_max`, `forward_delay_bands_minutes`.
+- rules: `R2_window_weeks`, `R5_window_weeks`.
+
+**Bug fixed:** `rules.R6_history_weeks` = [4, 8] was read, but the 8 (weeks averaged for R6's "usual week") was
+ignored because the SQL had 8 written in. Changing it did nothing; now it works (at 6,000 accounts, 6 weeks
+instead of 8 gives 251 alerts instead of 91).
+
+**Effect on results: none.** Same values: rebuilding `data/v1` gives identical files, rows, labels, alerts and
+tuning table. 10 checks and 5 tests pass. New `assumption` settings have no `test` values yet (team decision).
+
 ## 7 Oct 2026 — rule-tuning scales moved into the config
 
 The list of scales tried when tuning R3–R6 was fixed in `rules.py` (`np.geomspace(0.25, 8, 26)`). It is now
