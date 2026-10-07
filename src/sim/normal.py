@@ -5,8 +5,6 @@ import numpy as np
 
 from .common import MONTH, Rows, interp_anchor, lognormal_mean, lognormal_median, sample_seconds, ext_ids
 
-AVG_WEEKLY_SPEND = 676.60   # ONS FYE 2025 average household, the reference for "spending ratio"
-
 
 def _calendar_day(cfg, year, month, day):
     d0 = dt.date.fromisoformat(cfg.get("meta.day0_date"))
@@ -30,11 +28,13 @@ def generate_normal(cfg, batch, all_open: np.ndarray, rng: np.random.Generator) 
     src = cfg.get("income.money_in_source")
     anchors = cfg.get("income.ons_household_disposable_annual") if src == "ons_household" \
         else cfg.get("income.hmrc_individual_gross_annual")
-    annual_in = interp_anchor(inc, anchors) * mult
+    ax = cfg.get("income.anchor_points")
+    annual_in = interp_anchor(inc, anchors, ax) * mult
     monthly_in = annual_in / 12
-    weekly_spend = interp_anchor(inc, cfg.get("income.spend_weekly_household")) * mult
+    weekly_spend = interp_anchor(inc, cfg.get("income.spend_weekly_household"), ax) * mult
     spend = np.minimum(weekly_spend * 52 / 12, cfg.get("income.spend_cap_share_of_income") * monthly_in)
-    ratio = spend / (AVG_WEEKLY_SPEND * 52 / 12)
+    avg_weekly_spend = cfg.get("income.spend_weekly_household")[1]   # the average household: reference for "spending ratio"
+    ratio = spend / (avg_weekly_spend * 52 / 12)
 
     def per_window(rate_per_month, scale=1.0):
         return rng.poisson(rate_per_month * n_months * scale)
@@ -80,11 +80,12 @@ def generate_normal(cfg, batch, all_open: np.ndarray, rng: np.random.Generator) 
     week = np.repeat(w_first, k_w) + (np.arange(len(pos)) - np.repeat(np.cumsum(k_w) - k_w, k_w))
     wday = np.clip(week * 7 + 6, o[pos], o[pos] + days - 1)
     per_week = cfg.get("normal.card_per_month") * 7 / MONTH
-    count = rng.poisson(per_week * np.sqrt(ratio[pos]))
+    split = cfg.get("normal.card_split_exponent")
+    count = rng.poisson(per_week * ratio[pos] ** split)
     keep = count > 0
     pos, wday, count = pos[keep], wday[keep], count[keep]
-    item_avg = cfg.get("normal.card_avg_amount") * np.sqrt(ratio[pos])
-    amt = count * item_avg * lognormal_mean(rng, 1.0, 0.15, len(pos))
+    item_avg = cfg.get("normal.card_avg_amount") * ratio[pos] ** split
+    amt = count * item_avg * lognormal_mean(rng, 1.0, cfg.get("normal.card_week_sigma"), len(pos))
     rows.add(acct[pos], wday, np.full(len(pos), 23 * 3600 + 59 * 60), "out", "CARD_MERCHANTS",
              amt, "Debit card", "Normal_Card", item_count=count)
 
@@ -102,7 +103,7 @@ def generate_normal(cfg, batch, all_open: np.ndarray, rng: np.random.Generator) 
     # ---- Direct Debits: fixed payees, fixed day of month, steady amounts -----------
     n_dd = np.maximum(1, rng.poisson(cfg.get("normal.direct_debits_per_month"), size=n))
     payee_owner = np.repeat(np.arange(n), n_dd)
-    share = rng.gamma(1.0, size=len(payee_owner))
+    share = rng.gamma(cfg.get("normal.dd_split_gamma_shape"), size=len(payee_owner))
     share = share / np.bincount(payee_owner, weights=share)[payee_owner]
     payee_amt = share * dd_total[payee_owner]
     payee_off = rng.integers(0, 28, size=len(payee_owner))
@@ -153,20 +154,21 @@ def generate_normal(cfg, batch, all_open: np.ndarray, rng: np.random.Generator) 
     k = per_window(cfg.get("normal.transfers_in_per_month"), np.ones(n))
     pos = np.repeat(np.arange(n), k)
     rows.add(acct[pos], anywhere(pos, len(pos)), sample_seconds(rng, len(pos), hw), "in",
-             ext_ids(rng, len(pos)), lognormal_median(rng, cfg.get("normal.transfer_in_median"), 1.0, len(pos)),
+             ext_ids(rng, len(pos)), lognormal_median(rng, cfg.get("normal.transfer_in_median"), cfg.get("normal.transfer_in_sigma"), len(pos)),
              "ACH", "Normal_TransferIn")
 
     # ---- cheques --------------------------------------------------------------------
+    chq = cfg.get("normal.cheque_amount")
     k = per_window(cfg.get("normal.cheques_per_month"), np.ones(n))
     pos = np.repeat(np.arange(n), k)
     rows.add(acct[pos], anywhere(pos, len(pos)), sample_seconds(rng, len(pos), hw), "out",
-             ext_ids(rng, len(pos)), lognormal_median(rng, 100.0, 0.8, len(pos)), "Cheque", "Normal_Cheque")
+             ext_ids(rng, len(pos)), lognormal_median(rng, chq["median"], chq["sigma"], len(pos)), "Cheque", "Normal_Cheque")
 
     # ---- cash withdrawals ------------------------------------------------------------
     cw = cfg.get("normal.cash_withdrawal_amount")
     k = per_window(cfg.get("normal.cash_withdrawals_per_month"), np.ones(n))
     pos = np.repeat(np.arange(n), k)
-    amt = np.clip(np.round(lognormal_median(rng, cw["median"], 0.6, len(pos)) / 10) * 10, 10, cw["max"])
+    amt = np.clip(np.round(lognormal_median(rng, cw["median"], cfg.get("normal.cash_withdrawal_sigma"), len(pos)) / 10) * 10, 10, cw["max"])
     rows.add(acct[pos], anywhere(pos, len(pos)), sample_seconds(rng, len(pos), hw), "out", "CASH",
              amt, "Cash Withdrawal", "Normal_CashWithdrawal")
 
@@ -175,12 +177,12 @@ def generate_normal(cfg, batch, all_open: np.ndarray, rng: np.random.Generator) 
     k = per_window(cfg.get("normal.cash_deposits_per_month"), dep.astype(float))
     pos = np.repeat(np.arange(n), k)
     rows.add(acct[pos], anywhere(pos, len(pos)), sample_seconds(rng, len(pos), hw), "in", "CASH",
-             lognormal_median(rng, cfg.get("normal.cash_deposit_median"), 0.7, len(pos)),
+             lognormal_median(rng, cfg.get("normal.cash_deposit_median"), cfg.get("normal.cash_deposit_sigma"), len(pos)),
              "Cash Deposit", "Normal_CashDeposit")
     p_large = 1 - (1 - cfg.get("normal.large_cash_yearly_rate")) ** (days / 365.25)
     big = np.flatnonzero(rng.random(n) < p_large)
     rows.add(acct[big], anywhere(big, len(big)), sample_seconds(rng, len(big), hw), "in", "CASH",
-             rng.uniform(10_000, 20_000, len(big)), "Cash Deposit", "Normal_LargeCash")
+             rng.uniform(*cfg.get("normal.large_cash_amount"), len(big)), "Cash Deposit", "Normal_LargeCash")
 
     # ---- money sent abroad ------------------------------------------------------------
     sender = rng.random(n) < cfg.get("normal.abroad_sender_share")
@@ -190,16 +192,17 @@ def generate_normal(cfg, batch, all_open: np.ndarray, rng: np.random.Generator) 
     country = np.where(hr, rng.choice(cfg.get("countries.high_risk"), len(pos)),
                        rng.choice(cfg.get("countries.other_abroad"), len(pos)))
     rows.add(acct[pos], anywhere(pos, len(pos)), sample_seconds(rng, len(pos), hw), "out",
-             ext_ids(rng, len(pos)), lognormal_median(rng, cfg.get("normal.abroad_median"), 0.8, len(pos)),
+             ext_ids(rng, len(pos)), lognormal_median(rng, cfg.get("normal.abroad_median"), cfg.get("normal.abroad_sigma"), len(pos)),
              "Cross-border", "Normal_Abroad", rloc=country)
 
-    # ---- group collections: 8-15 small payments in one week ---------------------------
+    # ---- group collections: several small payments in one week (normal.group_collection) ---
+    gc = cfg.get("normal.group_collection")
     k = rng.poisson(cfg.get("normal.group_collection_yearly_rate") * days / 365.25, size=n)
     ev = np.repeat(np.arange(n), k)
     ev_day = anywhere(ev, len(ev))
-    size = rng.integers(8, 16, size=len(ev))
+    size = rng.integers(gc["payers"][0], gc["payers"][1] + 1, size=len(ev))
     pos = np.repeat(ev, size)
-    gday = np.minimum(np.repeat(ev_day, size) + rng.integers(0, 7, size=len(pos)), o[pos] + days - 1)
+    gday = np.minimum(np.repeat(ev_day, size) + rng.integers(0, gc["spread_days"], size=len(pos)), o[pos] + days - 1)
     rows.add(acct[pos], gday, sample_seconds(rng, len(pos), hw), "in", ext_ids(rng, len(pos)),
-             lognormal_median(rng, 20.0, 0.5, len(pos)), "ACH", "Normal_GroupCollection")
+             lognormal_median(rng, gc["median"], gc["sigma"], len(pos)), "ACH", "Normal_GroupCollection")
     return rows

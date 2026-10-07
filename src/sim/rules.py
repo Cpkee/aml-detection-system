@@ -9,6 +9,7 @@ Six rules run once a week on transactions only (never on hidden files):
                        with money in above GBP 2,000                           (tuned)
   R5 high-risk country GBP 5,000+ sent to MX/TR/MA/UAE over 4 weeks           (tuned)
   R6 sudden change     money in >= 10x the usual week (avg of previous 8)     (tuned)
+Time windows (R2 2 weeks, R5 4 weeks, R6 8 weeks) come from configs/sim.yaml.
 Then: at most one alert per account every 28 days; each alert is reviewed for 3-30 days;
 80% of true alerts are confirmed; a confirmed account is closed at alert day + review days,
 and all its later activity is removed. R3-R6 thresholds are scaled together until 90-95% of
@@ -21,16 +22,19 @@ import pandas as pd
 RULES = ["R1", "R2", "R3", "R4", "R5", "R6"]
 
 
-def weekly_features(con, tx_rel: str, acc_path: str, days: int, high_risk: list[str], r2_day: float) -> pd.DataFrame:
+def weekly_features(con, tx_rel: str, acc_path: str, cfg) -> pd.DataFrame:
     """One row per account-week with everything the six rules look at."""
-    hr = ", ".join(f"'{c}'" for c in high_risk)
-    f = con.execute(_features(con, tx_rel, acc_path, days, hr).replace("{R2DAY}", str(float(r2_day)))).df()
+    hr = ", ".join(f"'{c}'" for c in cfg.get("countries.high_risk"))
+    win = {"R2": cfg.get("rules.R2_window_weeks"), "R5": cfg.get("rules.R5_window_weeks"),
+           "R6": cfg.get("rules.R6_history_weeks")[1]}
+    sql = _features(con, tx_rel, acc_path, cfg.get("size.observe_days"), hr, win)
+    f = con.execute(sql.replace("{R2DAY}", str(float(cfg.get("rules.R2_cash_per_day"))))).df()
     # previous week's 12-month cash total, so the yearly limit fires when it is crossed, not every week after
     f["cash_52wk_prev"] = f.groupby("acct")["cash_52wk"].shift(1).fillna(0.0)
     return f
 
 
-def _features(con, tx_rel, acc_path, days, hr):
+def _features(con, tx_rel, acc_path, days, hr, win):
     sql = f"""
     WITH acc AS (SELECT row_number() OVER () - 1 AS acct, account_id, open_day FROM read_parquet('{acc_path}')),
     t AS (SELECT a.acct, x.day, x.day // 7 AS w, x.direction, x.counterparty_id, x.amount, x.payment_type,
@@ -52,11 +56,11 @@ def _features(con, tx_rel, acc_path, days, hr):
                  coalesce(cash_in, 0) cash_in, coalesce(days_over, 0) days_over
           FROM grid g LEFT JOIN wk USING (acct, w) LEFT JOIN cday USING (acct, w))
     SELECT acct, w, money_in, money_out, max_cash, n_senders,
-      sum(days_over) OVER (PARTITION BY acct ORDER BY w ROWS BETWEEN 1 PRECEDING AND CURRENT ROW)  AS days_over_2wk,
+      sum(days_over) OVER (PARTITION BY acct ORDER BY w ROWS BETWEEN {win['R2'] - 1} PRECEDING AND CURRENT ROW) AS days_over_2wk,
       sum(cash_in)   OVER (PARTITION BY acct ORDER BY w ROWS BETWEEN 51 PRECEDING AND CURRENT ROW) AS cash_52wk,
-      sum(hr_out)    OVER (PARTITION BY acct ORDER BY w ROWS BETWEEN 3 PRECEDING AND CURRENT ROW)  AS hr_4wk,
-      avg(money_in)  OVER (PARTITION BY acct ORDER BY w ROWS BETWEEN 8 PRECEDING AND 1 PRECEDING)  AS usual_in,
-      count(*)       OVER (PARTITION BY acct ORDER BY w ROWS BETWEEN 8 PRECEDING AND 1 PRECEDING)  AS hist
+      sum(hr_out)    OVER (PARTITION BY acct ORDER BY w ROWS BETWEEN {win['R5'] - 1} PRECEDING AND CURRENT ROW) AS hr_4wk,
+      avg(money_in)  OVER (PARTITION BY acct ORDER BY w ROWS BETWEEN {win['R6']} PRECEDING AND 1 PRECEDING) AS usual_in,
+      count(*)       OVER (PARTITION BY acct ORDER BY w ROWS BETWEEN {win['R6']} PRECEDING AND 1 PRECEDING) AS hist
     FROM g ORDER BY acct, w"""
     return sql
 

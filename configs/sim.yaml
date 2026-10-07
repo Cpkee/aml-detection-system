@@ -57,6 +57,7 @@ networks:
 
 income:
   # BAF income takes values 0.1 ... 0.9. Anchors below are placed at 0.1, 0.5, 0.9 and joined by straight lines.
+  anchor_points: {value: [0.1, 0.5, 0.9], source: "BAF income values where the poorest-fifth, median and richest-fifth anchors below are placed; straight lines between, flat outside. BAF does not say what its income score means; placement is ours. Moved here from the code on 7 Oct 2026, same value (results unchanged)", strength: modelling}
   money_in_source: {value: ons_household, source: "Spending figures are household and after tax, so money in uses ONS household disposable income for consistency. Approved 6 Oct 2026", strength: modelling, test: [hmrc_individual]}
   ons_household_disposable_annual: {value: [18300, 39200, 77000], source: "ONS FYE 2025: poorest-fifth median, overall median, richest-fifth median", strength: sourced}
   hmrc_individual_gross_annual:    {value: [15700, 29700, 67400], source: "HMRC 2023-24 p10, p50, p90 (taxpayers, before tax)", strength: sourced}
@@ -70,8 +71,11 @@ income:
 
 normal:
   card_per_month:        {value: 38.6, source: "UK Finance 2026: 26.6bn debit card payments / 57.4m adults / 12", strength: derived}
+  card_split_exponent:   {value: 0.5, source: "How an account's spending ratio (its spending / the average household's, middle value of income.spend_weekly_household) is shared between more card payments and bigger ones: count x ratio^0.5 and size x ratio^0.5. Even split is ours. Moved here from the code on 7 Oct 2026, same value (results unchanged)", strength: modelling}
+  card_week_sigma:       {value: 0.15, source: "Week-to-week spread of each account's weekly card total (log scale). Ours. Moved here from the code on 7 Oct 2026, same value (results unchanged)", strength: modelling}
   card_avg_amount:       {value: 29.0, source: "UK Finance Nov 2025: GBP 66.7bn / 2.3bn transactions", strength: derived}
   direct_debits_per_month: {value: 7.3, source: "UK Finance 2026: 5.0bn / 57.4m / 12 (payees per account)", strength: derived}
+  dd_split_gamma_shape:  {value: 1.0, source: "How each account's Direct Debit budget is split across its payees (gamma shape; 1.0 = a few large bills and several small ones). Ours. Moved here from the code on 7 Oct 2026, same value (results unchanged)", strength: modelling}
   standing_order_share:  {value: 0.8, source: "UK Finance 2026: 551m / 57.4m / 12 (share of accounts with one monthly standing order)", strength: derived}
   transfers_out_per_month: {value: 6.9, source: "Pay.UK 2025: 4.74bn single immediate payments / 57.4m / 12", strength: derived}
   cheques_per_month:     {value: 0.1, source: "UK Finance 2026: 77m / 57.4m / 12", strength: derived}
@@ -80,21 +84,44 @@ normal:
     source: "count x Pay.UK 2025 average value (305, 297, 727). Used only to split spending; published averages include business payments"
     strength: derived
   cash_withdrawals_per_month: {value: 2.0, source: "No published UK figure", strength: assumption, test: [1.0, 4.0]}
+  cash_withdrawal_sigma: {value: 0.6, source: "Spread of normal cash withdrawals (log scale), before rounding to GBP 10 and capping at the max below. Same as amount_sigma; ours. Moved here from the code on 7 Oct 2026, same value (results unchanged)", strength: modelling}
   cash_withdrawal_amount: {value: {median: 139, max: 350}, source: "SAML-D normal cash withdrawals: median 139, max 350", strength: samld}
   transfers_in_per_month: {value: 1.0, source: "Gifts and repayments from friends; no published figure", strength: assumption, test: [0.5, 2.0]}
   transfer_in_median:    {value: 100, strength: assumption}
+  transfer_in_sigma:     {value: 1.0, source: "Spread of transfers in from friends and family (log scale). Ours. Moved here from the code on 7 Oct 2026, same value (results unchanged)", strength: modelling}
+  cheque_amount:
+    value: {median: 100, sigma: 0.8}
+    source: "Size of personal cheques (median GBP, log-scale spread). No published personal figure: Pay.UK Annual Summary of Payment Statistics 2025 gives only the all-cheque average, GBP 1,431 (78.7m cheques, GBP 112.7bn), which includes business cheques, so it is an upper bound. Median ours; tests halve/double it (approved 7 Oct 2026). Moved here from the code on 7 Oct 2026, same value (results unchanged)"
+    strength: assumption
+    test: [{median: 50, sigma: 0.8}, {median: 200, sigma: 0.8}]
   internal_share_of_transfers: {value: 0.10, source: "Some normal transfers go to other accounts in our data, so internal links are not a laundering giveaway", strength: assumption, test: [0.05, 0.2]}
   abroad_sender_share:   {value: 0.07, source: "FCA Financial Lives 2022: 7% used an international money transfer service in 12 months", strength: sourced}
   abroad_per_month:      {value: 0.5, source: "YouGov 2021: 20% of senders send at least monthly; rate ours", strength: modelling}
   abroad_median:         {value: 450, source: "YouGov 2021: 54% send less than GBP 500", strength: modelling}
+  abroad_sigma:          {value: 0.8, source: "Spread of normal payments abroad (log scale) around abroad_median; affects how often normal senders reach R5. Ours. Moved here from the code on 7 Oct 2026, same value (results unchanged)", strength: modelling}
   high_risk_share_of_abroad: {value: 0.159, source: "SAML-D normal: 1.56% of rows to MX/TR/MA/UAE out of 9.82% cross-border", strength: samld}
   bonus_share:           {value: 0.30, source: "Share of accounts receiving a yearly bonus; no published figure", strength: assumption, test: [0.15, 0.6]}
   bonus_avg:             {value: 1600, source: "ONS 2017: average bonus per employee just over GBP 1,600", strength: sourced}
   bonus_dec_to_mar_share: {value: 0.528, source: "ONS 2017: 52.8% of bonuses paid December to March", strength: sourced}
   cash_depositor_share:  {value: 0.06, source: "FCA Financial Lives 2022: 6% are heavy cash users", strength: sourced}
+  cash_deposit_sigma:    {value: 0.7, source: "Spread of heavy cash users' deposits (log scale) around cash_deposit_median; sets how many normal customers cross R2's GBP 1,000/day and GBP 10,000/year limits. Ours. Moved here from the code on 7 Oct 2026, same value (results unchanged)", strength: modelling}
   cash_deposits_per_month: {value: 2.0, strength: assumption, test: [1.0, 4.0]}
   cash_deposit_median:   {value: 150, source: "No published figure. Set to the low test value: at 300, 40% of cash depositors passed GBP 10,000 a year, contradicting the FCA premise that legitimate personal customers rarely need more (changed 6 Oct)", strength: assumption, test: [75, 300]}
   large_cash_yearly_rate: {value: 0.002, source: "Share of accounts making one cash deposit >= GBP 10,000 per year; no published figure", strength: assumption, test: [0.001, 0.004]}
+  large_cash_amount:
+    value: [10000, 20000]
+    source: "Size of the rare legitimate large cash deposits (even spread, GBP); every one is at or above R1's GBP 10,000. No published size distribution. Upper end consistent with bank caps on personal cash deposits: Barclays GBP 20,000 a year (from 1 Jul 2024), HSBC GBP 20,000 a year via the Post Office (MoneyWeek, 2 Jul 2024). Tests halve/double the range above GBP 10,000 (approved 7 Oct 2026). Moved here from the code on 7 Oct 2026, same value (results unchanged)"
+    strength: assumption
+    test: [[10000, 15000], [10000, 30000]]
+  group_collection:
+    value: {payers: [8, 15], spread_days: 7, median: 20, sigma: 0.5}
+    source: "Shape of a group collection (e.g. a shared gift): 8-15 payers, paid over 7 days from the start day, median GBP 20 each (log-scale spread 0.5). Payers average 11.5, matching Collection Pot's leaving collections (11.4 contributors; retirement 18.3; average contribution GBP 12.89, tens of thousands of UK workplace pots; London TV, 6 Oct 2022). Those are online pots, so they support the size of a collection, not that it arrives as separate transfers. Median kept at GBP 20 (team decision 7 Oct 2026; the source implies ~GBP 11 at this spread, tested). Drives almost all R3 alerts (328 of 329 at 244k), so the payer range matters most. Tests: retirement-size 15-22 payers, half-size 4-8 payers, median GBP 11 and GBP 40 (approved 7 Oct 2026). Moved here from the code on 7 Oct 2026, same value (results unchanged)"
+    strength: partly_sourced
+    test:
+      - {payers: [15, 22], spread_days: 7, median: 20, sigma: 0.5}
+      - {payers: [4, 8], spread_days: 7, median: 20, sigma: 0.5}
+      - {payers: [8, 15], spread_days: 7, median: 11, sigma: 0.5}
+      - {payers: [8, 15], spread_days: 7, median: 40, sigma: 0.5}
   group_collection_yearly_rate: {value: 0.01, source: "Share of accounts receiving 8-15 small payments in one week per year (e.g. a shared gift); no published figure", strength: assumption, test: [0.005, 0.02]}
   hour_weights:
     value: [1.28, 1.28, 1.28, 1.28, 1.28, 1.28, 1.28, 1.50, 5.67, 5.67, 5.68, 5.68, 5.67, 5.69, 5.68, 5.68, 5.68, 5.67, 5.47, 5.46, 5.45, 5.45, 5.47, 5.46]
@@ -132,6 +159,11 @@ laundering:
     source: "Shape structure measured from SAML-D (payment types, payers/receivers per account, abroad share, median amount); amounts re-anchored to RUSI GBP 532. Structuring and Smurfing use more, smaller payments than Synectics' 3-4 by definition"
     strength: samld
   out_transfer_mean: {value: 532, source: "RUSI 2025 (Lloyds, 17 Jun-11 Aug 2024): 7,631 Faster Payments worth GBP 4.06m out of mule accounts", strength: sourced, test: [1500]}
+  piece_sigma:       {value: 0.6, source: "Spread of laundering piece amounts (log scale) around each shape's mean. Same as normal.amount_sigma; ours. Moved here from the code on 7 Oct 2026, same value (results unchanged)", strength: modelling}
+  split_max_n_in:    {value: 4, source: "Shapes whose n_in can exceed this (Structuring, Smurfing: many small payments in) pass each payment on as one piece; the others split each payment into ~out_pieces_mean pieces. Ours. Moved here from the code on 7 Oct 2026, same value (results unchanged)", strength: modelling}
+  half_cash_share:   {value: 0.5, source: "Chance that a payment into a half_cash shape (Deposit-Send) is a cash deposit rather than a transfer. Ours. Moved here from the code on 7 Oct 2026, same value (results unchanged)", strength: modelling}
+  layered_internal_multiplier: {value: 2, source: "Layered shapes pass this many times networks.internal_pieces_share of their pieces to the next network member. Ours. Moved here from the code on 7 Oct 2026, same value (results unchanged)", strength: modelling}
+  cash_out_piece_max: {value: 300, source: "Cash_Withdrawal shape: money leaves in equal cash withdrawals of at most this (GBP), below SAML-D's largest normal withdrawal (350). Ours. Moved here from the code on 7 Oct 2026, same value (results unchanged)", strength: modelling}
   out_pieces_mean:   {value: 2.0, source: "Each incoming payment is split into ~2 outgoing transfers", strength: modelling}
   card_out:          {value: deferred, source: "RUSI: card out avg GBP 107. Deferred: single laundering card rows would stand out next to weekly normal card rows", strength: design}
   holder_keeps:      {value: [0.0, 0.10], source: "Europol/FBI: mules keep 'a commission'; % only in news reports", strength: assumption}
@@ -139,6 +171,10 @@ laundering:
     value: {under_15min: 0.28, 15_to_60min: 0.25, 1_to_24h: 0.32, over_24h: 0.15}
     source: "RUSI 2025: 28% left within 15 min, a further 25% within 1 h, under 15% remained after 24 h (1-24h share derived)"
     strength: sourced
+  forward_delay_bands_minutes:
+    value: {under_15min: [1, 15], 15_to_60min: [15, 60], 1_to_24h: [60, 1440], over_24h: [1440, 10080]}
+    source: "Edges of the forward_delay_shares bands in minutes (RUSI's 15 min / 1 h / 24 h). Delays are spread evenly inside a band. The 1-minute minimum and the 7-day (10,080 min) maximum of the last band are ours. Moved here from the code on 7 Oct 2026, same value (results unchanged)"
+    strength: modelling
   abroad_ratio_vs_normal: {value: 3.15, source: "SAML-D: 30.95% of laundering rows go abroad vs 9.82% of normal rows. Applied to OUR normal rate of transfers abroad (~0.5%), so launderers send ~1.6% of transfers abroad. Approved 6 Oct 2026", strength: samld, test: [1.0, 6.0]}
   high_risk_share_of_cross_border: {value: 0.269, source: "SAML-D laundering: 8.33% to MX/TR/MA/UAE out of 30.95% cross-border", strength: samld}
 
@@ -151,13 +187,15 @@ rules:
   R1_large_cash:     {value: 10000, source: "MLR 2017 reg 14(1)(a): cash of at least GBP 10,000 (since 30 Jun 2026)", strength: sourced}
   R2_cash_per_day:   {value: 1000,  source: "FCA proposed personal limit: GBP 1,000 per 24 hours", strength: sourced}
   R2_days_in_2wk:    {value: 2,     source: "Days over the daily limit within 2 weeks; count is ours", strength: modelling}
+  R2_window_weeks:   {value: 2, source: "R2's 'within 2 weeks' = this rule week and the one before. Ours. Moved here from the code on 7 Oct 2026, same value (results unchanged)", strength: modelling}
   R2_cash_per_year:  {value: 10000, source: "FCA proposed personal limit: GBP 10,000 per 12 months", strength: sourced}
   R3_senders_week:   {value: 8,     source: "FFIEC: 'many small, incoming transfers'; 8 is the starting value, then tuned", strength: partly_sourced}
   R4_out_share:      {value: 0.8,   source: "FFIEC: 'all or most ... wired' onward; 80% of the week's money in leaves the same week", strength: partly_sourced}
   R4_min_in:         {value: 2000,  source: "Week's money in must exceed this; starting value ours, then tuned", strength: modelling}
   R5_high_risk_4wk:  {value: 5000,  source: "FFIEC: transfers to higher-risk locations; GBP 5,000 over 4 weeks, then tuned", strength: partly_sourced}
+  R5_window_weeks:   {value: 4, source: "R5 adds up money sent to high-risk countries over this many rule weeks (this week + 3 before). Ours. Moved here from the code on 7 Oct 2026, same value (results unchanged)", strength: modelling}
   R6_multiple:       {value: 10,    source: "FFIEC/FinCEN: sudden change; money in >= 10x the account's usual week, then tuned", strength: partly_sourced}
-  R6_history_weeks:  {value: [4, 8], source: "Usual = average of the previous 8 weeks; needs at least 4 weeks of history", strength: modelling}
+  R6_history_weeks:  {value: [4, 8], source: "[min weeks of history, weeks averaged]: usual = average of the previous 8 weeks; needs at least 4 weeks of history. The 8 was ignored by the code (fixed in SQL) until 7 Oct 2026; now read here, same value", strength: modelling}
   R6_min_in:         {value: 1000,  source: "Floor so tiny accounts don't trigger; ours", strength: modelling}
   R6_min_usual:      {value: 100,   source: "The usual week must have at least GBP 100 coming in, so a first salary after quiet weeks is not a sudden change; ours", strength: modelling}
   pause_days:        {value: 28,    source: "Alert suppression is standard (Oracle); 28 days is ours", strength: partly_sourced}

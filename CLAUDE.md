@@ -91,6 +91,8 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
    features via `amldata`, application-only / activity-only / combined models, same weekly alert budget.
 4. Week 3: BAF Variants II (fairness) and IV (drift) with identical settings; sensitivity runs from
    `test` values; professor comments (fixed-cohort same-week comparison; 0.1/0.3/1% prevalence).
+   **Decision 7 Oct 2026: freeze the bank's rules** — variant and sensitivity runs reuse the v1_full scale
+   (1.741) instead of re-tuning (needs a fixed-scale option in `rules`/`run`; not built yet).
 
 ## Decision records
 - Logic, assumptions, full schema: https://claude.ai/artifact/LchcqbsutNLSHWKESoWWQL
