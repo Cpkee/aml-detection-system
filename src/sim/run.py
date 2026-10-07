@@ -132,7 +132,7 @@ def step_rules(cfg, out):
     print(f"chosen scale {scale}: closures {len(exits)}")
 
 
-def _write_final(con, p, exits_path):
+def _write_final(con, p, exits_path, seed):
     tx_parts = os.path.join(p["parts"], "tx_*.parquet")
     tr_parts = os.path.join(p["parts"], "truth_*.parquet")
     con.execute(f"""CREATE OR REPLACE TEMP TABLE removed AS
@@ -142,8 +142,17 @@ def _write_final(con, p, exits_path):
     if os.path.exists(links):   # money that never arrived can't be forwarded on
         con.execute(f"""INSERT INTO removed SELECT DISTINCT l.txn_id FROM read_parquet('{links}') l
                         JOIN removed r ON r.txn_id = l.hop_txn_id ANTI JOIN removed r2 ON r2.txn_id = l.txn_id""")
-    con.execute(f"COPY (SELECT * FROM read_parquet('{tx_parts}') ANTI JOIN removed USING (txn_id)) TO '{p['tx']}' (FORMAT PARQUET)")
-    con.execute(f"COPY (SELECT * FROM read_parquet('{tr_parts}') ANTI JOIN removed USING (txn_id)) TO '{p['txtruth']}' (FORMAT PARQUET)")
+    # Part files use provisional ids ('N003_17', 'L_5') that reveal which generator made a row.
+    # Public ids are 'T' + 16 hex digits of md5(provisional id + seed): random-looking, the same for both rows
+    # of a transfer, and no lookup table needed. Rows are sorted by time, so neither the id nor the row's
+    # position in the file says anything about laundering. (A duplicate id would fail check 1.)
+    new_id = f"'T' || substr(md5(txn_id || ':{seed}'), 1, 16)"
+    con.execute(f"""COPY (SELECT * FROM (SELECT {new_id} AS txn_id, * EXCLUDE (txn_id) FROM read_parquet('{tx_parts}')
+                                         ANTI JOIN removed USING (txn_id))
+                          ORDER BY day, time, txn_id, account_id)
+                    TO '{p['tx']}' (FORMAT PARQUET)""")
+    con.execute(f"""COPY (SELECT {new_id} AS txn_id, * EXCLUDE (txn_id) FROM read_parquet('{tr_parts}')
+                          ANTI JOIN removed USING (txn_id)) TO '{p['txtruth']}' (FORMAT PARQUET)""")
     return con.execute("SELECT count(*) FROM removed").fetchone()[0]
 
 
@@ -158,7 +167,7 @@ def step_finalize(cfg, out):
     ids = pd.read_parquet(p["accounts"], columns=["account_id"])["account_id"].to_numpy()
     seed = cfg.get("meta.seed")
     for it in range(4):
-        removed = _write_final(con, p, exits_path)
+        removed = _write_final(con, p, exits_path, seed)
         f = weekly_features(con, f"read_parquet('{p['tx']}')", p["accounts"], cfg.get("size.observe_days"),
                             cfg.get("countries.high_risk"), cfg.get("rules.R2_cash_per_day"))
         al, exits = decide(hits(f, cfg, scale), cfg, start, is_l, seed)

@@ -28,6 +28,8 @@ def connect(out):
     for name in ["accounts", "accounts_truth", "transactions", "transactions_truth", "aml_alerts", "aml_outcomes"]:
         con.execute(f"CREATE VIEW {name} AS SELECT * FROM read_parquet('{os.path.join(out, name + '.parquet')}')")
     con.execute(f"CREATE VIEW acc_internal AS SELECT * FROM read_parquet('{os.path.join(out, '_internal/accounts_internal.parquet')}')")
+    con.execute(f"""CREATE VIEW tx_order AS SELECT file_row_number, day, time
+                    FROM read_parquet('{os.path.join(out, 'transactions.parquet')}', file_row_number = true)""")
     return con
 
 
@@ -106,6 +108,15 @@ def run_checks(con, cfg, baf_path):
                     USING (account_id) WHERE o.aml_exit_day IS DISTINCT FROM c.e""")
     check("9 rules", too_close == 0 and bad_rev == 0 and bad_conf == 0 and bad_exit == 0,
           f"alerts closer than {pause} days {too_close}, bad review {bad_rev}, wrong confirmations {bad_conf}, exit mismatches {bad_exit}")
+
+    # 10. txn_id and row order carry no label: anonymous ids, laundering ids spread evenly, rows in time order
+    bad_id = q("SELECT count(*) FROM transactions_truth WHERE NOT regexp_full_match(txn_id, 'T[0-9a-f]{16}')")
+    l_pos = q("""SELECT coalesce(avg(TRY_CAST(('0x' || substr(txn_id, 2, 8)) AS BIGINT)) / 4294967296, -1)
+                 FROM transactions_truth WHERE is_laundering = 1""")
+    unsorted = q("""SELECT count(*) FROM (SELECT day, time, lag(day) OVER w pd, lag(time) OVER w pt FROM tx_order
+                    WINDOW w AS (ORDER BY file_row_number)) WHERE day < pd OR (day = pd AND time < pt)""")
+    check("10 anonymous ids", bad_id == 0 and abs(l_pos - 0.5) < 0.05 and unsorted == 0,
+          f"ids not T+16 hex {bad_id}, laundering ids' mean position {l_pos:.3f} (0.5 = random), rows out of time order {unsorted}")
     return res
 
 
