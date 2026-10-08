@@ -76,6 +76,9 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
   Rules: 96.9% / 96.8% false alarms, 25% / 26% caught; 169 / 171 test launderers. Use each variant for training
   AND testing with the same split as the main data (IV's bias exists only in training months by design);
   train-on-main / test-on-variant is an optional extra robustness check.
+- Sensitivity (42 runs, rules frozen; `outputs/sensitivity/FINDINGS.md`): the rules' catch rate moves only with
+  launderer behaviour (transfer size, repeated bursts: 25% -> ~70%); false alarms move with prevalence (1%: 90.8%,
+  0.1%: 99.0%) and normal cash use (98.9%). Seeds 43/44: 96.7–96.9% / 24–26%. Re-check models on those scenarios.
 - Everything is seeded and deterministic: same config + seed = identical data.
 
 ## Known limits / gotchas

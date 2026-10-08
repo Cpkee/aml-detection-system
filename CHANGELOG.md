@@ -4,6 +4,13 @@ Changes to the simulator and the data it generates, newest first. Settings chang
 `source` of each value in `configs/sim.yaml`; decisions are recorded in the "Simulated Dataset: Logic,
 Assumptions and Use" doc.
 
+## 8 Oct 2026 — sensitivity results (42 runs, `outputs/sensitivity/`)
+
+All 42 runs pass the 10 checks. Seeds 43/44 put chance at 96.7–96.9% false alarms and 24–26% caught. Large effects:
+laundering transfers of £1,500 (71% caught) and repeated bursts (67% caught); prevalence 1% (90.8% false alarms)
+and 0.1% (99.0%); doubled cash deposits (98.9%, R2 ~13,000 alerts); 15–22-payer group collections (R3 2,178
+alerts). Everything else stays near the seed range. Details: `outputs/sensitivity/FINDINGS.md`.
+
 ## 8 Oct 2026 — repeated bursts and window-scaled start bands (team decisions 8 Oct 2026)
 
 - `timing.bursts_per_launderer = repeat_until_closed` is now built: a new burst starts `timing.repeat_gap_days`
