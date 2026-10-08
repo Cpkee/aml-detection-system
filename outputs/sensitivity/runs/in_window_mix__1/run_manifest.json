@@ -2,15 +2,15 @@
   "version": "v1",
   "seed": 42,
   "config": "configs/sim.yaml",
-  "config_sha256": "cfc131cfb3ef8129b406f153a228ed557218ba81c0232fe343c697f9146ef49a",
+  "config_sha256": "aed1d38d3ba654ac476a37125842f462de99c00589c37583a4a8df3986cefaf3",
   "set": [
     "size.n_accounts=244000",
-    "rules.fixed_scale=1.741",
+    "rules.fixed_scale=1.516",
     "profiles.in_window_mix={\"fake\": 0.53, \"witting\": 0.235, \"unwitting\": 0.235}"
   ],
   "baf_file": "data/raw/BAF_Base.csv",
   "baf_sha256": "7bf10a37ce07e72e14c1b09e5efee3d27261baff4facc7da767b0474dcf9b809",
-  "git_commit": "bb5b24e040122f94c1405f3f198c831a7e9036f8",
+  "git_commit": "23fc46af103d331177e048b15ae3388cbbe9ab2a",
   "git_uncommitted_changes": false,
   "python": "3.12.15",
   "packages": {

@@ -2,7 +2,7 @@
 
 Run: v1, seed 42, 244,000 accounts, 548 days each.
 
-Overrides (--set): size.n_accounts=244000, rules.fixed_scale=1.741, normal.transfers_in_per_month=2.0. Code: bb5b24e. BAF file: data/raw/BAF_Base.csv (sha256 7bf10a37ce07). See run_manifest.json.
+Overrides (--set): size.n_accounts=244000, rules.fixed_scale=1.516, normal.transfers_in_per_month=2.0. Code: 23fc46a. BAF file: data/raw/BAF_Base.csv (sha256 7bf10a37ce07). See run_manifest.json.
 
 ## Accounts by profile
 
@@ -19,42 +19,42 @@ Overrides (--set): size.n_accounts=244000, rules.fixed_scale=1.741, normal.trans
 | profile        |   rows_per_month |   payments_per_month |   money_in_per_month |   money_out_per_month |   out_over_in |
 |:---------------|-----------------:|---------------------:|---------------------:|----------------------:|--------------:|
 | app_fraud_only |             25.5 |                 65.8 |                 5490 |                  3866 |          0.72 |
-| fake           |             25.9 |                 63.4 |                 4834 |                  3681 |          0.74 |
+| fake           |             25.5 |                 62.1 |                 4672 |                  3388 |          0.75 |
 | normal         |             25.5 |                 61.9 |                 4402 |                  3279 |          0.75 |
-| unwitting      |             25.9 |                 60.3 |                 4100 |                  3084 |          0.79 |
-| witting        |             26.3 |                 58.7 |                 3600 |                  2811 |          0.76 |
+| unwitting      |             25.2 |                 58.3 |                 4057 |                  3008 |          0.79 |
+| witting        |             26.4 |                 59.9 |                 3706 |                  2856 |          0.76 |
 
 ## Rows by type
 
 | laundering_type        |    rows_ |   pct_rows |   median_amount |
 |:-----------------------|---------:|-----------:|----------------:|
-| Normal_Transfer        | 32885961 |     29.09  |          129.46 |
-| Normal_DirectDebit     | 32120149 |     28.413 |           42.05 |
-| Normal_Card            | 19292051 |     17.065 |          260.66 |
-| Normal_CashWithdrawal  |  8785171 |      7.771 |          140    |
-| Normal_TransferIn      |  8779322 |      7.766 |           99.98 |
-| Normal_Salary          |  6380453 |      5.644 |         1942.81 |
-| Normal_StandingOrder   |  3521543 |      3.115 |           54.18 |
-| Normal_CashDeposit     |   528340 |      0.467 |          150.11 |
-| Normal_Cheque          |   440168 |      0.389 |           99.94 |
-| Normal_Abroad          |   155047 |      0.137 |          449.25 |
-| Normal_Bonus           |   104239 |      0.092 |         1243.09 |
-| Normal_GroupCollection |    42254 |      0.037 |           20.02 |
-| Structuring            |     5474 |      0.005 |          285.03 |
-| Deposit-Send           |     1684 |      0.001 |          410.9  |
-| Layered_Fan_Out        |      958 |      0.001 |          412.96 |
-| Layered_Fan_In         |      851 |      0.001 |          709.51 |
+| Normal_Transfer        | 32881788 |     29.09  |          129.46 |
+| Normal_DirectDebit     | 32116652 |     28.413 |           42.05 |
+| Normal_Card            | 19290001 |     17.065 |          260.66 |
+| Normal_CashWithdrawal  |  8784252 |      7.771 |          140    |
+| Normal_TransferIn      |  8778350 |      7.766 |           99.98 |
+| Normal_Salary          |  6379743 |      5.644 |         1942.8  |
+| Normal_StandingOrder   |  3521193 |      3.115 |           54.18 |
+| Normal_CashDeposit     |   528339 |      0.467 |          150.11 |
+| Normal_Cheque          |   440115 |      0.389 |           99.94 |
+| Normal_Abroad          |   155031 |      0.137 |          449.23 |
+| Normal_Bonus           |   104232 |      0.092 |         1243.05 |
+| Normal_GroupCollection |    42239 |      0.037 |           20.02 |
+| Structuring            |     5374 |      0.005 |          283.86 |
+| Deposit-Send           |     1678 |      0.001 |          411.49 |
+| Layered_Fan_Out        |      925 |      0.001 |          424.85 |
+| Layered_Fan_In         |      794 |      0.001 |          715.49 |
 | Normal_LargeCash       |      726 |      0.001 |        14914    |
-| Cycle                  |      721 |      0.001 |         1438.04 |
-| Behavioural_Change_1   |      618 |      0.001 |          203.15 |
-| Behavioural_Change_2   |      596 |      0.001 |          223.69 |
-| Gather-Scatter         |      582 |      0.001 |          542.39 |
+| Cycle                  |      658 |      0.001 |         1418.72 |
+| Behavioural_Change_1   |      627 |      0.001 |          205.27 |
+| Behavioural_Change_2   |      563 |      0     |          227.71 |
+| Gather-Scatter         |      556 |      0     |          557.01 |
 | Fan_In                 |      439 |      0     |          565.09 |
-| Fan_Out                |      402 |      0     |          661.17 |
+| Fan_Out                |      390 |      0     |          678.69 |
 | Scatter-Gather         |      376 |      0     |          505.16 |
 | Cash_Withdrawal        |      325 |      0     |          270.87 |
-| Bipartite              |      285 |      0     |          687.69 |
-| Stacked Bipartite      |      276 |      0     |          479.95 |
+| Bipartite              |      279 |      0     |          682    |
+| Stacked Bipartite      |      240 |      0     |          465.5  |
 | Smurfing               |      162 |      0     |          139.44 |
 
 ## Laundering start (days after opening)
@@ -77,66 +77,66 @@ Overrides (--set): size.n_accounts=244000, rules.fixed_scale=1.741, normal.trans
 |   is_laundering |   pct_abroad |   pct_high_risk |   pct_internal |
 |----------------:|-------------:|----------------:|---------------:|
 |               0 |         0.16 |            0.03 |           2.75 |
-|               1 |         1.36 |            0.48 |          24.63 |
+|               1 |         1.39 |            0.5  |          23.91 |
 
 ## Laundered money per launderer (GBP)
 
 | profile   |   median_in |   median_out |         total_in |
 |:----------|------------:|-------------:|-----------------:|
-| fake      |        5087 |         4602 |      3.10144e+06 |
-| unwitting |        4419 |         3803 | 499711           |
-| witting   |        4111 |         3809 | 487228           |
+| fake      |        4958 |         4426 |      3.04252e+06 |
+| unwitting |        4353 |         3512 | 489746           |
+| witting   |        4085 |         3524 | 467319           |
 
 ## The bank's rules (benchmark)
 
-- Threshold scale for R3-R6: 1.741 (frozen (rules.fixed_scale, not tuned on this run))
-- Alerts: 8,915; true 186 -> false alarm share 97.9% (target 90-95%)
-- Launderers alerted after their start: 183 of 732 (25%); accounts closed: 152
+- Threshold scale for R3-R6: 1.516 (frozen (rules.fixed_scale, not tuned on this run))
+- Alerts: 3,842; true 233 -> false alarm share 93.9% (target 90-95%)
+- Launderers alerted after their start: 229 of 732 (31%); accounts closed: 188
 
 | rule   |   alerts |   true_alerts |
 |:-------|---------:|--------------:|
-| R1     |      726 |             1 |
-| R2     |      753 |            14 |
-| R3     |      405 |             3 |
-| R4     |      723 |           166 |
-| R5     |        2 |             0 |
-| R6     |     7353 |             9 |
+| R1     |      725 |             1 |
+| R2     |      751 |            13 |
+| R3     |      981 |             5 |
+| R4     |     1485 |           210 |
+| R5     |        3 |             0 |
+| R6     |      987 |            16 |
 
 Days from laundering start to the rules' first true alert:
 
 |   median_days_to_catch |   min_days |   max_days |
 |-----------------------:|-----------:|-----------:|
-|                     10 |          1 |        412 |
+|                      9 |          0 |        412 |
 
 Weekly alert budget (what every model gets):
 
 |   mean_alerts_per_week |   median_per_week |   max_per_week |
 |-----------------------:|------------------:|---------------:|
-|                   82.5 |                27 |            286 |
+|                   34.9 |                37 |             85 |
 
 Launderers by shape (alerted = first alert on or after start):
 
 | shape                |   launderers |   alerted |   closed |
 |:---------------------|-------------:|----------:|---------:|
-| Structuring          |          190 |        29 |       27 |
-| Deposit-Send         |          111 |        29 |       27 |
-| Behavioural_Change_1 |           50 |         4 |        3 |
-| Layered_Fan_Out      |           50 |        10 |       11 |
-| Layered_Fan_In       |           46 |        20 |       16 |
-| Behavioural_Change_2 |           44 |         4 |        2 |
-| Gather-Scatter       |           43 |         9 |        8 |
-| Cycle                |           40 |        29 |       26 |
-| Fan_In               |           33 |         9 |        6 |
-| Scatter-Gather       |           27 |         5 |        4 |
-| Fan_Out              |           25 |        10 |       11 |
+| Structuring          |          190 |        48 |       42 |
+| Deposit-Send         |          111 |        41 |       33 |
+| Behavioural_Change_1 |           50 |         4 |        2 |
+| Layered_Fan_Out      |           50 |        11 |       12 |
+| Layered_Fan_In       |           46 |        22 |       18 |
+| Behavioural_Change_2 |           44 |         6 |        4 |
+| Gather-Scatter       |           43 |        16 |       13 |
+| Cycle                |           40 |        28 |       23 |
+| Fan_In               |           33 |        10 |        7 |
+| Scatter-Gather       |           27 |        11 |        8 |
+| Fan_Out              |           25 |        13 |       12 |
 | Bipartite            |           24 |         6 |        5 |
-| Stacked Bipartite    |           22 |         1 |        1 |
-| Cash_Withdrawal      |           18 |         7 |        5 |
+| Stacked Bipartite    |           22 |         2 |        2 |
+| Cash_Withdrawal      |           18 |         9 |        7 |
 | Smurfing             |            9 |         0 |        0 |
 
 
 ## Too-easy check (5-fold, whole-window totals)
 
-- Activity model AUC: 0.793 (average precision 0.186, base rate 0.0030)
+- Activity model AUC: 0.784 (average precision 0.243, base rate 0.0030)
 - Application-only logistic AUC: 0.734
-- Single-feature AUC: n_rows 0.497, money_in 0.504, money_out 0.509, max_in 0.585, n_senders 0.565, share_abroad 0.556, n_internal 0.640, spike 0.492
+- Single-feature AUC: n_rows 0.466, money_in 0.480, money_out 0.484, max_in 0.585, n_senders 0.528, share_abroad 0.555, n_internal 0.596, spike 0.490

@@ -1,4 +1,4 @@
-ROOT     : /private/tmp/claude-501/-Users-cheepheng-aml-detection-system/1db6e3ad-fff6-45ed-9d4a-0657fb872fe2/scratchpad/wt-variants
+ROOT     : /private/tmp/claude-501/-Users-cheepheng-aml-detection-system/1db6e3ad-fff6-45ed-9d4a-0657fb872fe2/scratchpad/wt-r6
 DATA_DIR : /Users/cheepheng/aml-detection-system/data/variant_IV
 OUT_DIR  : /Users/cheepheng/aml-detection-system/outputs/eda/variant_IV
 pandas 3.0.6 | python 3.12.15
@@ -8,15 +8,15 @@ pandas 3.0.6 | python 3.12.15
 ==============================================================================
 accounts                244,000 rows x 32 cols
 accounts_truth          244,000 rows x  8 cols
-transactions_truth   106,027,108 rows x  3 cols
-aml_alerts                6,084 rows x  6 cols
+transactions_truth   106,011,048 rows x  3 cols
+aml_alerts                3,598 rows x  6 cols
 aml_outcomes            244,000 rows x  3 cols
-transactions         (streamed)      transactions.parquet  3,825 MB
+transactions         (streamed)      transactions.parquet  3,824 MB
 
 account_id unique in accounts        : True
 accounts_truth covers every account  : True
 row counts match (accounts == truth) : True
-aml_outcomes non-null alert days      : 5,967
+aml_outcomes non-null alert days      : 3,289
 
 ==============================================================================
 3. SCHEMA, DTYPES, MISSINGNESS, SENTINELS
@@ -191,20 +191,20 @@ lag from open_day to launder_start_day: med=98 days, p10=67, p90=377
 ==============================================================================
 7. PASS OVER TRANSACTIONS (DuckDB)
 ==============================================================================
-read 108,647,341 transaction rows -> 74,924,365 account-days
-txn_id prefixes: {'T': 108647341}
+read 108,630,310 transaction rows -> 74,912,970 account-days
+txn_id prefixes: {'T': 108630310}
 
-acct_day: 74,924,365 rows (1,570 MB on disk)
+acct_day: 74,912,970 rows (1,570 MB on disk)
 
 transaction volume by payment_type x direction:
    payment_type direction        n                 amt  share
-            ACH       out 65912353  7,959,478,295.9999 0.6067
-     Debit card       out 19292315  5,724,697,551.5100 0.1776
-            ACH        in 13539478 19,858,939,106.4704 0.1246
-Cash Withdrawal       out  8782282  1,398,167,703.7400 0.0808
-   Cash Deposit        in   526066    111,482,692.6200 0.0048
-         Cheque       out   440098     60,595,726.2200 0.0041
-   Cross-border       out   154749     96,058,427.6900 0.0014
+            ACH       out 65902294  7,957,941,520.2999 0.6067
+     Debit card       out 19289524  5,723,747,251.4200 0.1776
+            ACH        in 13536763 19,855,408,668.2203 0.1246
+Cash Withdrawal       out  8780968  1,397,960,193.7400 0.0808
+   Cash Deposit        in   525998    111,470,271.8100 0.0048
+         Cheque       out   440048     60,586,843.9800 0.0041
+   Cross-border       out   154715     96,038,711.4600 0.0014
 
 ==============================================================================
 8. ACCOUNT-LEVEL TRANSACTION BEHAVIOUR
@@ -213,37 +213,37 @@ accounts with zero transactions: 0 (0.00%)
 
 behaviour features, launderers vs the rest:
                     non_launderer_median  launderer_median  ratio
-n_txn                            442.000           440.500  0.997
-share_out                          0.885             0.867  0.979
-share_internal                     0.048             0.061  1.269
-share_night                        0.063             0.067  1.074
-share_cash                         0.083             0.080  0.974
-amt_total                    139,860.220       148,418.020  1.061
-amt_mean                         313.651           379.742  1.211
-max_amt_in_a_day               4,714.405         6,537.860  1.387
+n_txn                            442.000           431.500  0.976
+share_out                          0.885             0.866  0.978
+share_internal                     0.048             0.061  1.264
+share_night                        0.063             0.067  1.075
+share_cash                         0.083             0.080  0.968
+amt_total                    139,860.220       137,237.425  0.981
+amt_mean                         313.651           379.882  1.211
+max_amt_in_a_day               4,714.405         6,498.030  1.378
 max_txn_in_a_day                   4.000             5.000  1.250
-passthrough                        0.772             0.766  0.992
-in_degree                         30.000            33.000  1.100
-out_degree                       137.000           139.000  1.015
-active_days                      306.000           302.000  0.987
-txn_per_active_day                 1.437             1.485  1.033
+passthrough                        0.772             0.768  0.995
+in_degree                         30.000            32.000  1.067
+out_degree                       137.000           136.000  0.993
+active_days                      306.000           297.000  0.971
+txn_per_active_day                 1.437             1.491  1.037
 
 univariate AUC, behaviour features:
            feature    auc
-  max_txn_in_a_day 0.7730
-    share_internal 0.7189
-  max_amt_in_a_day 0.6752
-         share_out 0.3284
-txn_per_active_day 0.6607
-          amt_mean 0.6016
-       share_night 0.5993
-         in_degree 0.5898
-       active_days 0.4282
-             n_txn 0.4635
-        share_cash 0.4655
-       passthrough 0.4933
-         amt_total 0.5037
-        out_degree 0.4999
+  max_txn_in_a_day 0.7673
+    share_internal 0.6992
+         share_out 0.3232
+  max_amt_in_a_day 0.6724
+txn_per_active_day 0.6719
+       active_days 0.3887
+          amt_mean 0.6035
+       share_night 0.6023
+             n_txn 0.4210
+        out_degree 0.4546
+         in_degree 0.5419
+        share_cash 0.4606
+         amt_total 0.4674
+       passthrough 0.4943
 
   Compare these against §5. If behaviour dominates onboarding by a wide margin,
   the BAF half of the dataset is contributing little and you should say so.
@@ -251,55 +251,55 @@ txn_per_active_day 0.6607
 ==============================================================================
 9. LAUNDERING AT THE TRANSACTION LEVEL
 ==============================================================================
-transactions_truth rows        : 106,027,108
-is_laundering rate             : 0.01126%
+transactions_truth rows        : 106,011,048
+is_laundering rate             : 0.01106%
 
 laundering_type mix:
                                n   share
 laundering_type                         
-Normal_DirectDebit      32086908 0.30263
-Normal_Transfer         30301559 0.28579
-Normal_Card             19292315 0.18196
-Normal_CashWithdrawal    8781965 0.08283
-Normal_Salary            6380345 0.06018
-Normal_TransferIn        4388544 0.04139
-Normal_StandingOrder     3516519 0.03317
-Normal_CashDeposit        525037 0.00495
-Normal_Cheque             440098 0.00415
-Normal_Abroad             154657 0.00146
-Normal_Bonus              103971 0.00098
+Normal_DirectDebit      32082454 0.30263
+Normal_Transfer         30296612 0.28579
+Normal_Card             19289524 0.18196
+Normal_CashWithdrawal    8780651 0.08283
+Normal_Salary            6379235 0.06018
+Normal_TransferIn        4387924 0.04139
+Normal_StandingOrder     3516073 0.03317
+Normal_CashDeposit        524969 0.00495
+Normal_Cheque             440048 0.00415
+Normal_Abroad             154625 0.00146
+Normal_Bonus              103961 0.00098
 Normal_GroupCollection     42542 0.00040
-Structuring                 4969 0.00005
-Deposit-Send                1256 0.00001
-Layered_Fan_In               844 0.00001
-Layered_Fan_Out              727 0.00001
+Structuring                 4867 0.00005
+Deposit-Send                1227 0.00001
+Layered_Fan_In               823 0.00001
+Layered_Fan_Out              709 0.00001
 Normal_LargeCash             709 0.00001
-Behavioural_Change_1         510 0.00000
-Fan_In                       503 0.00000
+Behavioural_Change_1         504 0.00000
 Cycle                        500 0.00000
-Behavioural_Change_2         452 0.00000
+Fan_In                       498 0.00000
+Behavioural_Change_2         447 0.00000
 Cash_Withdrawal              390 0.00000
 Stacked Bipartite            321 0.00000
-Bipartite                    318 0.00000
-Smurfing                     305 0.00000
+Bipartite                    314 0.00000
+Smurfing                     295 0.00000
 
 typologies actually generated: 15
 laundering_type
-Structuring             4969
-Deposit-Send            1256
-Layered_Fan_In           844
-Layered_Fan_Out          727
-Behavioural_Change_1     510
-Fan_In                   503
+Structuring             4867
+Deposit-Send            1227
+Layered_Fan_In           823
+Layered_Fan_Out          709
+Behavioural_Change_1     504
 Cycle                    500
-Behavioural_Change_2     452
+Fan_In                   498
+Behavioural_Change_2     447
 Cash_Withdrawal          390
 Stacked Bipartite        321
-Bipartite                318
-Smurfing                 305
+Bipartite                314
+Smurfing                 295
 Fan_Out                  292
-Gather-Scatter           288
-Scatter-Gather           264
+Gather-Scatter           280
+Scatter-Gather           254
   -> SAML-D ships 28 typology names. Any with zero rows exist in the vocabulary
      but not in your data; do not claim coverage you do not have.
 
@@ -339,7 +339,7 @@ True       732  732 1.0000
   -> network_id is truth-only. If you build graph features, derive them from the
      internal A->A edges in transactions, never from this column.
 
-internal (account-to-account) edges seen in transactions: 5,240,466
+internal (account-to-account) edges seen in transactions: 5,238,524
 
 ==============================================================================
 11. WEEKLY PANEL + COHORT COMPOSITION
@@ -355,12 +355,12 @@ week
 5          29717  155297            78                    1        0.00262
 6          35750  190793            96                    1        0.00269
 7          41605  223110           121                    1        0.00291
-105        50143  263943           107                  107        0.00213
-106        42381  220247            86                   86        0.00203
-107        34536  173892            65                   65        0.00188
-108        26762  135943            40                   40        0.00149
-109        20443  101395            33                   33        0.00161
-110        14540   67595            26                   26        0.00179
+105        50135  263901            99                   99        0.00197
+106        42374  220206            79                   79        0.00186
+107        34532  173870            61                   61        0.00177
+108        26760  135935            38                   38        0.00142
+109        20442  101388            32                   32        0.00157
+110        14539   67593            25                   25        0.00172
 111         8585   33378            14                   14        0.00163
 112         2626    5261             7                    7        0.00267
 
