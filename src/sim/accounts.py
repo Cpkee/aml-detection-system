@@ -17,6 +17,14 @@ def _age_bin(age: np.ndarray) -> np.ndarray:
     return np.where(age >= 40, "40plus", age.astype(int).astype(str))
 
 
+def _age_weights(age: np.ndarray, target: dict) -> np.ndarray:
+    """Sampling weights that make the picked rows' age bins match `target` shares."""
+    bins = _age_bin(age)
+    counts = pd.Series(bins).value_counts()
+    w = np.array([target[b] / counts[b] for b in bins])
+    return w / w.sum()
+
+
 def build_accounts(cfg, baf: pd.DataFrame, rng: np.random.Generator):
     n = cfg.get("size.n_accounts")
     picked = np.sort(rng.choice(len(baf), size=n, replace=False))
@@ -42,13 +50,20 @@ def build_accounts(cfg, baf: pd.DataFrame, rng: np.random.Generator):
     fraud_idx = np.flatnonzero(fraud == 1)
     if n_fake > len(fraud_idx):
         raise ValueError(f"Need {n_fake} fake accounts but sample has only {len(fraud_idx)} fraud rows")
-    fake_idx = rng.choice(fraud_idx, size=n_fake, replace=False)
+    target = {str(k): v for k, v in cfg.get("profiles.real_mule_age_weights").items()}
+    rule = cfg.get("profiles.fake_age_rule")
+    if rule == "baf_own_ages":            # fake accounts keep the ages of BAF's fraud rows
+        fake_idx = rng.choice(fraud_idx, size=n_fake, replace=False)
+    elif rule == "young_weighted":        # test: fraud rows re-weighted to the Cifas mule ages
+        fake_idx = rng.choice(fraud_idx, size=n_fake, replace=False,
+                              p=_age_weights(a["customer_age"].to_numpy()[fraud_idx], target))
+    else:
+        raise ValueError(f"unknown profiles.fake_age_rule '{rule}'")
     profile[fake_idx] = "fake"
 
     # Real customers who become mules: fraud_bool = 0 rows, weighted to Cifas mule ages.
     clean_idx = np.flatnonzero(fraud == 0)
     bins = _age_bin(a["customer_age"].to_numpy()[clean_idx])
-    target = {str(k): v for k, v in cfg.get("profiles.real_mule_age_weights").items()}
     counts = pd.Series(bins).value_counts()
     w = np.array([target[b] / counts[b] for b in bins])
     real_idx = rng.choice(clean_idx, size=n_wit + n_unw, replace=False, p=w / w.sum())

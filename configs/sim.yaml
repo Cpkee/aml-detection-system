@@ -37,7 +37,7 @@ profiles:
     value: {10: 0.17, 20: 0.40, 30: 0.24, 40plus: 0.19}
     source: "Cifas Fraudscape 2026 (21-30 = 40%, 31-40 = 24%) and H1 2026 update (under-21 = 17%); mapped to BAF decades"
     strength: sourced
-  fake_age_rule: {value: baf_own_ages, source: "Cifas: identity-fraud victims skew old (61+ = 25% in 2024); BAF fraud rows 50+ = 38.8%", strength: sourced, test: [young_weighted]}
+  fake_age_rule: {value: baf_own_ages, source: "Cifas: identity-fraud victims skew old (61+ = 25% in 2024); BAF fraud rows 50+ = 38.8%. Test young_weighted (built 7 Oct 2026): fake accounts drawn from BAF fraud rows weighted to real_mule_age_weights; BAF has few young fraud rows (74 of ~11,000 aged under 20), so the under-20 share reaches ~5% instead of 17%", strength: sourced, test: [young_weighted]}
   hijacked:      {value: excluded, source: "No published share of hijacked mule accounts", strength: assumption, test: [own_scenario]}
 
 timing:
