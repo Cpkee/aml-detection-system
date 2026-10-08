@@ -14,6 +14,10 @@ Assumptions and Use" doc.
 - Default unchanged: rebuilding `data/v1` is identical. 6,000-account smoke runs of all three pass 10/10 checks.
 - Bug fix: every simulator process shared one DuckDB scratch folder (`/tmp/sim_duckdb`); two runs at the same time
   could corrupt each other's temporary files (a sensitivity run crashed with SIGBUS). Each process now uses its own.
+- Bug fix: `finalize` settled closures in at most 4 passes; with repeated bursts they had not settled, leaving 219
+  rows after closure (check 3 failed). It now repeats until settled (up to 20 passes) and stops with an error
+  rather than write inconsistent files. Runs that settled within 4 passes (all others) are unaffected.
+- DuckDB's memory cap can be raised with `SIM_DUCKDB_MEMORY` (default 1500MB); the 732k run needs ~8GB.
 
 ## 7 Oct 2026 — sensitivity runner, young-weighted fake ages, guard on unread settings
 

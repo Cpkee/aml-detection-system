@@ -24,7 +24,7 @@ PUBLIC_TX = ["txn_id", "account_id", "direction", "counterparty_id", "day", "tim
 
 def connect(out):
     con = duckdb.connect()
-    con.execute("PRAGMA memory_limit='1500MB'")
+    con.execute(f"PRAGMA memory_limit='{os.environ.get('SIM_DUCKDB_MEMORY', '1500MB')}'")
     con.execute(f"PRAGMA temp_directory='{tempfile.gettempdir()}/sim_duckdb_{os.getpid()}'")
     for name in ["accounts", "accounts_truth", "transactions", "transactions_truth", "aml_alerts", "aml_outcomes"]:
         con.execute(f"CREATE VIEW {name} AS SELECT * FROM read_parquet('{os.path.join(out, name + '.parquet')}')")
