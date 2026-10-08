@@ -16,6 +16,17 @@ import yaml
 
 MANIFEST = "run_manifest.json"
 
+# Settings the simulator code does not read (documentation or not-built options). Overriding them would change
+# nothing, so --set refuses them rather than run a "sensitivity test" that silently tests nothing.
+NOT_READ = {
+    "meta.country": "a label only",
+    "meta.currency": "a label only",
+    "profiles.hijacked": "hijacked accounts are not simulated (dropped, team decision 7 Oct 2026)",
+    "timing.incoming_per_burst": "each shape's own n_in in laundering.shapes is used instead",
+    "laundering.card_out": "laundering card spending is deferred",
+    "rules.tune_rules": "the code always tunes R3-R6 together",
+}
+
 
 class Cfg:
     def __init__(self, path: str, overrides: dict | None = None, set_args: list[str] | None = None):
@@ -25,6 +36,9 @@ class Cfg:
             self.raw = yaml.safe_load(f)
         self.set_args = list(set_args or []) + [f"{k}={json.dumps(v)}" for k, v in (overrides or {}).items()]
         self.overrides = parse_overrides(self.set_args)
+        for key in self.overrides:
+            if key in NOT_READ:
+                raise ValueError(f"--set {key}: the simulator does not read this setting ({NOT_READ[key]})")
         for key, val in self.overrides.items():
             self.set(key, val)
 

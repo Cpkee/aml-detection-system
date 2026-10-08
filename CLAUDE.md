@@ -22,6 +22,8 @@ PYTHONPATH=src python -m sim.run all --baf data/raw/BAF_Base.csv        # full p
 PYTHONPATH=src python -m sim.checks --baf data/raw/BAF_Base.csv         # 10 checks + data/v1/data_card.md
 PYTHONPATH=src BAF_PATH=data/raw/BAF_Base.csv python -m pytest -q tests  # must pass before any commit
 ```
+Sensitivity runs (rules frozen, 244k, one `test` value each): `python -m sim.sensitivity --list | --run [--only NAME]
+| --summarise` -> `data/sensitivity/<name>/` (large files deleted) and `outputs/sensitivity/summary.csv`.
 Single steps: `accounts`, `normal --batches 3-3`, `laundering`, `rules`, `finalize`. Use `--out` for another
 output folder (e.g. `--out data/variant_II --baf data/raw/Variant_II.csv`). Run `sim.checks` after every run.
 Change a setting for one run with `--set key=value` (repeatable, value read as YAML), never by editing the YAML:
@@ -70,6 +72,14 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
 - v1_full result (244k, seed 42, `--set size.n_accounts=244000`, 11 min): 96.9% false alarms; 25% of 732
   launderers alerted, median 9 days; weekly alert budget mean 54.4 / median 28; rule scale 1.741 (50k: 1.516);
   180 launderers in test months 6–7. **This is the main dataset for modelling.**
+- Variants (244k, seed 42, rules frozen at 1.741): `data/variant_II` (fairness: age 50+ launderer rate higher in
+  all months) and `data/variant_IV` (drift: 50+ about 2x under-50 in train months, gap reversed in test months).
+  Rules: 96.9% / 96.8% false alarms, 25% / 26% caught; 169 / 171 test launderers. Use each variant for training
+  AND testing with the same split as the main data (IV's bias exists only in training months by design);
+  train-on-main / test-on-variant is an optional extra robustness check.
+- Sensitivity (42 runs, rules frozen; `outputs/sensitivity/FINDINGS.md`): the rules' catch rate moves only with
+  launderer behaviour (transfer size, repeated bursts: 25% -> ~70%); false alarms move with prevalence (1%: 90.8%,
+  0.1%: 99.0%) and normal cash use (98.9%). Seeds 43/44: 96.7–96.9% / 24–26%. Re-check models on those scenarios.
 - Everything is seeded and deterministic: same config + seed = identical data.
 
 ## Known limits / gotchas
@@ -90,10 +100,14 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
 2. ~~Full-size run~~ done 7 Oct 2026: `data/v1_full`, rules at 96.9% (see v1_full result above).
 3. Modelling (week 2): decide the weekly label ("ever launders" vs `started_by_day`), build weekly
    features via `amldata`, application-only / activity-only / combined models, same weekly alert budget.
-4. Week 3: BAF Variants II (fairness) and IV (drift) with identical settings; sensitivity runs from
-   `test` values; professor comments (fixed-cohort same-week comparison; 0.1/0.3/1% prevalence).
-   **Decision 7 Oct 2026: freeze the bank's rules** — variant and sensitivity runs reuse the v1_full scale
-   (1.741) instead of re-tuning (needs a fixed-scale option in `rules`/`run`; not built yet).
+4. Week 3: ~~BAF Variants II and IV~~ done 7 Oct 2026 (see above). Sensitivity runs from `test` values;
+   professor comments (fixed-cohort same-week comparison; 0.1/0.3/1% prevalence).
+   **Decisions 7 Oct 2026:** (a) freeze the bank's rules: variant and sensitivity runs use
+   `--set rules.fixed_scale=1.741` (the v1_full scale), never re-tuned; (b) sensitivity runs at 244k, keeping
+   summaries and deleting large files (rebuildable from the manifest); (c) 0.1% prevalence run at ~732k accounts
+   so the test set keeps ~180 launderers, 1% at 244k; (d) build repeated bursts and young-weighted fake ages,
+   drop hijacked accounts (state as a limitation); (e) main run repeated with seeds 43 and 44 as the
+   chance yardstick, one seed per sensitivity run.
 
 ## Decision records
 - Logic, assumptions, full schema: https://claude.ai/artifact/LchcqbsutNLSHWKESoWWQL

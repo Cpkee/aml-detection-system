@@ -1,6 +1,7 @@
 """Step 5: plant laundering bursts on launderers, in 15 SAML-D shapes.
 
-Each launderer gets one ~2-week burst from its start day. Its shape (drawn with SAML-D's
+Each launderer gets one ~2-week burst from its start day (test: repeated bursts every
+timing.repeat_gap_days until the window ends; the bank's closure then removes the rest). Its shape (drawn with SAML-D's
 weights) decides who pays in (how many payers, transfer or cash), and how the money leaves
 (how many receivers, transfers or cash withdrawals, how often abroad). Amounts are anchored to
 RUSI's GBP 532 average and leave at RUSI's speed. Networked launderers pass some pieces to their
@@ -56,6 +57,10 @@ def generate_laundering(cfg, truth: pd.DataFrame, internal: pd.DataFrame, open_d
     start = truth["launder_start_day"].fillna(-1).to_numpy().astype(int)
     successor = internal["successor"].to_numpy()
     burst = cfg.get("timing.burst_days")
+    repeat = cfg.get("timing.bursts_per_launderer")
+    if repeat not in (1, "repeat_until_closed"):
+        raise ValueError(f"unknown timing.bursts_per_launderer '{repeat}'")
+    gap = cfg.get("timing.repeat_gap_days")
     keep_lo, keep_hi = cfg.get("laundering.holder_keeps")
     pieces_mean = cfg.get("laundering.out_pieces_mean")
     out_mean = cfg.get("laundering.out_transfer_mean")
@@ -94,43 +99,54 @@ def generate_laundering(cfg, truth: pd.DataFrame, internal: pd.DataFrame, open_d
         p_abroad = min(1.0, base_abroad * sh["abroad_rel"])
         p_internal = min(1.0, base_internal * (layered_x if sh["layered"] else 1))
 
-        for e, d_in in enumerate(in_days):
-            s_in = int(sample_seconds(rng, 1, hw)[0])
-            n_p = 1 if many_small else 1 + rng.poisson(pieces_mean - 1)
-            piece = lognormal_mean(rng, piece_mean, piece_sigma, n_p)
-            keep = rng.uniform(keep_lo, keep_hi)
-            amt_in = piece.sum() / (1 - keep)
-            cash_in = sh["in_kind"] == "cash" or (sh["in_kind"] == "half_cash" and rng.random() < half_cash)
-            rows.add([i], [d_in], [s_in], "in", "CASH" if cash_in else payers[e:e + 1], [amt_in],
-                     "Cash Deposit" if cash_in else "ACH", name, is_l=1)
-            t0 = d_in * 86400 + s_in
+        while True:   # one burst; repeated only in the repeat_until_closed test
+            for e, d_in in enumerate(in_days):
+                s_in = int(sample_seconds(rng, 1, hw)[0])
+                n_p = 1 if many_small else 1 + rng.poisson(pieces_mean - 1)
+                piece = lognormal_mean(rng, piece_mean, piece_sigma, n_p)
+                keep = rng.uniform(keep_lo, keep_hi)
+                amt_in = piece.sum() / (1 - keep)
+                cash_in = sh["in_kind"] == "cash" or (sh["in_kind"] == "half_cash" and rng.random() < half_cash)
+                rows.add([i], [d_in], [s_in], "in", "CASH" if cash_in else payers[e:e + 1], [amt_in],
+                         "Cash Deposit" if cash_in else "ACH", name, is_l=1)
+                t0 = d_in * 86400 + s_in
 
-            if sh["out_kind"] == "cash_withdrawal":
-                total = piece.sum()
-                n_w = int(np.ceil(total / cash_piece_max))
-                add_out(i, t0 + _delays(rng, cfg, n_w), np.full(n_w, total / n_w), "CASH",
-                        "Cash Withdrawal", "UK", name)
-                continue
+                if sh["out_kind"] == "cash_withdrawal":
+                    total = piece.sum()
+                    n_w = int(np.ceil(total / cash_piece_max))
+                    add_out(i, t0 + _delays(rng, cfg, n_w), np.full(n_w, total / n_w), "CASH",
+                            "Cash Withdrawal", "UK", name)
+                    continue
 
-            t_out = t0 + _delays(rng, cfg, n_p)
-            rloc, ptype = _destination(rng, cfg, n_p, p_abroad)
-            for p in range(n_p):
-                o_day = int(min(t_out[p], end_sec(i)) // 86400)
-                j = successor[i]
-                if j >= 0 and rng.random() < p_internal and active(j, o_day):
-                    # internal hop i -> j (both rows share one transfer id), then j forwards it on
-                    t_p = min(t_out[p], end_sec(i))
-                    cp_j = np.array([j], dtype=object)
-                    cp_i = np.array([i], dtype=object)
-                    add_out(i, [t_p], [piece[p]], cp_j, "ACH", "UK", name, pair_id=pair)
-                    rows.add([j], [int(t_p // 86400)], [int(t_p % 86400)], "in", cp_i, [piece[p]], "ACH", name,
-                             is_l=1, pair=pair)
-                    keep_j = rng.uniform(keep_lo, keep_hi)
-                    r2, p2 = _destination(rng, cfg, 1, p_abroad)
-                    add_out(j, [t_p + _delays(rng, cfg, 1)[0]], [piece[p] * (1 - keep_j)], ext_ids(rng, 1),
-                            p2, r2, name, link=pair)
-                    pair += 1
-                else:
-                    cp = receivers[rng.integers(0, len(receivers)):][:1]
-                    add_out(i, t_out[p:p + 1], piece[p:p + 1], cp, ptype[p:p + 1], rloc[p:p + 1], name)
+                t_out = t0 + _delays(rng, cfg, n_p)
+                rloc, ptype = _destination(rng, cfg, n_p, p_abroad)
+                for p in range(n_p):
+                    o_day = int(min(t_out[p], end_sec(i)) // 86400)
+                    j = successor[i]
+                    if j >= 0 and rng.random() < p_internal and active(j, o_day):
+                        # internal hop i -> j (both rows share one transfer id), then j forwards it on
+                        t_p = min(t_out[p], end_sec(i))
+                        cp_j = np.array([j], dtype=object)
+                        cp_i = np.array([i], dtype=object)
+                        add_out(i, [t_p], [piece[p]], cp_j, "ACH", "UK", name, pair_id=pair)
+                        rows.add([j], [int(t_p // 86400)], [int(t_p % 86400)], "in", cp_i, [piece[p]], "ACH", name,
+                                 is_l=1, pair=pair)
+                        keep_j = rng.uniform(keep_lo, keep_hi)
+                        r2, p2 = _destination(rng, cfg, 1, p_abroad)
+                        add_out(j, [t_p + _delays(rng, cfg, 1)[0]], [piece[p] * (1 - keep_j)], ext_ids(rng, 1),
+                                p2, r2, name, link=pair)
+                        pair += 1
+                    else:
+                        cp = receivers[rng.integers(0, len(receivers)):][:1]
+                        add_out(i, t_out[p:p + 1], piece[p:p + 1], cp, ptype[p:p + 1], rloc[p:p + 1], name)
+            if repeat == 1:
+                break
+            b_start = int(in_days[0]) + burst + gap
+            last_day = open_day[i] + days - 1
+            if b_start > last_day:
+                break
+            k_in = int(rng.integers(lo, hi + 1))
+            in_days = b_start + np.sort(np.concatenate([[0], rng.integers(0, burst, size=k_in - 1)]))
+            in_days = in_days[in_days <= last_day]
+            payers = _payers(rng, sh["senders"], k_in)
     return rows, shape_of

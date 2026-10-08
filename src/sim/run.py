@@ -104,8 +104,9 @@ def step_laundering(cfg, out):
 
 def _con():
     con = duckdb.connect()
-    con.execute("PRAGMA memory_limit='1500MB'")
-    con.execute(f"PRAGMA temp_directory='{tempfile.gettempdir()}/sim_duckdb'")
+    # DuckDB memory cap: 1.5 GB suits small laptops; raise it for very large runs (e.g. SIM_DUCKDB_MEMORY=8GB at 732k)
+    con.execute(f"PRAGMA memory_limit='{os.environ.get('SIM_DUCKDB_MEMORY', '1500MB')}'")
+    con.execute(f"PRAGMA temp_directory='{tempfile.gettempdir()}/sim_duckdb_{os.getpid()}'")
     con.execute("PRAGMA preserve_insertion_order=false")
     return con
 
@@ -174,7 +175,8 @@ def step_finalize(cfg, out):
     start, is_l = _truth_arrays(p)
     ids = pd.read_parquet(p["accounts"], columns=["account_id"])["account_id"].to_numpy()
     seed = cfg.get("meta.seed")
-    for it in range(4):
+    max_passes = 20   # closing accounts removes activity, which can change other alerts; repeat until settled
+    for it in range(max_passes):
         removed = _write_final(con, p, exits_path, seed)
         f = weekly_features(con, f"read_parquet('{p['tx']}')", p["accounts"], cfg)
         al, exits = decide(hits(f, cfg, scale), cfg, start, is_l, seed)
@@ -185,6 +187,8 @@ def step_finalize(cfg, out):
         if same:
             break
         new.to_parquet(exits_path, index=False)
+    else:
+        raise RuntimeError(f"closures did not settle after {max_passes} passes; files would be inconsistent")
     rules_fired = al[RULES].apply(lambda r: ";".join(k for k in RULES if r[k]), axis=1)
     alerts = pd.DataFrame({"alert_id": [f"AL{i:07d}" for i in range(1, len(al) + 1)],
                            "account_id": ids[al["acct"].to_numpy()], "alert_day": al["alert_day"].to_numpy(),
