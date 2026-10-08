@@ -4,6 +4,12 @@ Changes to the simulator and the data it generates, newest first. Settings chang
 `source` of each value in `configs/sim.yaml`; decisions are recorded in the "Simulated Dataset: Logic,
 Assumptions and Use" doc.
 
+
+## 8 Oct 2026 — `amldata` reads the full-size dataset by default
+
+`amldata.public()`, `labels()` and `evaluation()` now default to `data/v1_full` (244k, the main modelling dataset)
+instead of `data/v1` (50k), so model code can't train on the small set by accident. Pass `out="data/v1"` for quick
+experiments, or a variant folder. Data unchanged.
 ## 7 Oct 2026 — frozen rules option (`rules.fixed_scale`)
 
 Team decision: the bank's rules are frozen for variant and sensitivity runs. New setting `rules.fixed_scale`

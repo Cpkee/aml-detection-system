@@ -44,7 +44,8 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
 - 6 files in `data/v1/`. **Model inputs:** `accounts` (32 cols: id, open_month, open_day, 29 BAF features)
   and `transactions` (11 cols; card spending = one row per account per week, `item_count` = purchases).
   **Hidden:** `accounts_truth`, `aml_alerts`, `aml_outcomes`, `transactions_truth`.
-- Model/feature code uses `amldata.public()` and `amldata.labels(as_of_day=...)` only. `labels()` returns
+- Model/feature code uses `amldata.public()` and `amldata.labels(as_of_day=...)` only. Default folder is
+  `data/v1_full` (main dataset); pass `out=` for others (`data/v1` 50k, `data/variant_II`, `data/variant_IV`). `labels()` returns
   `is_launderer` (+ `started_by_day`) for months 0–5 and refuses test months 6–7.
   Scoring code uses `amldata.evaluation()`. Never read hidden parquet files directly elsewhere.
 - `txn_id` is anonymous (`T` + 16 hex of md5(provisional id + seed)); rows sorted by `day`, `time`. Provisional
