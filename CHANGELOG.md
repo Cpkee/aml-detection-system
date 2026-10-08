@@ -4,6 +4,16 @@ Changes to the simulator and the data it generates, newest first. Settings chang
 `source` of each value in `configs/sim.yaml`; decisions are recorded in the "Simulated Dataset: Logic,
 Assumptions and Use" doc.
 
+
+## 8 Oct 2026 — R6 waits 8 weeks before judging a new account (team decision); all data regenerated
+
+R6 ("sudden change") compared money in against the average of the previous weeks after only 4 weeks of history.
+For many new accounts those weeks hold no salary yet, so the first monthly salary looked like a sudden change:
+3,837 alerts at 244k (65% of all the rules' alerts), none on a launderer, almost all in an account's 4th–5th week.
+They also put two-thirds of the test cohort's weekly alert budget into a single week. `rules.R6_history_weeks` is
+now [8, 8] (was [4, 8]). At 50k with the scale held fixed: alerts 1,592 -> 756, the same 45 launderers caught,
+false alarms 97.2% -> 94.0%. The main data, variants and sensitivity runs are regenerated with this setting; the
+rules are re-tuned once on the full-size data and frozen at the new scale for the variants and sensitivity runs.
 ## 8 Oct 2026 — `amldata` reads the full-size dataset by default
 
 `amldata.public()`, `labels()` and `evaluation()` now default to `data/v1_full` (244k, the main modelling dataset)
