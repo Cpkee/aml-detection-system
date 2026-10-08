@@ -100,7 +100,12 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
 2. ~~Full-size run~~ done 7 Oct 2026: `data/v1_full`, rules at 96.9% (see v1_full result above).
 3. Modelling (week 2). **Decisions 8 Oct 2026:** weekly label = "mule account by this week" (a fake account
    counts from the day it opens; a real customer — witting/unwitting — from `launder_start_day`); alert budget
-   = the rules' own alert count in each week. Still open: the fixed cohort (professor's same-week comparison).
+   = the rules' own alert count in each week. **Fixed cohort (8 Oct 2026):** main comparison = the 50,061 test
+   accounts (opened months 6-7, 180 launderers), clock = weeks since each account opened (0-78), weekly budget =
+   the rules' alerts on these accounts in that week of their life (only 21 in weeks 0-3, 1,130 in weeks 0-12,
+   1,501 in total); secondary = same total of 1,501 flags used at any time (upper bound on the head start).
+   Based on the repo's notes of the professor's comment ("fixed-cohort same-week comparison"; EDA cohort check);
+   the professor's exact wording is not in the repo — confirm it.
    1. Add that label to `amldata.labels()` (it now returns only `is_launderer` / `started_by_day`).
    2. **Baseline to beat** (rough check 8 Oct, untuned application-only model, train months 0-4, same number
       of flags as the rules on the test cohort = 1,462): 56/180 caught (31%) vs rules 48 (27%), a tie within
