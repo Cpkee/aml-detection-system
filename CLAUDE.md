@@ -98,8 +98,18 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
 ## Next tasks
 1. ~~`--set key=value` override~~ done 7 Oct 2026 (with run manifest).
 2. ~~Full-size run~~ done 7 Oct 2026: `data/v1_full`, rules at 96.9% (see v1_full result above).
-3. Modelling (week 2): decide the weekly label ("ever launders" vs `started_by_day`), build weekly
-   features via `amldata`, application-only / activity-only / combined models, same weekly alert budget.
+3. Modelling (week 2). **Decisions 8 Oct 2026:** weekly label = "mule account by this week" (a fake account
+   counts from the day it opens; a real customer — witting/unwitting — from `launder_start_day`); alert budget
+   = the rules' own alert count in each week. Still open: the fixed cohort (professor's same-week comparison).
+   1. Add that label to `amldata.labels()` (it now returns only `is_launderer` / `started_by_day`).
+   2. **Baseline to beat** (rough check 8 Oct, untuned application-only model, train months 0-4, same number
+      of flags as the rules on the test cohort = 1,462): 56/180 caught (31%) vs rules 48 (27%), a tie within
+      noise (±6-7 pts); flags at opening, median 98 days *before* start vs rules 10 days *after*; union 84 (47%).
+   3. **Stress test the fake-account assumption**: 73% of launderers are fakes from BAF fraud rows and the
+      baseline caught almost only fakes (53/56). Rebuild with `in_window_mix` tests (53% / 56% fake) and report
+      how much the advantage shrinks — the main threat to the result.
+   4. Weekly features via `amldata` (rows up to each week only); application-only / activity-only / combined
+      models; score months 6-7 against the rules: caught within budget, days earlier, false alarms, precision.
 4. Week 3: ~~BAF Variants II and IV~~ done 7 Oct 2026 (see above). Sensitivity runs from `test` values;
    professor comments (fixed-cohort same-week comparison; 0.1/0.3/1% prevalence).
    **Decisions 7 Oct 2026:** (a) freeze the bank's rules: variant and sensitivity runs use
