@@ -47,7 +47,8 @@ Never open the hidden files directly. Use `amldata`:
 
 ```python
 from amldata import public, labels
-con = public()                                            # only `accounts` and `transactions`
+con = public()                                            # data/v1_full by default; public("data/v1") for 50k
+                                                          # only `accounts` and `transactions`
 tx = con.sql("SELECT * FROM transactions WHERE day <= 377").df()
 y = labels(as_of_day=377)                                 # training/calibration accounts (months 0-5) only
 ```

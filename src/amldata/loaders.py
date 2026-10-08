@@ -26,7 +26,7 @@ PUBLIC = ["accounts", "transactions"]
 HIDDEN = ["accounts_truth", "aml_alerts", "aml_outcomes", "transactions_truth"]
 TRAIN_MONTHS = (0, 1, 2, 3, 4, 5)   # 0-4 train, 5 calibrate
 TEST_MONTHS = (6, 7)                # stay closed until scoring
-DEFAULT_OUT = "data/v1"
+DEFAULT_OUT = "data/v1_full"       # the main modelling dataset (244k); pass out="data/v1" for quick 50k work
 
 
 def _file(out: str, name: str) -> str:
