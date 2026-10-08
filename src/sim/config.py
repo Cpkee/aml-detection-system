@@ -23,7 +23,6 @@ NOT_READ = {
     "meta.currency": "a label only",
     "profiles.hijacked": "hijacked accounts are not simulated (dropped, team decision 7 Oct 2026)",
     "timing.incoming_per_burst": "each shape's own n_in in laundering.shapes is used instead",
-    "timing.bursts_per_launderer": "repeated bursts are not built yet",
     "laundering.card_out": "laundering card spending is deferred",
     "rules.tune_rules": "the code always tunes R3-R6 together",
 }

@@ -77,6 +77,13 @@ def build_accounts(cfg, baf: pd.DataFrame, rng: np.random.Generator):
     lo, hi = cfg.get("timing.fake_start_days")
     rel[fake_idx] = rng.integers(lo, hi + 1, size=n_fake)
     bands = cfg.get("timing.existing_start_bands")
+    # The bands are cut so a burst and its forwarding end inside the window. For a shorter window (observe_days
+    # test) the band edges shrink in proportion; the main window and longer ones use them unchanged.
+    days = cfg.get("size.observe_days")
+    fwd_days = int(np.ceil(cfg.get("laundering.forward_delay_bands_minutes")["over_24h"][1] / 1440))
+    fit = (days - 1 - cfg.get("timing.burst_days") - fwd_days) / max(b["days"][1] for b in bands)
+    if fit < 1:
+        bands = [{**b, "days": [int(round(b["days"][0] * fit)), int(round(b["days"][1] * fit))]} for b in bands]
     shares = np.array([b["share"] for b in bands])
     pick = rng.choice(len(bands), size=len(real_idx), p=shares / shares.sum())
     for k, b in enumerate(bands):

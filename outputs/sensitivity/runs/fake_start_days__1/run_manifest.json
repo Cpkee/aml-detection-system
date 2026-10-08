@@ -1,0 +1,21 @@
+{
+  "version": "v1",
+  "seed": 42,
+  "config": "configs/sim.yaml",
+  "config_sha256": "cfc131cfb3ef8129b406f153a228ed557218ba81c0232fe343c697f9146ef49a",
+  "set": [
+    "size.n_accounts=244000",
+    "rules.fixed_scale=1.741",
+    "timing.fake_start_days=[15, 45]"
+  ],
+  "baf_file": "data/raw/BAF_Base.csv",
+  "baf_sha256": "7bf10a37ce07e72e14c1b09e5efee3d27261baff4facc7da767b0474dcf9b809",
+  "git_commit": "bb5b24e040122f94c1405f3f198c831a7e9036f8",
+  "git_uncommitted_changes": false,
+  "python": "3.12.15",
+  "packages": {
+    "numpy": "2.5.3",
+    "pandas": "3.0.6",
+    "duckdb": "1.5.6"
+  }
+}

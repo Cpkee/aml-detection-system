@@ -4,6 +4,28 @@ Changes to the simulator and the data it generates, newest first. Settings chang
 `source` of each value in `configs/sim.yaml`; decisions are recorded in the "Simulated Dataset: Logic,
 Assumptions and Use" doc.
 
+## 8 Oct 2026 — sensitivity results (42 runs, `outputs/sensitivity/`)
+
+All 42 runs pass the 10 checks. Seeds 43/44 put chance at 96.7–96.9% false alarms and 24–26% caught. Large effects:
+laundering transfers of £1,500 (71% caught) and repeated bursts (67% caught); prevalence 1% (90.8% false alarms)
+and 0.1% (99.0%); doubled cash deposits (98.9%, R2 ~13,000 alerts); 15–22-payer group collections (R3 2,178
+alerts). Everything else stays near the seed range. Details: `outputs/sensitivity/FINDINGS.md`.
+
+## 8 Oct 2026 — repeated bursts and window-scaled start bands (team decisions 8 Oct 2026)
+
+- `timing.bursts_per_launderer = repeat_until_closed` is now built: a new burst starts `timing.repeat_gap_days`
+  (30, new setting, assumption) after each burst ends, until the window ends; the bank's closure removes the rest.
+- `size.observe_days` shorter than 548: existing customers' start bands shrink in proportion, so every burst and
+  its forwarding still end inside the window (365 days: starts up to day ~343). 548 and longer: unchanged.
+- The sensitivity runner now includes `observe_days` (365, 730) and repeated bursts: 42 runs.
+- Default unchanged: rebuilding `data/v1` is identical. 6,000-account smoke runs of all three pass 10/10 checks.
+- Bug fix: every simulator process shared one DuckDB scratch folder (`/tmp/sim_duckdb`); two runs at the same time
+  could corrupt each other's temporary files (a sensitivity run crashed with SIGBUS). Each process now uses its own.
+- Bug fix: `finalize` settled closures in at most 4 passes; with repeated bursts they had not settled, leaving 219
+  rows after closure (check 3 failed). It now repeats until settled (up to 20 passes) and stops with an error
+  rather than write inconsistent files. Runs that settled within 4 passes (all others) are unaffected.
+- DuckDB's memory cap can be raised with `SIM_DUCKDB_MEMORY` (default 1500MB); the 732k run needs ~8GB.
+
 ## 7 Oct 2026 — sensitivity runner, young-weighted fake ages, guard on unread settings
 
 - `python -m sim.sensitivity`: one run per `test` value in the config (244k, seed 42, rules frozen at the

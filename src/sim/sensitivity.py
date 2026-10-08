@@ -37,7 +37,6 @@ N_MAIN = 244_000
 SPECIAL = {
     "size.n_accounts": "the full-size main run itself",
     "profiles.launderer_share": "prevalence runs (special sizes, below)",
-    "size.observe_days": "needs the existing-customer start bands to follow the window (team decision pending)",
 }
 
 
