@@ -104,8 +104,8 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
    accounts (opened months 6-7, 180 launderers), clock = weeks since each account opened (0-78), weekly budget =
    the rules' alerts on these accounts in that week of their life (only 21 in weeks 0-3, 1,130 in weeks 0-12,
    1,501 in total); secondary = same total of 1,501 flags used at any time (upper bound on the head start).
-   Based on the repo's notes of the professor's comment ("fixed-cohort same-week comparison"; EDA cohort check);
-   the professor's exact wording is not in the repo — confirm it.
+   This answers comment 2 of the professor's feedback (verbatim in `docs/professor_feedback.md`). Accounts closed
+   by the bank stay in the cohort as caught; report accounts still open per week.
    1. Add that label to `amldata.labels()` (it now returns only `is_launderer` / `started_by_day`).
    2. **Baseline to beat** (rough check 8 Oct, untuned application-only model, train months 0-4, same number
       of flags as the rules on the test cohort = 1,462): 56/180 caught (31%) vs rules 48 (27%), a tie within
@@ -115,8 +115,17 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
       how much the advantage shrinks — the main threat to the result.
    4. Weekly features via `amldata` (rows up to each week only); application-only / activity-only / combined
       models; score months 6-7 against the rules: caught within budget, days earlier, false alarms, precision.
+   5. **Value of onboarding information (professor comment 2):** at each week since opening, on the same cohort
+      and the same transactions, compare activity-only vs application + activity; the gap is the onboarding
+      value, so data availability and cohort changes cannot explain it.
+   6. **Label maturity (comment 2):** also score against a fixed final label (mule at any point in the window);
+      report per week how many cohort launderers have started and how many accounts are still open.
+   7. **Imbalance (comment 1):** model vs rules false-alarm share and precision at 0.1% / 0.3% / 1% prevalence
+      (datasets exist under `data/sensitivity/`). The test set is never rebalanced; resample training data only.
+   8. **Report checklist (professor):** justify dataset choice; size and variables; preprocessing; feature
+      engineering; why each model suits the task. State that the test set is at the natural 0.3% rate.
 4. Week 3: ~~BAF Variants II and IV~~ done 7 Oct 2026 (see above). Sensitivity runs from `test` values;
-   professor comments (fixed-cohort same-week comparison; 0.1/0.3/1% prevalence).
+   professor's feedback: `docs/professor_feedback.md` (imbalance, cohort/data/label changes, report detail).
    **Decisions 7 Oct 2026:** (a) freeze the bank's rules: variant and sensitivity runs use
    `--set rules.fixed_scale=1.741` (the v1_full scale), never re-tuned; (b) sensitivity runs at 244k, keeping
    summaries and deleting large files (rebuildable from the manifest); (c) 0.1% prevalence run at ~732k accounts
