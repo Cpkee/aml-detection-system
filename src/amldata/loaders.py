@@ -4,6 +4,7 @@ Three doors, so hidden answers never reach a model by accident:
 
   public(out)               model inputs only: `accounts` and `transactions`
   labels(out, ...)          the training answer `is_launderer`, for training/calibration accounts only
+                            (`profile=True` adds each launderer's hidden type for EDA; months 0-5 only)
   evaluation(out)           every table; for scoring code in src/evaluation/ only
 
 Feature and model code must only use `public()` and `labels()`. tests/test_hidden_files.py fails if any
@@ -16,6 +17,7 @@ Example
     week = con.sql("SELECT * FROM transactions WHERE day <= 377").df()
     y = labels(as_of_day=377)                        # months 0-5 only; weekly labels at one calendar day
     y4 = labels(weeks_since_open=4)                  # weekly labels at the end of each account's week 4
+    e = labels(profile=True)                         # + fake / witting / unwitting per launderer (EDA only)
 """
 from __future__ import annotations
 import os
@@ -57,7 +59,7 @@ def accounts(out: str = DEFAULT_OUT) -> pd.DataFrame:
 
 
 def labels(out: str = DEFAULT_OUT, months=TRAIN_MONTHS, as_of_day: int | None = None,
-           weeks_since_open: int | None = None, allow_test: bool = False) -> pd.DataFrame:
+           weeks_since_open: int | None = None, allow_test: bool = False, profile: bool = False) -> pd.DataFrame:
     """Training answers for accounts opened in `months`.
 
     Always returns account_id, open_month and is_launderer (the fixed final label: a mule at any point in
@@ -74,13 +76,16 @@ def labels(out: str = DEFAULT_OUT, months=TRAIN_MONTHS, as_of_day: int | None = 
     if as_of_day is not None and weeks_since_open is not None:
         raise ValueError("give as_of_day or weeks_since_open, not both")
     months = tuple(int(m) for m in months)
+    if profile and set(months) & set(TEST_MONTHS):
+        raise ValueError("profile=True is for EDA on months 0-5 only; scoring code reads the type via evaluation()")
     if not allow_test and set(months) & set(TEST_MONTHS):
         raise ValueError("labels for test months 6-7 stay closed; use amldata.evaluation() in scoring code")
     con = _connect()
     m = ", ".join(str(x) for x in months)
     df = con.execute(f"""
         SELECT a.account_id, a.open_month, a.open_day, t.is_launderer, t.launder_start_day,
-               (t.profile = 'fake') AS is_fake
+               (t.profile = 'fake') AS is_fake,
+               CASE WHEN t.is_launderer = 1 THEN t.profile END AS profile
         FROM read_parquet('{_file(out, 'accounts')}') a
         JOIN read_parquet('{_file(out, 'accounts_truth')}') t USING (account_id)
         WHERE a.open_month IN ({m})""").df()
@@ -91,7 +96,8 @@ def labels(out: str = DEFAULT_OUT, months=TRAIN_MONTHS, as_of_day: int | None = 
         started = launders & start.notna() & (start <= cutoff)
         df["started_by_day"] = started.astype(int)
         df["mule_by_day"] = (started | (launders & df["is_fake"])).astype(int)
-    return df.drop(columns=["open_day", "launder_start_day", "is_fake"])
+    drop = ["open_day", "launder_start_day", "is_fake"] + ([] if profile else ["profile"])
+    return df.drop(columns=drop)
 
 
 def evaluation(out: str = DEFAULT_OUT) -> duckdb.DuckDBPyConnection:

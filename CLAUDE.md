@@ -22,6 +22,10 @@ PYTHONPATH=src python -m sim.run all --baf data/raw/BAF_Base.csv        # full p
 PYTHONPATH=src python -m sim.checks --baf data/raw/BAF_Base.csv         # 10 checks + data/v1/data_card.md
 PYTHONPATH=src BAF_PATH=data/raw/BAF_Base.csv python -m pytest -q tests  # must pass before any commit
 ```
+Modelling (plan: "Modelling: phased plan" tab of the decision-record doc; Phase 0 done 9 Oct 2026):
+`PYTHONPATH=src python -m features weekly --out data/v1 --weeks 0-78` builds `<out>/features/weekly.parquet` + its
+`features_manifest.json` (feature list, cut-off rule, code commit, hash of the data's `run_manifest.json`; `features.weekly.load()`
+refuses a stale store). `python -m features eda|preprocess` and `python -m models train` are Phase 1/2/4 stubs.
 Sensitivity runs (rules frozen, 244k, one `test` value each): `python -m sim.sensitivity --list | --run [--only NAME]
 | --summarise` -> `data/sensitivity/<name>/` (large files deleted) and `outputs/sensitivity/summary.csv`.
 Single steps: `accounts`, `normal --batches 3-3`, `laundering`, `rules`, `finalize`. Use `--out` for another
@@ -39,6 +43,8 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
   batching, closure removal) -> `checks.py` (checks + data card). `src/sim/eda/` — EDA scripts.
 - `src/amldata/` — **the only way model code reads data** (see Data rules).
 - `src/evaluation/` — scoring code; the only place besides `sim` allowed to read hidden files.
+- `src/features/` — modelling EDA, preprocessing, weekly feature store (`weekly.py`, `manifest.py`); reads via `amldata` only.
+- `src/models/` — training and calibration (Phase 4). `outputs/modelling/` — committed modelling results (see its README).
 - `tests/` — `test_data.py` (runs the 10 checks), `test_hidden_files.py` (blocks hidden-file leaks).
 - `outputs/` — committed results (e.g. `outputs/eda/`). `data/` — generated data, never committed.
 
@@ -51,6 +57,8 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
   `is_launderer` (fixed final label) for months 0–5 and refuses test months 6–7; with a cut-off
   (`as_of_day=` one calendar day, or `weeks_since_open=w` = end of each account's week w) it adds
   `started_by_day` and `mule_by_day` (main label: fake accounts count from opening, real customers from start).
+  `labels(profile=True)` adds each launderer's hidden type (fake / witting / unwitting; None otherwise) for EDA on
+  months 0–5 only; it refuses test months even with `allow_test`. Never a model input (decision 9 Oct 2026).
   Scoring code uses `amldata.evaluation()`. Never read hidden parquet files directly elsewhere.
 - `txn_id` is anonymous (`T` + 16 hex of md5(provisional id + seed)); rows sorted by `day`, `time`. Provisional
   `N###_`/`L_` ids exist only in `_internal/parts` and must never reach public files (check 10).
@@ -103,7 +111,14 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
 ## Next tasks
 1. ~~`--set key=value` override~~ done 7 Oct 2026 (with run manifest).
 2. ~~Full-size run~~ done 7 Oct 2026, regenerated 8 Oct after the R6 fix: rules at 93.4% (see above).
-3. Modelling (week 2). **Decisions 8 Oct 2026:** weekly label = "mule account by this week" (a fake account
+3. Modelling. **Decisions 9 Oct 2026** (phased plan in the doc tab "Modelling: phased plan"): one pooled account-week
+   model (row per account per week since opening, label `mule_by_day`, `weeks_since_open` a feature); horizon weeks 0–26 main,
+   0–78 appendix; a model flag is permanent (caught at first flag, leaves the pool); class weights main + one 1:20 undersampling
+   ablation, no SMOTE; features precomputed to `data/<run>/features/` with a manifest; lightgbm + torch (CPU) + networkx.
+   Phases: 0 setup ~~done 9 Oct~~ -> 1 EDA on months 0–5 (`src/features/eda_train.py`, new; the sim EDA peeks ahead) -> 2 cleaning
+   (BAF −1 codes -> NaN + flag; `credit_risk_score` negatives are real) -> 3 feature store -> 4 models -> 5 harness (dry-run on
+   month 5 first) -> 6 extensions (fake-mix stress test first). Dropped as un-rewardable by the simulator: round/under-limit
+   amounts, quiet-then-active. **Decisions 8 Oct 2026:** weekly label = "mule account by this week" (a fake account
    counts from the day it opens; a real customer — witting/unwitting — from `launder_start_day`); alert budget
    = the rules' own alert count in each week. **Fixed cohort (8 Oct 2026):** main comparison = the 50,061 test
    accounts (opened months 6-7, 180 launderers), clock = weeks since each account opened (0-78), weekly budget =

@@ -60,3 +60,13 @@ def test_mule_label_counts_fakes_from_opening():
 def test_labels_refuse_two_cutoffs():
     with pytest.raises(ValueError):
         labels(OUT, as_of_day=100, weeks_since_open=4)
+
+
+@needs_data
+def test_profile_only_for_eda_on_training_months():
+    assert "profile" not in labels(OUT).columns                    # absent unless asked for
+    y = labels(OUT, profile=True)
+    assert set(y["profile"].dropna()) <= {"fake", "witting", "unwitting"}
+    assert (y["profile"].notna() == (y["is_launderer"] == 1)).all()  # the type is shown for launderers only
+    with pytest.raises(ValueError):
+        labels(OUT, months=(6, 7), profile=True, allow_test=True)   # never on test months, even for evaluation

@@ -6,6 +6,16 @@ Assumptions and Use" doc.
 
 
 
+## 9 Oct 2026 — Modelling Phase 0: `labels(profile=True)`, feature-store skeleton with manifest, leak tests
+
+No data change. `amldata.labels(profile=True)` returns each launderer's hidden type (fake / witting / unwitting, None for
+everyone else) for months 0–5 only, for EDA breakdowns; it refuses test months even with `allow_test=True`. New packages
+`src/features` (weekly feature store `python -m features weekly`, `features_manifest.json` recording the feature list, the
+cut-off rule `day <= open_day + 7w + 6`, the code commit and a hash of the data's `run_manifest.json`; `load()` refuses a stale
+store) and `src/models` (CLI stub). `tests/test_features.py` checks on a synthetic dataset that week-w features ignore later
+rows, that rebuilds are byte-identical and that stale manifests are refused. Added lightgbm, networkx, torch to requirements.
+Phased plan: doc tab "Modelling: phased plan".
+
 ## 9 Oct 2026 — `amldata.labels()`: the agreed weekly label and a weeks-since-opening cut-off
 
 `labels()` now also returns `mule_by_day`, the main label agreed on 8 Oct: a fake account counts as a mule from
