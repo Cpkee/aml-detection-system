@@ -115,10 +115,21 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
    model (row per account per week since opening, label `mule_by_day`, `weeks_since_open` a feature); horizon weeks 0–26 main,
    0–78 appendix; a model flag is permanent (caught at first flag, leaves the pool); class weights main + one 1:20 undersampling
    ablation, no SMOTE; features precomputed to `data/<run>/features/` with a manifest; lightgbm + torch (CPU) + networkx.
-   Phases: 0 setup ~~done 9 Oct~~ -> 1 EDA on months 0–5 (`src/features/eda_train.py`, new; the sim EDA peeks ahead) -> 2 cleaning
+   Phases: 0 setup ~~done 9 Oct~~ -> 1 EDA ~~done 9 Oct~~ (`python -m features eda`, months 0–4 only, month 5 untouched;
+   `outputs/modelling/eda/report.md` + `univariate_tests.csv` + `feature_screen.csv`; 50k copy under `eda/v1_50k/`) -> 2 cleaning
    (BAF −1 codes -> NaN + flag; `credit_risk_score` negatives are real) -> 3 feature store -> 4 models -> 5 harness (dry-run on
    month 5 first) -> 6 extensions (fake-mix stress test first). Dropped as un-rewardable by the simulator: round/under-limit
-   amounts, quiet-then-active. **Decisions 8 Oct 2026:** weekly label = "mule account by this week" (a fake account
+   amounts, quiet-then-active. **EDA findings 9 Oct 2026 (244k, months 0–4, 455 launderers):** at opening only fake
+   accounts separate (housing_status, device_os, keep_alive_session, address months, credit score; AUC 0.60–0.69 vs 0.5);
+   real-customer mules do not (ceiling on earliness). Fakes start laundering in weeks 8–17 (median 13), real customers
+   spread over weeks 1–75; 361 of 455 start inside the 26-week horizon. Activity screen (open weeks only): cumulative rows and
+   money in, rows and payers this week, median in->out delay carry signal once a burst exists (AUC 0.70–0.86 vs started);
+   weekly abroad / high-risk / cash shares carry none; speed shares need redefining as transfers out after transfers in.
+   Homophily: a launderer's internal payees are launderers 5.4% of the time, 20x the base rate -> graph features worthwhile.
+   **Closure footprint (decision needed):** every open account has a weekly card row, so a zero-row week = closed by the
+   bank = a confirmed launderer (116 of 455 training launderers stop early, 1 normal account). Post-closure account-weeks
+   must be dropped from training and the scoring pool; proposal: `labels()` returns `open_by_day` for months 0–5.
+   **Decisions 8 Oct 2026:** weekly label = "mule account by this week" (a fake account
    counts from the day it opens; a real customer — witting/unwitting — from `launder_start_day`); alert budget
    = the rules' own alert count in each week. **Fixed cohort (8 Oct 2026):** main comparison = the 50,061 test
    accounts (opened months 6-7, 180 launderers), clock = weeks since each account opened (0-78), weekly budget =

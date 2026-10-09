@@ -15,13 +15,22 @@ def main(argv=None):
     w.add_argument("--weeks", default="0-78", help="weeks since opening, e.g. 0-26 (default 0-78)")
     w.add_argument("--force", action="store_true", help="rebuild even if the store exists")
 
-    for name, phase in [("eda", "Phase 1"), ("preprocess", "Phase 2")]:
-        sub.add_parser(name, help=f"{phase}, not built yet")
+    e = sub.add_parser("eda", help="Phase 1 EDA on the training months -> <report>/report.md, figures, CSVs")
+    e.add_argument("--out", default="data/v1_full", help="data folder (default data/v1_full)")
+    e.add_argument("--report", default=None,
+                   help="report folder (default outputs/modelling/eda, or outputs/modelling/eda/<data folder name>)")
+    sub.add_parser("preprocess", help="Phase 2, not built yet")
 
     a = ap.parse_args(argv)
     if a.cmd == "weekly":
         path, n = build(a.out, parse_weeks(a.weeks), force=a.force)
         print(f"wrote {path}: {n:,} account-weeks")
+    elif a.cmd == "eda":
+        import os, runpy
+        os.environ["EDA_DATA"] = a.out
+        if a.report:
+            os.environ["EDA_REPORT"] = a.report
+        runpy.run_module("features.eda_train", run_name="__main__")
     else:
         raise SystemExit(f"`{a.cmd}` is not built yet (see the modelling plan)")
 

@@ -6,6 +6,15 @@ Assumptions and Use" doc.
 
 
 
+## 9 Oct 2026 — Modelling Phase 1: EDA on the training months (`python -m features eda`)
+
+No data change. `src/features/eda_train.py` reads months 0–4 through `amldata` only (month 5 untouched, test months
+closed) and writes `outputs/modelling/eda/` (report, 8 figures, `univariate_tests.csv`, `feature_screen.csv`; 50k copy in
+`eda/v1_50k/`). Full-size findings: only fake accounts separate at opening; fakes start in weeks 8–17, real customers across
+the window; cumulative volume, weekly rows/payers and the median in->out delay carry signal once a burst exists; weekly
+abroad / high-risk / cash shares do not; homophily 20x the base rate. Found that a zero-activity week means the bank
+closed the account (only confirmed launderers are closed): post-closure weeks must be dropped from training.
+
 ## 9 Oct 2026 — Modelling Phase 0: `labels(profile=True)`, feature-store skeleton with manifest, leak tests
 
 No data change. `amldata.labels(profile=True)` returns each launderer's hidden type (fake / witting / unwitting, None for
