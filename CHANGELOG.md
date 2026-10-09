@@ -5,6 +5,15 @@ Changes to the simulator and the data it generates, newest first. Settings chang
 Assumptions and Use" doc.
 
 
+
+## 9 Oct 2026 — `amldata.labels()`: the agreed weekly label and a weeks-since-opening cut-off
+
+`labels()` now also returns `mule_by_day`, the main label agreed on 8 Oct: a fake account counts as a mule from
+the day it opens, a real customer from the day they start laundering. A new `weeks_since_open=w` cut-off ends at
+each account's own week w (open_day + 7w + 6), the clock of the fixed-cohort comparison; `as_of_day=` still gives
+one calendar day. `is_launderer` remains the fixed final label. On the full-size training accounts:
+`mule_by_day` 391 at week 0, 411 at week 8, 552 by week 78 (`started_by_day` 1, 34, 552). Data unchanged; new tests
+check fakes count from week 0, started implies mule, and both labels reach `is_launderer` by the end.
 ## 8 Oct 2026 — R6 waits 8 weeks before judging a new account (team decision); all data regenerated
 
 R6 ("sudden change") compared money in against the average of the previous weeks after only 4 weeks of history.

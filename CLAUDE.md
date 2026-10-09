@@ -46,9 +46,11 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
 - 6 files in `data/v1/`. **Model inputs:** `accounts` (32 cols: id, open_month, open_day, 29 BAF features)
   and `transactions` (11 cols; card spending = one row per account per week, `item_count` = purchases).
   **Hidden:** `accounts_truth`, `aml_alerts`, `aml_outcomes`, `transactions_truth`.
-- Model/feature code uses `amldata.public()` and `amldata.labels(as_of_day=...)` only. Default folder is
+- Model/feature code uses `amldata.public()` and `amldata.labels(...)` only. Default folder is
   `data/v1_full` (main dataset); pass `out=` for others (`data/v1` 50k, `data/variant_II`, `data/variant_IV`). `labels()` returns
-  `is_launderer` (+ `started_by_day`) for months 0–5 and refuses test months 6–7.
+  `is_launderer` (fixed final label) for months 0–5 and refuses test months 6–7; with a cut-off
+  (`as_of_day=` one calendar day, or `weeks_since_open=w` = end of each account's week w) it adds
+  `started_by_day` and `mule_by_day` (main label: fake accounts count from opening, real customers from start).
   Scoring code uses `amldata.evaluation()`. Never read hidden parquet files directly elsewhere.
 - `txn_id` is anonymous (`T` + 16 hex of md5(provisional id + seed)); rows sorted by `day`, `time`. Provisional
   `N###_`/`L_` ids exist only in `_internal/parts` and must never reach public files (check 10).
@@ -109,7 +111,7 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
    weeks 0-12, 731 in total); secondary = same total of 731 flags used at any time (upper bound on the head start).
    This answers comment 2 of the professor's feedback (verbatim in `docs/professor_feedback.md`). Accounts closed
    by the bank stay in the cohort as caught; report accounts still open per week.
-   1. Add that label to `amldata.labels()` (it now returns only `is_launderer` / `started_by_day`).
+   1. ~~Add that label to `amldata.labels()`~~ done 9 Oct 2026: `mule_by_day`, with `weeks_since_open=` cut-offs.
    2. **Baseline to beat** (rough check, untuned application-only logistic model, train months 0-4, same number
       of flags as the rules on the test cohort; after the R6 fix the rules flag 662 test accounts): model 35/180
       (19%, precision 5.3%) vs rules 59 (33%, precision 8.9%) — the rules win on count; the model flags at
