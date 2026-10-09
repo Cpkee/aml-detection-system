@@ -4,6 +4,27 @@ Changes to the simulator and the data it generates, newest first. Settings chang
 `source` of each value in `configs/sim.yaml`; decisions are recorded in the "Simulated Dataset: Logic,
 Assumptions and Use" doc.
 
+
+## 8 Oct 2026 — R6 waits 8 weeks before judging a new account (team decision); all data regenerated
+
+R6 ("sudden change") compared money in against the average of the previous weeks after only 4 weeks of history.
+For many new accounts those weeks hold no salary yet, so the first monthly salary looked like a sudden change:
+3,837 alerts at 244k (65% of all the rules' alerts), none on a launderer, almost all in an account's 4th–5th week.
+They also put two-thirds of the test cohort's weekly alert budget into a single week. `rules.R6_history_weeks` is
+now [8, 8] (was [4, 8]). At 50k with the scale held fixed: alerts 1,592 -> 756, the same 45 launderers caught,
+false alarms 97.2% -> 94.0%. Checked on every early R6 alert at 50k: 835 of 840 fell in the week of the account's
+first salary (the simulator pays it at a random point in the first pay period), the salary being all the money in.
+
+Regenerated (9 Oct 2026, code 23fc46a; all datasets pass the 10 checks):
+- `data/v1` (50k): 756 alerts, 94.0% false alarms, 45 of 150 caught (30%), median 7 days; scale 1.516.
+- `data/v1_full` (244k): rules re-tuned to scale **1.516** (was 1.741): 3,614 alerts, 240 true, **93.4%** false
+  alarms (inside 90–95% for the first time), **237 of 732 caught (32%)** (was 25%), median 9 days; weekly budget
+  mean 33.2 / median 34 / max 95 (was 54.4 / 28 / 170). Test cohort alerts in week 4 after opening: 10 (was 1,006).
+- Variants II / IV (frozen at 1.516): 93.2% / 93.1% false alarms, 34% / 33% caught.
+- 42 sensitivity runs (frozen at 1.516): seeds 93.1–93.4% / 32–33%; transfers £1,500 75% caught, repeated bursts
+  76%; prevalence 1% 81.3%, 0.1% 97.8% false alarms; doubled cash 98.4%. See `outputs/sensitivity/FINDINGS.md`.
+- Rough baseline (application-only model, same number of flags as the rules on the test cohort, now 662): model
+  19% vs rules 33%; together 44%. The rules are a stronger benchmark after the fix.
 ## 8 Oct 2026 — `amldata` reads the full-size dataset by default
 
 `amldata.public()`, `labels()` and `evaluation()` now default to `data/v1_full` (244k, the main modelling dataset)

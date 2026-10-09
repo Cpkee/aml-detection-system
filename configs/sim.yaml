@@ -196,19 +196,19 @@ rules:
   R5_high_risk_4wk:  {value: 5000,  source: "FFIEC: transfers to higher-risk locations; GBP 5,000 over 4 weeks, then tuned", strength: partly_sourced}
   R5_window_weeks:   {value: 4, source: "R5 adds up money sent to high-risk countries over this many rule weeks (this week + 3 before). Ours. Moved here from the code on 7 Oct 2026, same value (results unchanged)", strength: modelling}
   R6_multiple:       {value: 10,    source: "FFIEC/FinCEN: sudden change; money in >= 10x the account's usual week, then tuned", strength: partly_sourced}
-  R6_history_weeks:  {value: [4, 8], source: "[min weeks of history, weeks averaged]: usual = average of the previous 8 weeks; needs at least 4 weeks of history. The 8 was ignored by the code (fixed in SQL) until 7 Oct 2026; now read here, same value", strength: modelling}
+  R6_history_weeks:  {value: [8, 8], source: "[min weeks of history, weeks averaged]: usual = average of the previous 8 weeks; needs at least 8 weeks of history, so the baseline covers a full pay cycle. Changed 8 Oct 2026 from [4, 8] (team decision): with 4 weeks, a new account's first monthly salary looked like a sudden change, giving 3,837 alerts at 244k (65% of all alerts), none true; at 50k, 8 weeks halves alerts (1,592 to 756) with the same 45 launderers caught. Checked: 835 of the 840 early R6 alerts at 50k fell in the week of the account's first salary (the simulator pays the first salary within the first pay period). The 8 was ignored by the code until 7 Oct 2026", strength: modelling}
   R6_min_in:         {value: 1000,  source: "Floor so tiny accounts don't trigger; ours", strength: modelling}
   R6_min_usual:      {value: 100,   source: "The usual week must have at least GBP 100 coming in, so a first salary after quiet weeks is not a sudden change; ours", strength: modelling}
   pause_days:        {value: 28,    source: "Alert suppression is standard (Oracle); 28 days is ours", strength: partly_sourced}
   review_days:       {value: [3, 30], source: "FinCEN: report within 30 days of detection; 3-day minimum ours", strength: partly_sourced}
   confirm_share:     {value: 0.8,   source: "Share of true alerts the investigator confirms; no source", strength: assumption, test: [0.6, 1.0]}
-  false_alarm_target: {value: [0.90, 0.95], source: "Oztas et al. 2024: practitioners estimate 90-95% of alerts are false. Not reachable by tuning R3-R6 together; best achieved 97.2% at 50k accounts, accepted and reported (decision 6 Oct 2026)", strength: sourced}
+  false_alarm_target: {value: [0.90, 0.95], source: "Oztas et al. 2024: practitioners estimate 90-95% of alerts are false. Before the R6 fix the best reachable was 96.9-97.2% (accepted 6 Oct 2026); after R6 waits 8 weeks (8 Oct 2026) tuning reaches 93.4% at 244k and 94.0% at 50k", strength: sourced}
   tune_rules:        {value: [R3, R4, R5, R6], source: "R1 and R2 are legal limits and stay fixed; R3-R6 thresholds are scaled together until false alarms hit the target", strength: design}
   fixed_scale:
     value: null
-    source: "null = tune R3-R6 on this run (main runs). A number = use that scale and skip tuning: the bank's rules are frozen, as a real bank sets its rules once and keeps them while the world changes. Variant and sensitivity runs use --set rules.fixed_scale=1.741, the scale tuned on the full-size main run (team decision 7 Oct 2026)"
+    source: "null = tune R3-R6 on this run (main runs). A number = use that scale and skip tuning: the bank's rules are frozen, as a real bank sets its rules once and keeps them while the world changes. Variant and sensitivity runs use --set rules.fixed_scale=1.516, the scale tuned on the full-size main run (team decision 7 Oct 2026; 1.741 before the R6 fix of 8 Oct 2026)"
     strength: design
   tune_scales:
     value: {low: 0.25, high: 8.0, steps: 26}
-    source: "Scales tried when tuning R3-R6: 26 values evenly spaced on a log scale from 0.25x to 8x the starting thresholds (each ~15% above the last). If none reaches false_alarm_target, the scale closest to its midpoint (92.5%) is used; otherwise the one catching the most launderers. Range and step count are ours. Moved here from rules.py on 7 Oct 2026, same values (results unchanged). Chosen: 1.516 at 50k, 1.741 at 244k"
+    source: "Scales tried when tuning R3-R6: 26 values evenly spaced on a log scale from 0.25x to 8x the starting thresholds (each ~15% above the last). If none reaches false_alarm_target, the scale closest to its midpoint (92.5%) is used; otherwise the one catching the most launderers. Range and step count are ours. Moved here from rules.py on 7 Oct 2026, same values (results unchanged). Chosen: 1.516 at 50k and at 244k (244k chose 1.741 before the R6 fix of 8 Oct 2026)"
     strength: design

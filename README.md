@@ -39,7 +39,7 @@ says anything about laundering (check 10). Changes to the data are listed in `CH
 Full-size run (main modelling dataset): `--out data/v1_full --set size.n_accounts=244000` (~11 min, 7.2 GB,
 109M transactions, 732 launderers).
 
-Known limits: laundering card spending deferred; rules reach 96.9-97.2% false alarms at best (target 90-95%); accepted and reported as a finding.
+Known limits: laundering card spending deferred; after the R6 fix (8 Oct 2026) the rules reach 93–94% false alarms, inside the 90–95% that practitioners report.
 
 ## Using the data in model code
 

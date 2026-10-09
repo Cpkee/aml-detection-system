@@ -67,19 +67,22 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
 - Rules (weekly): R1 cash ≥ £10,000; R2 >£1,000 cash/day on 2+ days in 2 weeks or 12-month cash crosses
   £10,000; R3 many payers; R4 pass-through; R5 high-risk country; R6 sudden change. 28-day pause, 3–30 day
   review, 80% of true alerts confirmed, closure removes later activity. R3–R6 tuned together.
-- v1 result (50k, seed 42): 97.2% false alarms (target 90–95% unreachable; **accepted, report as a
-  finding**), 30% of launderers alerted, median 7 days after start; weekly alert budget ~15.
-- v1_full result (244k, seed 42, `--set size.n_accounts=244000`, 11 min): 96.9% false alarms; 25% of 732
-  launderers alerted, median 9 days; weekly alert budget mean 54.4 / median 28; rule scale 1.741 (50k: 1.516);
-  180 launderers in test months 6–7. **This is the main dataset for modelling.**
-- Variants (244k, seed 42, rules frozen at 1.741): `data/variant_II` (fairness: age 50+ launderer rate higher in
+- Results below are after the R6 fix (8 Oct 2026: R6 waits 8 weeks; before it, 65% of alerts were R6 firing on
+  new accounts' first salary, none true, and false alarms were 96.9–97.2%).
+- v1 result (50k, seed 42): 94.0% false alarms (inside the 90–95% target), 30% of launderers alerted, median 7
+  days after start; weekly alert budget mean 7.3.
+- v1_full result (244k, seed 42, `--set size.n_accounts=244000`, 11 min): 93.4% false alarms (3,614 alerts,
+  240 true); 32% of 732 launderers alerted (237), median 9 days; weekly alert budget mean 33.2 / median 34;
+  rule scale 1.516 (same at 50k); 180 launderers in test months 6–7. **This is the main dataset for modelling.**
+- Variants (244k, seed 42, rules frozen at 1.516): `data/variant_II` (fairness: age 50+ launderer rate higher in
   all months) and `data/variant_IV` (drift: 50+ about 2x under-50 in train months, gap reversed in test months).
-  Rules: 96.9% / 96.8% false alarms, 25% / 26% caught; 169 / 171 test launderers. Use each variant for training
+  Rules: 93.2% / 93.1% false alarms, 34% / 33% caught; 169 / 171 test launderers. Use each variant for training
   AND testing with the same split as the main data (IV's bias exists only in training months by design);
   train-on-main / test-on-variant is an optional extra robustness check.
-- Sensitivity (42 runs, rules frozen; `outputs/sensitivity/FINDINGS.md`): the rules' catch rate moves only with
-  launderer behaviour (transfer size, repeated bursts: 25% -> ~70%); false alarms move with prevalence (1%: 90.8%,
-  0.1%: 99.0%) and normal cash use (98.9%). Seeds 43/44: 96.7–96.9% / 24–26%. Re-check models on those scenarios.
+- Sensitivity (42 runs, rules frozen at 1.516; `outputs/sensitivity/FINDINGS.md`): the rules' catch rate moves
+  only with launderer behaviour (£1,500 transfers: 75%, repeated bursts: 76%, vs 32–33%); false alarms move with
+  prevalence (1%: 81.3%, 0.1%: 97.8%), normal cash use (98.4%) and group-collection size (R3). Seeds 43/44:
+  93.1–93.4% / 32–33%. Re-check models on those scenarios.
 - Everything is seeded and deterministic: same config + seed = identical data.
 
 ## Known limits / gotchas
@@ -97,23 +100,39 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
 
 ## Next tasks
 1. ~~`--set key=value` override~~ done 7 Oct 2026 (with run manifest).
-2. ~~Full-size run~~ done 7 Oct 2026: `data/v1_full`, rules at 96.9% (see v1_full result above).
+2. ~~Full-size run~~ done 7 Oct 2026, regenerated 8 Oct after the R6 fix: rules at 93.4% (see above).
 3. Modelling (week 2). **Decisions 8 Oct 2026:** weekly label = "mule account by this week" (a fake account
    counts from the day it opens; a real customer — witting/unwitting — from `launder_start_day`); alert budget
-   = the rules' own alert count in each week. Still open: the fixed cohort (professor's same-week comparison).
+   = the rules' own alert count in each week. **Fixed cohort (8 Oct 2026):** main comparison = the 50,061 test
+   accounts (opened months 6-7, 180 launderers), clock = weeks since each account opened (0-78), weekly budget =
+   the rules' alerts on these accounts in that week of their life (after the R6 fix: 29 in weeks 0-3, 111 in
+   weeks 0-12, 731 in total); secondary = same total of 731 flags used at any time (upper bound on the head start).
+   This answers comment 2 of the professor's feedback (verbatim in `docs/professor_feedback.md`). Accounts closed
+   by the bank stay in the cohort as caught; report accounts still open per week.
    1. Add that label to `amldata.labels()` (it now returns only `is_launderer` / `started_by_day`).
-   2. **Baseline to beat** (rough check 8 Oct, untuned application-only model, train months 0-4, same number
-      of flags as the rules on the test cohort = 1,462): 56/180 caught (31%) vs rules 48 (27%), a tie within
-      noise (±6-7 pts); flags at opening, median 98 days *before* start vs rules 10 days *after*; union 84 (47%).
+   2. **Baseline to beat** (rough check, untuned application-only logistic model, train months 0-4, same number
+      of flags as the rules on the test cohort; after the R6 fix the rules flag 662 test accounts): model 35/180
+      (19%, precision 5.3%) vs rules 59 (33%, precision 8.9%) — the rules win on count; the model flags at
+      opening, ~98 days *before* start vs rules 9 days *after*; together 80 (44%), overlap 14. (Before the fix,
+      with 1,462 flags: model 31% vs rules 27%.)
    3. **Stress test the fake-account assumption**: 73% of launderers are fakes from BAF fraud rows and the
-      baseline caught almost only fakes (53/56). Rebuild with `in_window_mix` tests (53% / 56% fake) and report
+      baseline catches almost only fakes (34 of 35). Rebuild with `in_window_mix` tests (53% / 56% fake) and report
       how much the advantage shrinks — the main threat to the result.
    4. Weekly features via `amldata` (rows up to each week only); application-only / activity-only / combined
       models; score months 6-7 against the rules: caught within budget, days earlier, false alarms, precision.
+   5. **Value of onboarding information (professor comment 2):** at each week since opening, on the same cohort
+      and the same transactions, compare activity-only vs application + activity; the gap is the onboarding
+      value, so data availability and cohort changes cannot explain it.
+   6. **Label maturity (comment 2):** also score against a fixed final label (mule at any point in the window);
+      report per week how many cohort launderers have started and how many accounts are still open.
+   7. **Imbalance (comment 1):** model vs rules false-alarm share and precision at 0.1% / 0.3% / 1% prevalence
+      (datasets exist under `data/sensitivity/`). The test set is never rebalanced; resample training data only.
+   8. **Report checklist (professor):** justify dataset choice; size and variables; preprocessing; feature
+      engineering; why each model suits the task. State that the test set is at the natural 0.3% rate.
 4. Week 3: ~~BAF Variants II and IV~~ done 7 Oct 2026 (see above). Sensitivity runs from `test` values;
-   professor comments (fixed-cohort same-week comparison; 0.1/0.3/1% prevalence).
+   professor's feedback: `docs/professor_feedback.md` (imbalance, cohort/data/label changes, report detail).
    **Decisions 7 Oct 2026:** (a) freeze the bank's rules: variant and sensitivity runs use
-   `--set rules.fixed_scale=1.741` (the v1_full scale), never re-tuned; (b) sensitivity runs at 244k, keeping
+   `--set rules.fixed_scale=1.516` (the v1_full scale after the R6 fix; 1.741 before), never re-tuned; (b) sensitivity runs at 244k, keeping
    summaries and deleting large files (rebuildable from the manifest); (c) 0.1% prevalence run at ~732k accounts
    so the test set keeps ~180 launderers, 1% at 244k; (d) build repeated bursts and young-weighted fake ages,
    drop hijacked accounts (state as a limitation); (e) main run repeated with seeds 43 and 44 as the
