@@ -100,7 +100,7 @@ medians per account-week, launderers (1) vs normal (0), weeks 0, 1, 4, 8, 12, 26
 | (8, 1)  |    455.00 |       5.00 |    42.09 |    697.18 |         0.69 |         3.00 |       0.08 |           0.01 |         0.00 |            0.47 |          0.54 |
 | (12, 0) | 164364.00 |       5.00 |    55.62 |    605.25 |         0.68 |         3.00 |       0.09 |           0.02 |         0.00 |            0.46 |          0.55 |
 | (12, 1) |    455.00 |       5.00 |   298.24 |    753.00 |         1.06 |         3.00 |       0.09 |           0.04 |         0.01 |            0.54 |          0.50 |
-| (26, 0) | 164364.00 |       6.00 |    74.10 |    660.92 |         0.73 |         3.00 |       0.08 |           0.03 |         0.00 |            0.49 |          0.62 |
+| (26, 0) | 164364.00 |       6.00 |    74.10 |    660.91 |         0.73 |         3.00 |       0.08 |           0.03 |         0.00 |            0.49 |          0.62 |
 | (26, 1) |    455.00 |       5.00 |     0.00 |    588.25 |         0.66 |         3.00 |       0.07 |           0.02 |         0.00 |            0.55 |          0.60 |
 
   -> before any laundering starts, launderers' weeks should look like everyone else's: the simulator gives
@@ -218,8 +218,8 @@ candidate pairs with |Spearman| > 0.8 at week 12 (keep one of each for logistic 
 | max_in              | peer_ratio_in       |     0.9977 |
 | money_in            | self_vs_past_in     |     0.9188 |
 | self_vs_past_in     | income_fit_in       |     0.9187 |
-| self_vs_past_in     | peer_ratio_in       |     0.9179 |
-| max_in              | self_vs_past_in     |     0.9177 |
+| self_vs_past_in     | peer_ratio_in       |     0.9180 |
+| max_in              | self_vs_past_in     |     0.9178 |
 | n_payers            | self_vs_past_payers |     0.9056 |
 | money_in            | n_payers            |     0.8791 |
 | n_payers            | income_fit_in       |     0.8791 |
@@ -229,7 +229,7 @@ candidate pairs with |Spearman| > 0.8 at week 12 (keep one of each for logistic 
 | money_in            | passthrough_wk      |    -0.8587 |
 | passthrough_wk      | income_fit_in       |    -0.8569 |
 | max_in              | passthrough_wk      |    -0.8554 |
-| n_payers            | self_vs_past_in     |     0.8543 |
+| n_payers            | self_vs_past_in     |     0.8544 |
 | passthrough_wk      | peer_ratio_in       |    -0.8495 |
 | n_rows              | n_payees            |     0.8374 |
 | money_in            | self_vs_past_payers |     0.8323 |
@@ -322,4 +322,4 @@ keep them cumulative rather than weekly if kept at all.
 Application columns: keep all 29 after Phase 2 cleaning; LightGBM ignores useless ones and L1 logistic
 regression drops them. Candidate pairs above |0.8| correlation: keep one for the logistic model.
 
-done in 33s
+done in 34s

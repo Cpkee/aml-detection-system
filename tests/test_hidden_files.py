@@ -1,4 +1,5 @@
 """Guards for the honesty rule: hidden answers never become model inputs."""
+import json
 import os
 import pathlib
 import pytest
@@ -10,6 +11,14 @@ SRC = pathlib.Path(__file__).resolve().parents[1] / "src"
 OUT = os.environ.get("SIM_OUT", "data/v1")
 
 
+NOTEBOOKS = SRC.parent / "notebooks"
+
+
+def _notebook_code(path: pathlib.Path) -> str:
+    cells = json.loads(path.read_text()).get("cells", [])
+    return "\n".join("".join(c.get("source", [])) for c in cells if c.get("cell_type") == "code")
+
+
 def test_no_hidden_files_outside_allowed_code():
     offenders = []
     for py in SRC.rglob("*.py"):
@@ -17,6 +26,9 @@ def test_no_hidden_files_outside_allowed_code():
             continue
         text = py.read_text()
         offenders += [f"{py.relative_to(SRC)} names {h}" for h in HIDDEN if h in text]
+    for nb in NOTEBOOKS.glob("**/*.ipynb"):                      # notebooks are model code too
+        text = _notebook_code(nb)
+        offenders += [f"notebooks/{nb.relative_to(NOTEBOOKS)} names {h}" for h in HIDDEN if h in text]
     assert not offenders, offenders
 
 

@@ -25,7 +25,8 @@ PYTHONPATH=src BAF_PATH=data/raw/BAF_Base.csv python -m pytest -q tests  # must 
 Modelling (plan: "Modelling: phased plan" tab of the decision-record doc; Phase 0 done 9 Oct 2026):
 `PYTHONPATH=src python -m features weekly --out data/v1 --weeks 0-78` builds `<out>/features/weekly.parquet` + its
 `features_manifest.json` (feature list, cut-off rule, code commit, hash of the data's `run_manifest.json`; `features.weekly.load()`
-refuses a stale store). `python -m features eda|preprocess` and `python -m models train` are Phase 1/2/4 stubs.
+refuses a stale store). `python -m features eda [--out data/v1 --report DIR]` executes `notebooks/01_eda_train.ipynb`;
+`python -m features preprocess` and `python -m models train` are Phase 2/4 stubs.
 Sensitivity runs (rules frozen, 244k, one `test` value each): `python -m sim.sensitivity --list | --run [--only NAME]
 | --summarise` -> `data/sensitivity/<name>/` (large files deleted) and `outputs/sensitivity/summary.csv`.
 Single steps: `accounts`, `normal --batches 3-3`, `laundering`, `rules`, `finalize`. Use `--out` for another
@@ -43,7 +44,10 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
   batching, closure removal) -> `checks.py` (checks + data card). `src/sim/eda/` — EDA scripts.
 - `src/amldata/` — **the only way model code reads data** (see Data rules).
 - `src/evaluation/` — scoring code; the only place besides `sim` allowed to read hidden files.
-- `src/features/` — modelling EDA, preprocessing, weekly feature store (`weekly.py`, `manifest.py`); reads via `amldata` only.
+- `src/features/` — preprocessing and the weekly feature store (`weekly.py`, `manifest.py`); reads via `amldata` only.
+- `notebooks/` — **analysis notebooks are the standard for EDA and modelling write-ups** (`01_eda_train.ipynb`, ...); reusable
+  code (features, preprocessing, models, scoring) stays in `src/` packages so tests cover it. `python -m features eda` executes
+  the EDA notebook on a data folder; the hidden-file guard scans notebook code cells too.
 - `src/models/` — training and calibration (Phase 4). `outputs/modelling/` — committed modelling results (see its README).
 - `tests/` — `test_data.py` (runs the 10 checks), `test_hidden_files.py` (blocks hidden-file leaks).
 - `outputs/` — committed results (e.g. `outputs/eda/`). `data/` — generated data, never committed.
@@ -115,7 +119,7 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
    model (row per account per week since opening, label `mule_by_day`, `weeks_since_open` a feature); horizon weeks 0–26 main,
    0–78 appendix; a model flag is permanent (caught at first flag, leaves the pool); class weights main + one 1:20 undersampling
    ablation, no SMOTE; features precomputed to `data/<run>/features/` with a manifest; lightgbm + torch (CPU) + networkx.
-   Phases: 0 setup ~~done 9 Oct~~ -> 1 EDA ~~done 9 Oct~~ (`python -m features eda`, months 0–4 only, month 5 untouched;
+   Phases: 0 setup ~~done 9 Oct~~ -> 1 EDA ~~done 9 Oct~~ (`notebooks/01_eda_train.ipynb`, run by `python -m features eda`; months 0–4 only, month 5 untouched;
    `outputs/modelling/eda/report.md` + `univariate_tests.csv` + `feature_screen.csv`; 50k copy under `eda/v1_50k/`) -> 2 cleaning
    (BAF −1 codes -> NaN + flag; `credit_risk_score` negatives are real) -> 3 feature store -> 4 models -> 5 harness (dry-run on
    month 5 first) -> 6 extensions (fake-mix stress test first). Dropped as un-rewardable by the simulator: round/under-limit

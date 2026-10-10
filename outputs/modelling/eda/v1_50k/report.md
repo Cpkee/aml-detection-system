@@ -216,10 +216,10 @@ candidate pairs with |Spearman| > 0.8 at week 12 (keep one of each for logistic 
 | peer_ratio_in       | income_fit_in       |     0.9971 |
 | money_in            | peer_ratio_in       |     0.9969 |
 | max_in              | peer_ratio_in       |     0.9964 |
-| money_in            | self_vs_past_in     |     0.9177 |
-| self_vs_past_in     | income_fit_in       |     0.9170 |
-| max_in              | self_vs_past_in     |     0.9168 |
-| self_vs_past_in     | peer_ratio_in       |     0.9151 |
+| money_in            | self_vs_past_in     |     0.9178 |
+| self_vs_past_in     | income_fit_in       |     0.9171 |
+| max_in              | self_vs_past_in     |     0.9169 |
+| self_vs_past_in     | peer_ratio_in       |     0.9152 |
 | n_payers            | self_vs_past_payers |     0.9072 |
 | money_in            | n_payers            |     0.8784 |
 | n_payers            | income_fit_in       |     0.8783 |
@@ -228,7 +228,7 @@ candidate pairs with |Spearman| > 0.8 at week 12 (keep one of each for logistic 
 | max_in              | n_payers            |     0.8722 |
 | money_in            | passthrough_wk      |    -0.8604 |
 | max_in              | passthrough_wk      |    -0.8573 |
-| n_payers            | self_vs_past_in     |     0.8531 |
+| n_payers            | self_vs_past_in     |     0.8532 |
 | passthrough_wk      | income_fit_in       |    -0.8502 |
 | n_rows              | n_payees            |     0.8386 |
 | passthrough_wk      | peer_ratio_in       |    -0.8385 |
@@ -322,4 +322,4 @@ keep them cumulative rather than weekly if kept at all.
 Application columns: keep all 29 after Phase 2 cleaning; LightGBM ignores useless ones and L1 logistic
 regression drops them. Candidate pairs above |0.8| correlation: keep one for the logistic model.
 
-done in 5s
+done in 6s

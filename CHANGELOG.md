@@ -8,7 +8,7 @@ Assumptions and Use" doc.
 
 ## 9 Oct 2026 — Modelling Phase 1: EDA on the training months (`python -m features eda`)
 
-No data change. `src/features/eda_train.py` reads months 0–4 through `amldata` only (month 5 untouched, test months
+No data change. `notebooks/01_eda_train.ipynb` (executed by `python -m features eda`) reads months 0–4 through `amldata` only (month 5 untouched, test months
 closed) and writes `outputs/modelling/eda/` (report, 8 figures, `univariate_tests.csv`, `feature_screen.csv`; 50k copy in
 `eda/v1_50k/`). Full-size findings: only fake accounts separate at opening; fakes start in weeks 8–17, real customers across
 the window; cumulative volume, weekly rows/payers and the median in->out delay carry signal once a burst exists; weekly
