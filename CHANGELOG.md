@@ -5,6 +5,34 @@ Changes to the simulator and the data it generates, newest first. Settings chang
 Assumptions and Use" doc.
 
 
+
+## 9 Oct 2026 — Modelling Phase 1: EDA on the training months (`python -m features eda`)
+
+No data change. `notebooks/01_eda_train.ipynb` (executed by `python -m features eda`) reads months 0–4 through `amldata` only (month 5 untouched, test months
+closed) and writes `outputs/modelling/eda/` (report, 8 figures, `univariate_tests.csv`, `feature_screen.csv`; 50k copy in
+`eda/v1_50k/`). Full-size findings: only fake accounts separate at opening; fakes start in weeks 8–17, real customers across
+the window; cumulative volume, weekly rows/payers and the median in->out delay carry signal once a burst exists; weekly
+abroad / high-risk / cash shares do not; homophily 20x the base rate. Found that a zero-activity week means the bank
+closed the account (only confirmed launderers are closed): post-closure weeks must be dropped from training.
+
+## 9 Oct 2026 — Modelling Phase 0: `labels(profile=True)`, feature-store skeleton with manifest, leak tests
+
+No data change. `amldata.labels(profile=True)` returns each launderer's hidden type (fake / witting / unwitting, None for
+everyone else) for months 0–5 only, for EDA breakdowns; it refuses test months even with `allow_test=True`. New packages
+`src/features` (weekly feature store `python -m features weekly`, `features_manifest.json` recording the feature list, the
+cut-off rule `day <= open_day + 7w + 6`, the code commit and a hash of the data's `run_manifest.json`; `load()` refuses a stale
+store) and `src/models` (CLI stub). `tests/test_features.py` checks on a synthetic dataset that week-w features ignore later
+rows, that rebuilds are byte-identical and that stale manifests are refused. Added lightgbm, networkx, torch to requirements.
+Phased plan: doc tab "Modelling: phased plan".
+
+## 9 Oct 2026 — `amldata.labels()`: the agreed weekly label and a weeks-since-opening cut-off
+
+`labels()` now also returns `mule_by_day`, the main label agreed on 8 Oct: a fake account counts as a mule from
+the day it opens, a real customer from the day they start laundering. A new `weeks_since_open=w` cut-off ends at
+each account's own week w (open_day + 7w + 6), the clock of the fixed-cohort comparison; `as_of_day=` still gives
+one calendar day. `is_launderer` remains the fixed final label. On the full-size training accounts:
+`mule_by_day` 391 at week 0, 411 at week 8, 552 by week 78 (`started_by_day` 1, 34, 552). Data unchanged; new tests
+check fakes count from week 0, started implies mule, and both labels reach `is_launderer` by the end.
 ## 8 Oct 2026 — R6 waits 8 weeks before judging a new account (team decision); all data regenerated
 
 R6 ("sudden change") compared money in against the average of the previous weeks after only 4 weeks of history.
