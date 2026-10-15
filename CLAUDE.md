@@ -22,10 +22,15 @@ PYTHONPATH=src python -m sim.run all --baf data/raw/BAF_Base.csv        # full p
 PYTHONPATH=src python -m sim.checks --baf data/raw/BAF_Base.csv         # 10 checks + data/v1/data_card.md
 PYTHONPATH=src BAF_PATH=data/raw/BAF_Base.csv python -m pytest -q tests  # must pass before any commit
 ```
-Modelling (plan: "Modelling: phased plan" tab of the decision-record doc; Phase 0 done 9 Oct 2026):
-`PYTHONPATH=src python -m features weekly --out data/v1 --weeks 0-78` builds `<out>/features/weekly.parquet` + its
-`features_manifest.json` (feature list, cut-off rule, code commit, hash of the data's `run_manifest.json`; `features.weekly.load()`
-refuses a stale store). `python -m features eda [--out data/v1 --report DIR]` executes `notebooks/01_eda_train.ipynb`;
+Modelling (plan: "Modelling: phased plan" tab of the decision-record doc; Phases 0–3 done):
+`PYTHONPATH=src python -m features weekly --out data/v1_full --weeks 0-78` builds `<out>/features/weekly.parquet` (28 features
+from the Phase 1 gate list, see `src/features/weekly.py`; money summed as exact pence; 19.3M account-weeks, ~4 min, ~4.2 GB) +
+`peer_medians.parquet` (frozen from months 0–4) + `features_manifest.json` (feature list, cut-off rule, code commit, hash of the
+data's `run_manifest.json` and of the peer medians; `features.weekly.load()` refuses a stale store).
+`python -m features store-check [--out D]` runs `notebooks/03_feature_store.ipynb` (Phase 3 gate: store equals the EDA's query
+value by value, first-week AUCs with account-level bootstrap intervals, whole-store checks) -> `outputs/modelling/features[/<run>]`.
+`tests/test_feature_store.py` checks the store on real data (independent pandas re-implementation, no-peek cut test,
+byte-identical rebuild, whole-store invariants); run it with `SIM_OUT` = a folder whose store is built. `python -m features eda [--out data/v1 --report DIR]` executes `notebooks/01_eda_train.ipynb`;
 `python -m features preprocess [--out data/v1_full --report DIR]` executes `notebooks/02_preprocess.ipynb` (Phase 2: all its
 code is in the notebook) -> `<out>/features/accounts_{linear,tree}.parquet` + `preprocess_manifest.json`, `<report>/params.json`
 + `report.md` (default `outputs/modelling/preprocess[/<run>]`); `python -m models train` is a Phase 4 stub.
@@ -134,9 +139,10 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
    money in, rows and payers this week, median in->out delay carry signal once a burst exists (AUC 0.70–0.86 vs started);
    weekly abroad / high-risk / cash shares carry none; speed shares need redefining as transfers out after transfers in.
    Homophily: a launderer's internal payees are launderers 5.4% of the time, 20x the base rate -> graph features worthwhile.
-   **Closure footprint (decision needed):** every open account has a weekly card row, so a zero-row week = closed by the
+   **Closure footprint (decided 15 Oct 2026):** every open account has a weekly card row, so a zero-row week = closed by the
    bank = a confirmed launderer (116 of 455 training launderers stop early, 1 normal account). Post-closure account-weeks
-   must be dropped from training and the scoring pool; proposal: `labels()` returns `open_by_day` for months 0–5.
+   are dropped from training and the scoring pool via `labels(...)["open_by_day"]` (months 0–5). Do not use a zero-row week
+   as the closure test: it also drops ~420 normal account-weeks (months 0–5, weeks 0–26).
    **Phase 2 — cleaning and preprocessing (plan revised 10 Oct 2026; built and run 15 Oct, PR open; gate: team agrees the 3 proposals below).** Goal: one fixed,
    tested recipe that turns the 32-column `accounts` table into model inputs. **All Phase 2 code lives in
    `notebooks/02_preprocess.ipynb`** (decision 10 Oct 2026, Phase 2 only; Phases 3–5 not decided). Later phases read the
@@ -208,6 +214,12 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
      fixes the Phase 3 feature list from the doc's "Phase 1 findings".
    - *Out of scope:* resampling (Phase 4, class weights), scaling of weekly activity features (Phase 3 computes them; the
      `linear` scaler is extended there), any look at months 6–7 labels.
+   **Phase 3 — weekly feature store (done 15 Oct 2026, branch `phase3-features`).** 28 features from the Phase 1 gate list
+   (`src/features/weekly.py`); stores built for v1_full and v1. Gate passed (`outputs/modelling/features/report.md`): the 14
+   shared features equal the EDA's query value by value on every account-week; 25 of 28 features separate a launderer's
+   first laundering week from normal weeks (95% account-level bootstrap); 30 tests pass on v1 and v1_full. **Open for the
+   team:** the redefined 1 h speed share scores 0.035 AUC *below* the EDA's original (paired 95% interval −0.050 to
+   −0.021); 24 h shows no difference. Keep, replace, or add the original as a 29th feature.
    **Decisions 8 Oct 2026:** weekly label = "mule account by this week" (a fake account
    counts from the day it opens; a real customer — witting/unwitting — from `launder_start_day`); alert budget
    = the rules' own alert count in each week. **Fixed cohort (8 Oct 2026):** main comparison = the 50,061 test

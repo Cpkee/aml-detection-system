@@ -6,6 +6,39 @@ Assumptions and Use" doc.
 
 
 
+## 15 Oct 2026 — Modelling Phase 3: weekly feature store (28 features), gate passed on v1_full and v1
+
+No change to the simulated data (`data/v1` was rebuilt from BAF Base: identical to the team's copy, 0 rows differ in
+`accounts_truth`, `aml_alerts`, `aml_outcomes`). `python -m features weekly` builds the feature list fixed at the Phase 1
+gate: volume, counterparties (distinct and first-time payers, distinct payees, cumulative distinct counts),
+pass-through, speed, self vs past (money in, payers, rows), peer ratio of money in (medians frozen from months 0–4 in
+`features/peer_medians.parquet`, hashed in the manifest), cumulative internal / cash / abroad / high-risk shares. Speed as
+the gate asked: transfers out (ACH, Cross-border) within 1 h / 24 h of the latest transfer in, each inflow passed on at
+most once. Money is summed as exact pence (DECIMAL), so totals do not depend on the order DuckDB adds them in.
+One opening month at a time: v1_full weeks 0–78 = 19,276,000 account-weeks in ~4 min, 4.2 GB peak.
+
+Gate (`python -m features store-check` -> `notebooks/03_feature_store.ipynb`, report `outputs/modelling/features/`):
+- Value by value, the 14 features the EDA screened equal the EDA's own query (copied verbatim, rerun) on all 4,450,113
+  account-weeks of months 0–4 (v1_full; relative difference ≤ 8.2e-14, identical NULL pattern); v1 likewise (912,627).
+  The EDA's float sums are not bit-reproducible run to run (its AUCs move by up to 7e-7 on v1_full, 4e-6 on v1); the
+  store's exact sums remove that noise.
+- First laundering week vs normal account-weeks, 95% account-level (Poisson) bootstrap, 1,000 replicates, v1_full:
+  25 of 28 features exclude AUC 0.5; strongest `fwd_1h_share_wk` 0.919 (0.902–0.936), `n_in_wk` 0.915, `fwd_24h_share_wk`
+  0.909, `n_rows_wk` 0.906; no signal for `self_vs_past_payers`, `n_payees_cum`, `abroad_out_share_cum`.
+- **Correction:** the redefined 1 h speed share is *not* better than the EDA's (any payment out after the latest payment
+  in): paired bootstrap gain −0.035 (−0.050 to −0.021); 24 h: +0.002 (−0.012 to +0.016). The EDA's "no signal" came from
+  screening weekly features at fixed weeks against `started_by_day`, not from the definition. Keep, replace or add the
+  old 1 h share: open for the team.
+
+Tests: `tests/test_feature_store.py` (real data, 3 seeded samples of 300 random accounts + 60 launderers, weeks 0–78):
+all 28 features equal an independent pandas re-implementation; cutting test-month accounts' transactions at a random
+week leaves every earlier value bit-identical; rebuilds are byte-identical; whole-store invariants (complete keys,
+shares in [0, 1], 1 h ≤ 24 h, running totals never fall, week-78 totals equal the transactions file, peer medians equal
+a recomputation). `tests/test_features.py` adds the speed cap, card rows out of speed, a week without a transfer in
+(NULL, not 1.0), payers counted once, self vs past waiting 4 weeks, peer medians ignoring non-training months.
+30 tests pass on v1 and v1_full. Two bugs were caught on the way: DuckDB's `least(1, NULL)` returning 1, and its median
+of a DECIMAL rounding to 2 places.
+
 ## 10 Oct 2026 — Modelling Phase 2 (in progress): `open_by_day`, cleaning notebook `notebooks/02_preprocess.ipynb`
 
 No change to the simulated data. New derived files per data folder: `<out>/features/accounts_linear.parquet`,

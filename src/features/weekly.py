@@ -4,20 +4,53 @@ Week w of an account runs from open_day + 7w to open_day + 7w + 6 (its cut-off),
 `amldata.labels(weeks_since_open=w)`. A feature for week w may use only transactions with day <= that cut-off.
 The store is written to <out>/features/weekly.parquet with a manifest (see manifest.py).
 
-Phase 0 builds the skeleton with a handful of volume features so the leak tests are real; Phase 3 adds the
-feature groups in the modelling plan (speed, counterparties, mix, self vs past, peers, income fit).
+The feature list is the one fixed at the Phase 1 gate (outputs/modelling/eda/report.md, section 8; phased plan,
+"Feature list for Phase 3"). Definitions follow the EDA panel (notebooks/01_eda_train.ipynb, section 3) so the
+gate's AUCs can be reproduced from the store; the speed shares are redefined as the EDA asked:
+
+  volume          rows, payments in / out, money in / out, largest payment in / out, card items (this week);
+                  rows, money in, money out (cumulative)
+  counterparties  distinct payers (not cash) and payees (not cash, not card), first-time payer share (this week);
+                  distinct payers and payees to date (cumulative)
+  pass-through    share of this week's money in that leaves this week: min(out, in) / in
+  speed           fwd_1h / fwd_24h_share_wk: transfers out (ACH, Cross-border) within 1 h / 24 h of the latest
+                  transfer in (ACH), each transfer in passing on at most its own amount, over this week's
+                  transfers in (capped at 1); med_in_out_minutes_wk: median minutes from the latest payment in to
+                  each payment out (the EDA's definition)
+  self vs past    (this week - median of earlier weeks) / MAD of earlier weeks, for money in, payers and rows;
+                  NaN until 4 earlier weeks exist or when the MAD is 0
+  peers           this week's money in / median money in of accounts with the same income and age band at the
+                  same week since opening; medians from accounts opened in months 0-4 only, frozen in
+                  features/peer_medians.parquet (kept instead of income fit: correlation 0.998 at the gate)
+  mix             internal (A*) share of money out, cash deposit share of money in, abroad and high-risk
+                  country shares of money out, all cumulative (weekly versions carried no signal at the gate)
+  clock           weeks_since_open
+Dropped at the gate: night share (same hour weights for everyone), weekly cash / abroad / high-risk shares.
 """
 from __future__ import annotations
 import os
+import shutil
 
 import amldata
 from amldata.loaders import _connect
 from . import manifest
 
-# this week = rows in [open_day + 7w, open_day + 7w + 6]; cumulative = rows with day <= open_day + 7w + 6
-FEATURES = ["n_rows_wk", "n_in_wk", "n_out_wk", "money_in_wk", "money_out_wk",
-            "n_rows_cum", "money_in_cum", "money_out_cum"]
 KEYS = ["account_id", "weeks_since_open"]
+FEATURES = [
+    "n_rows_wk", "n_in_wk", "n_out_wk", "money_in_wk", "money_out_wk",
+    "n_rows_cum", "money_in_cum", "money_out_cum",
+    "max_in_wk", "max_out_wk", "card_items_wk",
+    "n_payers_wk", "n_payees_wk", "new_payer_share_wk", "n_payers_cum", "n_payees_cum",
+    "passthrough_wk", "fwd_1h_share_wk", "fwd_24h_share_wk", "med_in_out_minutes_wk",
+    "self_vs_past_money_in", "self_vs_past_payers", "self_vs_past_rows",
+    "peer_ratio_money_in",
+    "internal_out_share_cum", "cash_in_share_cum", "abroad_out_share_cum", "high_risk_out_share_cum",
+]
+MONEY = ["money_in_wk", "money_out_wk", "money_in_cum", "money_out_cum", "max_in_wk", "max_out_wk"]  # exact sums, then DOUBLE
+PEER_MONTHS = (0, 1, 2, 3, 4)                         # peer medians come from training months only
+HIGH_RISK = ("Mexico", "Turkey", "Morocco", "UAE")   # configs/sim.yaml countries.high_risk (SAML-D)
+SELF_MIN_WEEKS = 4
+PEERS = "peer_medians.parquet"
 
 
 def parse_weeks(text: str) -> tuple[int, int]:
@@ -28,47 +61,181 @@ def parse_weeks(text: str) -> tuple[int, int]:
     return lo, hi
 
 
-def sql(w_lo: int, w_hi: int) -> str:
-    """Features for every account and week in [w_lo, w_hi], from the `accounts` and `transactions` views."""
+def base_sql(w_hi: int, month: int) -> str:
+    """Per account and week 0..w_hi: the weekly aggregates every feature is built from (accounts of one month)."""
+    hr = ", ".join(f"'{c}'" for c in HIGH_RISK)
     return f"""
-    WITH grid AS (
-        SELECT account_id, open_day, unnest(range({w_lo}, {w_hi + 1})) AS w FROM accounts),
+    WITH acc AS (
+        SELECT account_id, open_day, open_month, income, customer_age FROM accounts WHERE open_month = {month}),
+    t AS (
+        -- money as exact pence (amounts have 2 decimals): sums do not depend on the order DuckDB adds them in
+        SELECT x.account_id, x.direction, x.counterparty_id, CAST(x.amount AS DECIMAL(18, 2)) AS amount,
+               x.item_count, x.payment_type,
+               x.receiver_bank_location, (x.day - a.open_day) // 7 AS w,
+               x.day * 86400 + CAST(substr(x.time, 1, 2) AS INT) * 3600 + CAST(substr(x.time, 4, 2) AS INT) * 60
+                   + CAST(substr(x.time, 7, 2) AS INT) AS ts,
+               row_number() OVER (PARTITION BY x.account_id, x.counterparty_id
+                                  ORDER BY x.day, x.time, x.txn_id) AS nth_with_cp,
+               row_number() OVER (PARTITION BY x.account_id, x.direction, x.counterparty_id
+                                  ORDER BY x.day, x.time, x.txn_id) AS nth_dir_cp
+        FROM transactions x JOIN acc a USING (account_id)
+        WHERE x.day <= a.open_day + 7 * {w_hi} + 6),
+    ins AS (SELECT account_id, ts FROM t WHERE direction = 'in'),
+    delays AS (
+        SELECT o.account_id, o.w, median(o.ts - i.ts) / 60.0 AS med_in_out_minutes_wk
+        FROM (SELECT account_id, w, ts FROM t WHERE direction = 'out') o
+        ASOF JOIN ins i ON o.account_id = i.account_id AND o.ts >= i.ts
+        GROUP BY 1, 2),
+    tin AS (
+        SELECT account_id, ts, amount AS in_amt,
+               row_number() OVER (PARTITION BY account_id ORDER BY ts, amount) AS in_id
+        FROM t WHERE direction = 'in' AND payment_type = 'ACH'),
+    fo AS (
+        SELECT o.account_id, o.w, o.ts, o.amount, i.in_id, i.in_amt, o.ts - i.ts AS delay
+        FROM (SELECT account_id, w, ts, amount FROM t
+              WHERE direction = 'out' AND payment_type IN ('ACH', 'Cross-border')) o
+        ASOF JOIN tin i ON o.account_id = i.account_id AND o.ts >= i.ts),
+    fc AS (
+        SELECT account_id, w,
+               CASE WHEN delay <= 3600 THEN greatest(0, least(amount, in_amt
+                    - coalesce(sum(amount) FILTER (WHERE delay <= 3600) OVER before, 0))) ELSE 0 END AS f1h,
+               CASE WHEN delay <= 86400 THEN greatest(0, least(amount, in_amt
+                    - coalesce(sum(amount) FILTER (WHERE delay <= 86400) OVER before, 0))) ELSE 0 END AS f24h
+        FROM fo
+        WINDOW before AS (PARTITION BY account_id, in_id ORDER BY ts, amount
+                          ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING)),
+    fwd AS (SELECT account_id, w, sum(f1h) AS fwd_1h, sum(f24h) AS fwd_24h FROM fc GROUP BY 1, 2),
     wk AS (
-        SELECT g.account_id, g.w,
-               count(t.account_id)                                            AS n_rows_wk,
-               count(t.account_id) FILTER (WHERE t.direction = 'in')          AS n_in_wk,
-               count(t.account_id) FILTER (WHERE t.direction = 'out')         AS n_out_wk,
-               coalesce(sum(t.amount) FILTER (WHERE t.direction = 'in'), 0)   AS money_in_wk,
-               coalesce(sum(t.amount) FILTER (WHERE t.direction = 'out'), 0)  AS money_out_wk
-        FROM grid g LEFT JOIN transactions t
-          ON t.account_id = g.account_id AND t.day BETWEEN g.open_day + 7 * g.w AND g.open_day + 7 * g.w + 6
-        GROUP BY 1, 2)
-    SELECT account_id, w AS weeks_since_open, n_rows_wk, n_in_wk, n_out_wk, money_in_wk, money_out_wk,
-           sum(n_rows_wk)   OVER (PARTITION BY account_id ORDER BY w) AS n_rows_cum,
-           sum(money_in_wk)  OVER (PARTITION BY account_id ORDER BY w) AS money_in_cum,
-           sum(money_out_wk) OVER (PARTITION BY account_id ORDER BY w) AS money_out_cum
-    FROM wk ORDER BY account_id, w"""
+        SELECT account_id, w,
+               count(*)                                                                AS n_rows_wk,
+               count(*) FILTER (WHERE direction = 'in')                                AS n_in_wk,
+               count(*) FILTER (WHERE direction = 'out')                               AS n_out_wk,
+               coalesce(sum(amount) FILTER (WHERE direction = 'in'), 0)                AS money_in_wk,
+               coalesce(sum(amount) FILTER (WHERE direction = 'out'), 0)               AS money_out_wk,
+               coalesce(max(amount) FILTER (WHERE direction = 'in'), 0)                AS max_in_wk,
+               coalesce(max(amount) FILTER (WHERE direction = 'out'), 0)               AS max_out_wk,
+               coalesce(sum(item_count) FILTER (WHERE counterparty_id = 'CARD_MERCHANTS'), 0) AS card_items_wk,
+               count(DISTINCT counterparty_id) FILTER (WHERE direction = 'in' AND counterparty_id <> 'CASH')
+                                                                                       AS n_payers_wk,
+               count(DISTINCT counterparty_id) FILTER (WHERE direction = 'out'
+                                    AND counterparty_id NOT IN ('CASH', 'CARD_MERCHANTS')) AS n_payees_wk,
+               count(DISTINCT counterparty_id) FILTER (WHERE direction = 'in' AND counterparty_id <> 'CASH'
+                                                       AND nth_with_cp = 1)            AS n_new_payers_wk,
+               count(*) FILTER (WHERE direction = 'in' AND counterparty_id <> 'CASH' AND nth_dir_cp = 1)
+                                                                                       AS first_seen_payers,
+               count(*) FILTER (WHERE direction = 'out' AND counterparty_id NOT IN ('CASH', 'CARD_MERCHANTS')
+                                AND nth_dir_cp = 1)                                    AS first_seen_payees,
+               coalesce(sum(amount) FILTER (WHERE direction = 'in' AND payment_type = 'ACH'), 0) AS transfer_in_wk,
+               coalesce(sum(amount) FILTER (WHERE direction = 'in' AND payment_type = 'Cash Deposit'), 0)
+                                                                                       AS cash_in_wk,
+               coalesce(sum(amount) FILTER (WHERE direction = 'out' AND counterparty_id LIKE 'A%'), 0)
+                                                                                       AS internal_out_wk,
+               coalesce(sum(amount) FILTER (WHERE direction = 'out' AND receiver_bank_location <> 'UK'), 0)
+                                                                                       AS abroad_out_wk,
+               coalesce(sum(amount) FILTER (WHERE direction = 'out' AND receiver_bank_location IN ({hr})), 0)
+                                                                                       AS high_risk_out_wk
+        FROM t GROUP BY 1, 2),
+    grid AS (SELECT account_id, open_month, income, customer_age, unnest(range(0, {w_hi + 1})) AS w FROM acc)
+    SELECT g.account_id, g.open_month, g.income, g.customer_age, g.w,
+           coalesce(n_rows_wk, 0) AS n_rows_wk, coalesce(n_in_wk, 0) AS n_in_wk, coalesce(n_out_wk, 0) AS n_out_wk,
+           coalesce(money_in_wk, 0) AS money_in_wk, coalesce(money_out_wk, 0) AS money_out_wk,
+           coalesce(max_in_wk, 0) AS max_in_wk, coalesce(max_out_wk, 0) AS max_out_wk,
+           coalesce(card_items_wk, 0) AS card_items_wk,
+           coalesce(n_payers_wk, 0) AS n_payers_wk, coalesce(n_payees_wk, 0) AS n_payees_wk,
+           coalesce(n_new_payers_wk, 0) AS n_new_payers_wk,
+           coalesce(first_seen_payers, 0) AS first_seen_payers, coalesce(first_seen_payees, 0) AS first_seen_payees,
+           coalesce(transfer_in_wk, 0) AS transfer_in_wk, coalesce(cash_in_wk, 0) AS cash_in_wk,
+           coalesce(internal_out_wk, 0) AS internal_out_wk, coalesce(abroad_out_wk, 0) AS abroad_out_wk,
+           coalesce(high_risk_out_wk, 0) AS high_risk_out_wk,
+           coalesce(fwd_1h, 0) AS fwd_1h, coalesce(fwd_24h, 0) AS fwd_24h, med_in_out_minutes_wk
+    FROM grid g LEFT JOIN wk USING (account_id, w) LEFT JOIN fwd USING (account_id, w)
+         LEFT JOIN delays USING (account_id, w)"""
+
+
+def peer_sql(parts: str) -> str:
+    """Median money in per income band, age band and week since opening, over accounts opened in months 0-4."""
+    months = ", ".join(map(str, PEER_MONTHS))
+    return f"""
+    SELECT income, customer_age, w, median(CAST(money_in_wk AS DOUBLE)) AS peer_median_money_in
+    FROM read_parquet('{parts}') WHERE open_month IN ({months})
+    GROUP BY 1, 2, 3 ORDER BY 1, 2, 3"""
+
+
+def final_sql(parts: str, peers: str, w_lo: int, w_hi: int) -> str:
+    self_vs_past = []
+    for name, col in [("money_in", "money_in_wk"), ("payers", "n_payers_wk"), ("rows", "n_rows_wk")]:
+        self_vs_past.append(
+            # medians of DECIMAL round to 2 places in DuckDB, so take them on DOUBLE
+            f"CASE WHEN count(*) OVER past >= {SELF_MIN_WEEKS} THEN (CAST({col} AS DOUBLE) - median(CAST({col} AS DOUBLE))"
+            f" OVER past) / nullif(mad(CAST({col} AS DOUBLE)) OVER past, 0) END AS self_vs_past_{name}")
+    cols = [f"CAST({c} AS DOUBLE) AS {c}" if c in MONEY else c for c in KEYS + FEATURES]
+    return f"""
+    SELECT {", ".join(cols)} FROM (
+        SELECT b.account_id, b.w AS weeks_since_open,
+               n_rows_wk, n_in_wk, n_out_wk, money_in_wk, money_out_wk,
+               sum(n_rows_wk)    OVER cum AS n_rows_cum,
+               sum(money_in_wk)  OVER cum AS money_in_cum,
+               sum(money_out_wk) OVER cum AS money_out_cum,
+               max_in_wk, max_out_wk, card_items_wk,
+               n_payers_wk, n_payees_wk,
+               n_new_payers_wk / nullif(n_payers_wk, 0)                    AS new_payer_share_wk,
+               sum(first_seen_payers) OVER cum                             AS n_payers_cum,
+               sum(first_seen_payees) OVER cum                             AS n_payees_cum,
+               least(money_out_wk, money_in_wk) / nullif(money_in_wk, 0)   AS passthrough_wk,
+               -- least() skips NULLs in DuckDB, so weeks without a transfer in must be NULL explicitly
+               CASE WHEN transfer_in_wk > 0 THEN least(1.0, fwd_1h / transfer_in_wk) END  AS fwd_1h_share_wk,
+               CASE WHEN transfer_in_wk > 0 THEN least(1.0, fwd_24h / transfer_in_wk) END AS fwd_24h_share_wk,
+               med_in_out_minutes_wk,
+               {", ".join(self_vs_past)},
+               CAST(money_in_wk AS DOUBLE) / nullif(p.peer_median_money_in, 0) AS peer_ratio_money_in,
+               sum(internal_out_wk)  OVER cum / nullif(sum(money_out_wk) OVER cum, 0) AS internal_out_share_cum,
+               sum(cash_in_wk)       OVER cum / nullif(sum(money_in_wk)  OVER cum, 0) AS cash_in_share_cum,
+               sum(abroad_out_wk)    OVER cum / nullif(sum(money_out_wk) OVER cum, 0) AS abroad_out_share_cum,
+               sum(high_risk_out_wk) OVER cum / nullif(sum(money_out_wk) OVER cum, 0) AS high_risk_out_share_cum
+        FROM read_parquet('{parts}') b
+        LEFT JOIN read_parquet('{peers}') p USING (income, customer_age, w)
+        WINDOW cum  AS (PARTITION BY b.account_id ORDER BY b.w),
+               past AS (PARTITION BY b.account_id ORDER BY b.w ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING))
+    WHERE weeks_since_open BETWEEN {w_lo} AND {w_hi}
+    ORDER BY account_id, weeks_since_open"""
 
 
 def build(out: str = amldata.DEFAULT_OUT, weeks: tuple[int, int] = (0, 78), force: bool = False):
-    """Write <out>/features/weekly.parquet (+ manifest). Returns (path, rows)."""
+    """Write <out>/features/weekly.parquet (+ peer medians and manifest). Returns (path, rows).
+
+    Accounts are processed one opening month at a time to bound memory (~13M transaction rows per month at
+    244k accounts); weeks before `weeks[0]` are still computed because cumulative and self-vs-past features
+    need them, then left out of the store."""
     folder = os.path.join(out, "features")
     path = os.path.join(folder, "weekly.parquet")
     if os.path.exists(path) and not force:
         try:
             manifest.check(out, FEATURES, weeks)
-            con = _connect()
-            n = con.execute(f"SELECT count(*) FROM read_parquet('{path}')").fetchone()[0]
+            n = _connect().execute(f"SELECT count(*) FROM read_parquet('{path}')").fetchone()[0]
             return path, n
         except (ValueError, FileNotFoundError):
             pass
     os.makedirs(folder, exist_ok=True)
+    work = os.path.join(folder, "_build")
+    shutil.rmtree(work, ignore_errors=True)
+    os.makedirs(work)
     con = amldata.public(out)                       # only the `accounts` and `transactions` views exist here
+    con.execute(f"PRAGMA memory_limit='{os.environ.get('FEATURES_DUCKDB_MEMORY', '4GB')}'")
+    con.execute(f"PRAGMA temp_directory='{os.path.join(work, 'duckdb_tmp')}'")
+    months = [r[0] for r in con.execute("SELECT DISTINCT open_month FROM accounts ORDER BY 1").fetchall()]
+    for m in months:
+        con.execute(f"COPY ({base_sql(weeks[1], m)}) TO '{os.path.join(work, f'base_{m}.parquet')}' (FORMAT PARQUET)")
+    parts = os.path.join(work, "base_*.parquet")
+    peers = os.path.join(folder, PEERS)
+    con.execute(f"COPY ({peer_sql(parts)}) TO '{peers}' (FORMAT PARQUET)")
     tmp = path + ".tmp"
-    con.execute(f"COPY ({sql(*weeks)}) TO '{tmp}' (FORMAT PARQUET)")
+    con.execute(f"COPY ({final_sql(parts, peers, *weeks)}) TO '{tmp}' (FORMAT PARQUET)")
     os.replace(tmp, path)
     n = con.execute(f"SELECT count(*) FROM read_parquet('{path}')").fetchone()[0]
-    manifest.write(out, FEATURES, weeks, {"rows": int(n)})
+    con.close()
+    shutil.rmtree(work, ignore_errors=True)
+    manifest.write(out, FEATURES, weeks, {"rows": int(n), "peer_months": list(PEER_MONTHS),
+                                         "peer_medians_sha256": manifest._sha256(peers)})
     return path, n
 
 

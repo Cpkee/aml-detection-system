@@ -49,6 +49,11 @@ def main(argv=None):
     p.add_argument("--out", default="data/v1_full", help="data folder (default data/v1_full); fitted on its months 0-4")
     p.add_argument("--report", default=None,
                    help="report folder (default outputs/modelling/preprocess, or .../preprocess/<data folder name>)")
+    c = sub.add_parser("store-check", help="Phase 3 gate: execute notebooks/03_feature_store.ipynb on a built store -> "
+                                           "<report>/report.md (screen reproduced, first-week AUCs with bootstrap CIs)")
+    c.add_argument("--out", default="data/v1_full", help="data folder whose features/weekly.parquet is checked")
+    c.add_argument("--report", default=None,
+                   help="report folder (default outputs/modelling/features, or .../features/<data folder name>)")
 
     a = ap.parse_args(argv)
     if a.cmd == "weekly":
@@ -58,6 +63,8 @@ def main(argv=None):
         run_notebook("01_eda_train.ipynb", a.out, a.report)
     elif a.cmd == "preprocess":
         run_notebook("02_preprocess.ipynb", a.out, a.report, report_root="outputs/modelling/preprocess")
+    elif a.cmd == "store-check":
+        run_notebook("03_feature_store.ipynb", a.out, a.report, report_root="outputs/modelling/features")
     else:
         raise SystemExit(f"`{a.cmd}` is not built yet (see the modelling plan)")
 

@@ -12,7 +12,7 @@ from amldata import HIDDEN
 from features import manifest, weekly
 
 ACCOUNTS = pd.DataFrame({"account_id": ["A1", "A2", "A3"], "open_month": [0, 0, 1], "open_day": [0, 10, 40],
-                         "income": [0.1, 0.5, 0.9]})
+                         "income": [0.1, 0.5, 0.9], "customer_age": [20, 30, 40]})
 TX_COLS = ["txn_id", "account_id", "direction", "counterparty_id", "day", "time", "amount", "item_count",
            "payment_type", "sender_bank_location", "receiver_bank_location"]
 
@@ -30,9 +30,9 @@ BASE = _tx([
 ])
 
 
-def _write(folder, tx):
+def _write(folder, tx, accounts=ACCOUNTS):
     os.makedirs(folder, exist_ok=True)
-    ACCOUNTS.to_parquet(os.path.join(folder, "accounts.parquet"), index=False)
+    accounts.to_parquet(os.path.join(folder, "accounts.parquet"), index=False)
     tx.to_parquet(os.path.join(folder, "transactions.parquet"), index=False)
     with open(os.path.join(folder, "run_manifest.json"), "w") as f:
         json.dump({"seed": 1, "set": []}, f)
@@ -68,6 +68,36 @@ def test_rebuild_is_byte_identical(tmp_path):
     first = open(p, "rb").read()
     weekly.build(folder, (0, 3), force=True)
     assert open(p, "rb").read() == first
+
+
+def test_speed_counts_transfers_only_and_caps_at_the_inflow(tmp_path):
+    tx = _tx([
+        ("S1", "A2", "in", "EXT_P", 11, "10:00:00", 200.0, 1, "ACH", "UK", "UK"),            # transfer in
+        ("S2", "A2", "out", "EXT_Q", 11, "10:10:00", 80.0, 1, "ACH", "UK", "UK"),            # +10 min
+        ("S3", "A2", "out", "CARD_MERCHANTS", 11, "10:20:00", 30.0, 1, "Debit card", "UK", "UK"),  # not a transfer
+        ("S4", "A2", "out", "EXT_R", 11, "10:30:00", 50.0, 1, "Cross-border", "UK", "Spain"),  # +30 min
+        ("S5", "A2", "out", "EXT_S", 11, "15:00:00", 40.0, 1, "ACH", "UK", "UK"),            # +5 h
+        ("S6", "A2", "out", "EXT_T", 11, "16:00:00", 90.0, 1, "ACH", "UK", "UK"),            # +6 h, over the cap
+        ("S7", "A2", "in", "EXT_P", 12, "09:00:00", 10.0, 1, "ACH", "UK", "UK"),             # same payer again
+    ])
+    f = _store(_write(tmp_path / "d", tx))
+    w0 = f.loc[("A2", 0)]                                         # A2 opens day 10: days 10-16 are week 0
+    assert w0["fwd_1h_share_wk"] == (80 + 50) / 210               # card row ignored; within 1 h of the 200 in
+    assert w0["fwd_24h_share_wk"] == 200 / 210                    # 80 + 50 + 40 + only 30 of the 90 (cap 200)
+    assert w0["n_payers_wk"] == 1 and w0["n_payers_cum"] == 1    # one payer, paid twice
+    assert w0["n_payees_wk"] == 4                                 # card merchants are not payees
+    assert w0["abroad_out_share_cum"] == 50 / 290
+    assert pd.isna(f.loc[("A2", 1), "fwd_1h_share_wk"])            # no transfer in that week: no share, not 1.0
+
+
+def test_self_vs_past_waits_for_four_weeks_and_peers_use_training_months(tmp_path):
+    f = _store(_write(tmp_path / "d", BASE), weeks=(0, 5))
+    assert f.loc[pd.IndexSlice[:, 0:3], "self_vs_past_money_in"].isna().all()
+    late = ACCOUNTS.iloc[[0]].assign(account_id="A9", open_month=5, open_day=150)     # A1's income and age band
+    rich = _tx([("T9", "A9", "in", "EXT_9", 151, "10:00:00", 1e6, 1, "ACH", "UK", "UK")])
+    g = _store(_write(tmp_path / "e", pd.concat([BASE, rich]), pd.concat([ACCOUNTS, late])), weeks=(0, 5))
+    assert g.loc[("A9", 0), "money_in_wk"] == 1e6
+    assert g.drop(index="A9", level=0).equals(f)                  # a month-5 account never moves the peer medians
 
 
 def test_no_feature_named_after_hidden_data():
