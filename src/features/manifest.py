@@ -74,6 +74,9 @@ def check(out: str, features: list[str] | None = None, weeks: tuple[int, int] | 
         problems.append(f"feature list differs: store has {m['features']}, caller expects {list(features)}")
     if weeks is not None and (weeks[0] < m["weeks"][0] or weeks[1] > m["weeks"][1]):
         problems.append(f"store covers weeks {m['weeks']}, caller needs {list(weeks)}")
+    if "peer_medians_sha256" in m and m["peer_medians_sha256"] != _sha256(
+            os.path.join(out, "features", "peer_medians.parquet")):
+        problems.append("the frozen peer medians changed since the store was built")
     if problems:
         raise ValueError(f"{out}/features is stale: " + "; ".join(problems) + ". Rebuild with --force.")
     return m

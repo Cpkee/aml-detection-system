@@ -1,0 +1,17 @@
+feature,eda_name,account_weeks,null_pattern_equal,max_rel_diff
+n_rows_wk,n_rows,912627,True,0.0
+money_in_wk,money_in,912627,True,3.575071842943282e-16
+money_out_wk,money_out,912627,True,4.969554322670085e-16
+max_in_wk,max_in,912627,True,0.0
+n_payers_wk,n_payers,912627,True,0.0
+n_payees_wk,n_payees,912627,True,0.0
+new_payer_share_wk,new_payer_share,912627,True,0.0
+passthrough_wk,passthrough_wk,912627,True,4.440892098500626e-16
+out_1h_share_wk,out_1h_share,912627,True,3.8200110403924437e-16
+out_24h_share_wk,out_24h_share,912627,True,5.030169717915483e-16
+med_in_out_minutes_wk,med_delay_min,912627,True,0.0
+money_in_cum,money_in_cum,912627,True,8.944269615715543e-16
+n_rows_cum,n_rows_cum,912627,True,0.0
+self_vs_past_money_in,self_vs_past_in,912627,True,8.043380810690037e-14
+self_vs_past_payers,self_vs_past_payers,912627,True,0.0
+peer_ratio_money_in,peer_ratio_in,912627,True,4.866605866608624e-16

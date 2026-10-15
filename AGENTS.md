@@ -22,11 +22,18 @@ PYTHONPATH=src python -m sim.run all --baf data/raw/BAF_Base.csv        # full p
 PYTHONPATH=src python -m sim.checks --baf data/raw/BAF_Base.csv         # 10 checks + data/v1/data_card.md
 PYTHONPATH=src BAF_PATH=data/raw/BAF_Base.csv python -m pytest -q tests  # must pass before any commit
 ```
-Modelling (plan: "Modelling: phased plan" tab of the decision-record doc; Phase 0 done 9 Oct 2026):
-`PYTHONPATH=src python -m features weekly --out data/v1 --weeks 0-78` builds `<out>/features/weekly.parquet` + its
-`features_manifest.json` (feature list, cut-off rule, code commit, hash of the data's `run_manifest.json`; `features.weekly.load()`
-refuses a stale store). `python -m features eda [--out data/v1 --report DIR]` executes `notebooks/01_eda_train.ipynb`;
-`python -m features preprocess` and `python -m models train` are Phase 2/4 stubs.
+Modelling (plan: "Modelling: phased plan" tab of the decision-record doc; Phases 0–3 done):
+`PYTHONPATH=src python -m features weekly --out data/v1_full --weeks 0-78` builds `<out>/features/weekly.parquet` (28 features
+from the Phase 1 gate list, see `src/features/weekly.py`; money summed as exact pence; 19.3M account-weeks, ~4 min, ~4.2 GB) +
+`peer_medians.parquet` (frozen from months 0–4) + `features_manifest.json` (feature list, cut-off rule, code commit, hash of the
+data's `run_manifest.json` and of the peer medians; `features.weekly.load()` refuses a stale store).
+`python -m features store-check [--out D]` runs `notebooks/03_feature_store.ipynb` (Phase 3 gate: store equals the EDA's query
+value by value, first-week AUCs with account-level bootstrap intervals, whole-store checks) -> `outputs/modelling/features[/<run>]`.
+`tests/test_feature_store.py` checks the store on real data (independent pandas re-implementation, no-peek cut test,
+byte-identical rebuild, whole-store invariants); run it with `SIM_OUT` = a folder whose store is built. `python -m features eda [--out data/v1 --report DIR]` executes `notebooks/01_eda_train.ipynb`;
+`python -m features preprocess [--out data/v1_full --report DIR]` executes `notebooks/02_preprocess.ipynb` (Phase 2: all its
+code is in the notebook) -> `<out>/features/accounts_{linear,tree}.parquet` + `preprocess_manifest.json`, `<report>/params.json`
++ `report.md` (default `outputs/modelling/preprocess[/<run>]`); `python -m models train` is a Phase 4 stub.
 Sensitivity runs (rules frozen, 244k, one `test` value each): `python -m sim.sensitivity --list | --run [--only NAME]
 | --summarise` -> `data/sensitivity/<name>/` (large files deleted) and `outputs/sensitivity/summary.csv`.
 Single steps: `accounts`, `normal --batches 3-3`, `laundering`, `rules`, `finalize`. Use `--out` for another
@@ -60,7 +67,9 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
   `data/v1_full` (main dataset); pass `out=` for others (`data/v1` 50k, `data/variant_II`, `data/variant_IV`). `labels()` returns
   `is_launderer` (fixed final label) for months 0–5 and refuses test months 6–7; with a cut-off
   (`as_of_day=` one calendar day, or `weeks_since_open=w` = end of each account's week w) it adds
-  `started_by_day` and `mule_by_day` (main label: fake accounts count from opening, real customers from start).
+  `started_by_day` and `mule_by_day` (main label: fake accounts count from opening, real customers from start), and
+  for months 0–5 `open_by_day` (0 once the bank has closed the account, i.e. `aml_exit_day <=` cut-off; only confirmed
+  launderers are closed, so drop account-weeks with 0 from training; withheld when test months are requested).
   `labels(profile=True)` adds each launderer's hidden type (fake / witting / unwitting; None otherwise) for EDA on
   months 0–5 only; it refuses test months even with `allow_test`. Never a model input (decision 9 Oct 2026).
   Scoring code uses `amldata.evaluation()`. Never read hidden parquet files directly elsewhere.
@@ -130,9 +139,89 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
    money in, rows and payers this week, median in->out delay carry signal once a burst exists (AUC 0.70–0.86 vs started);
    weekly abroad / high-risk / cash shares carry none; speed shares need redefining as transfers out after transfers in.
    Homophily: a launderer's internal payees are launderers 5.4% of the time, 20x the base rate -> graph features worthwhile.
-   **Closure footprint (decision needed):** every open account has a weekly card row, so a zero-row week = closed by the
+   **Closure footprint (decided 15 Oct 2026):** every open account has a weekly card row, so a zero-row week = closed by the
    bank = a confirmed launderer (116 of 455 training launderers stop early, 1 normal account). Post-closure account-weeks
-   must be dropped from training and the scoring pool; proposal: `labels()` returns `open_by_day` for months 0–5.
+   are dropped from training and the scoring pool via `labels(...)["open_by_day"]` (months 0–5). Do not use a zero-row week
+   as the closure test: it also drops ~420 normal account-weeks (months 0–5, weeks 0–26).
+   **Phase 2 — cleaning and preprocessing (plan revised 10 Oct 2026; built and run 15 Oct, PR open; gate: team agrees the 3 proposals below).** Goal: one fixed,
+   tested recipe that turns the 32-column `accounts` table into model inputs. **All Phase 2 code lives in
+   `notebooks/02_preprocess.ipynb`** (decision 10 Oct 2026, Phase 2 only; Phases 3–5 not decided). Later phases read the
+   notebook's output *files*, never import notebook code. The data has no NaN, duplicates or broken keys by construction
+   (10 checks), so "cleaning" means BAF's codes and encodings. **Fit per dataset (decision 10 Oct 2026):** the recipe is the
+   same everywhere; medians, levels and scaler numbers are fitted on each dataset's own months 0–4 (v1_full, v1, variant_II,
+   variant_IV, a sensitivity run when used); train-on-main / test-on-variant reuses the main fit.
+   - *Unavoidable code outside the notebook (3 small pieces):* (1) `open_by_day` in `src/amldata/loaders.py` (only amldata
+     may read hidden `aml_outcomes`); (2) `python -m features preprocess [--out D --report R]` in `src/features/__main__.py`
+     runs the notebook through the existing `run_notebook` (generalise its default report folder per notebook);
+     (3) `tests/test_preprocess.py` executes the notebook on `data/v1` (skipped without data).
+   - *Step 0, the open decision first:* ~~done 10 Oct 2026~~ `labels()` returns `open_by_day` with any cut-off (1 unless
+     `aml_exit_day <=` the cut-off; a bank knows which accounts it closed), months 0–5 only; withheld (column left out) when
+     the request includes test months, even with `allow_test`. Tests in `tests/test_hidden_files.py`: closed accounts are
+     launderers only; never rises again once 0 (weeks 0–78); 1 for every account at week 0 (earliest closure is day 55);
+     total closures match `aml_outcomes`. v1_full months 0–4: 0 / 1 / 19 / 84 / 118 of 455 launderers closed by weeks
+     0 / 8 / 12 / 26 / 78. Phase 3 drops training account-weeks with `open_by_day = 0`; the harness already counts closed
+     cohort accounts as caught.
+   - *Notebook sections (a plain-language markdown cell each, like `01_eda_train.ipynb`; reads `EDA_DATA` / `EDA_REPORT`,
+     which `run_notebook` sets):* 0 setup; 1 the recipe as one Python dict per column (the report's column table is printed
+     from this dict, so they cannot drift); 2 before: months 0–4 via `amldata.public()`, same table as EDA §1 for comparison;
+     3 `fit(train) -> params` (pure function, months 0–4 only); 4 `transform(df, params, mode)` (pure function, `linear` /
+     `tree`); 5 apply to all months 0–7 (accounts are public; no labels touched) and write files; 6 after: before/after per
+     column, missing-flag rate launderers vs normal (labels months 0–4 only); 7 checks as `assert` cells (execution fails if
+     one breaks); 8 write the report.
+   - *Outputs:* `data/<run>/features/accounts_linear.parquet` and `accounts_tree.parquet` (keys `account_id`, `open_month`
+     plus features, every account, months 0–7) + `preprocess_manifest.json` (recipe, fitted params, input/output columns per
+     mode, months fitted, sha256 of `run_manifest.json`, git commit + dirty flag, package versions); committed copy
+     `outputs/modelling/preprocess/params.json` + `report.md` (other datasets under `preprocess/<run>/`). JSON, not joblib:
+     readable, diffable, no pickled notebook classes. Phase 4 refuses a file whose manifest hash differs from the data run.
+   - *Column recipe (from the EDA, `outputs/modelling/eda/report.md` §1; 29 BAF columns):* (a) negative codes -> NaN +
+     `<col>_missing` flag (both modes): `intended_balcon_amount` (73% negative), `prev_address_months_count` (69% at −1),
+     `bank_months_count` (25%), `current_address_months_count` (0.4%), `session_length_in_minutes` (0.2%),
+     `device_distinct_emails_8w` (0.04%); (b) `credit_risk_score` −165 to 385: real values, keep; (c) `velocity_6h`: fixed
+     rule clip at 0 (0 negative rows in months 0–4, 9 in months 5–7 of v1_full, 5–12 in the other datasets), before any log;
+     (d) categoricals `payment_type` (5), `employment_status` (7), `housing_status` (7), `source` (2), `device_os` (5):
+     levels frozen from months 0–4; `linear` one-hot (unseen level -> all zeros), `tree` `category` dtype with the frozen
+     levels (unseen -> NaN); (e) `income`, `customer_age`, `proposed_credit_limit` already binned: keep numeric; 6 binary
+     columns (`email_is_free`, `phone_home_valid`, `phone_mobile_valid`, `has_other_cards`, `foreign_request`,
+     `keep_alive_session`) stay 0/1; (f) `linear` only: `log1p` on `days_since_request`, `prev_address_months_count`,
+     `session_length_in_minutes`, `bank_branch_count_8w`, `zip_count_4w`, `current_address_months_count` (**changed 10 Oct
+     2026**, team decision: log only where it brings the skew closer to 0; `intended_balcon_amount` 1.34 -> −1.15 and
+     `velocity_6h/24h/4w` 0.34 / 0.32 / 0.11 -> −1.20 / −0.34 / −0.45 on v1_full months 0–4 got worse, so they are no longer
+     logged; by the same rule `current_address_months_count` 1.41 -> −0.54 was added; not logged: `proposed_credit_limit`
+     (binned) and `device_distinct_emails_8w` (values 0–2); the notebook's section 6
+     shows the skew with and without the log, section 7 asserts each logged column improves); (g) `open_month`, `open_day`, `account_id` never features; (h) `linear` = NaN step, clip, log, impute
+     month 0–4 median, one-hot, standardise continuous columns (0/1 columns left as 0/1); `tree` = NaN step, clip, raw scale,
+     NaN kept, category dtype. Proposals for the team: keep both columns of the 3 pairs with |Spearman| > 0.5 (Phase 4's
+     regularisation handles them); flags in both modes; standardise continuous only.
+   - *Transactions:* no cleaning needed; the feature store parses `time` to seconds, derives `counterparty_kind`
+     (`EXT_*`, `CARD_MERCHANTS`, `CASH`, `A*`), counts the £0.00 rows and keeps them. Recorded here so the report's
+     preprocessing section is complete.
+   - *Checks (assert cells in section 7, run by pytest via the notebook):* `linear` has no NaN; `tree` NaN exactly where
+     codes were; output column lists identical for months 0–4 / 5 / 6–7; `fit` twice gives equal params, and changing
+     month 5–7 rows leaves them unchanged (a pure function of months 0–4); `linear` continuous columns mean ≈ 0, sd ≈ 1 on
+     months 0–4; row count and `account_id` order preserved; an invented unseen level gives all-zero one-hot / NaN category;
+     manifest hash equals the data's `run_manifest.json`. The hidden-file guard already scans notebook cells.
+   - *Progress:* 10 Oct 2026 branch `preprocess` created; Step 0 done; notebook + CLI + `tests/test_preprocess.py` built.
+     15 Oct: both notebooks find the repo root themselves (VS Code "Run All" works without `PYTHONPATH`); notebook run on
+     v1_full (executed copy in `notebooks/`, report `outputs/modelling/preprocess/`), v1 (`preprocess/v1_50k/`),
+     variant_II, variant_IV (`preprocess/<run>/`): all 25 checks pass on each, v1_full and v1 match EDA §1; 56 `linear` /
+     35 `tree` features. Variant IV has 148,992 accounts in months 0–4 (its BAF file spreads accounts differently over the
+     months; Variant II matches Base). Missing flags carry fake-account signal (v1_full months 0–4, normal / fake / real
+     mule: `prev_address` 69% / 89% / 67%, `intended_balcon` 73% / 88% / 63%, `bank_months` 25% / 40% / 21%). Then
+     pytest + `sim.checks` passed, commit + PR into `main`. Still open: decision-record doc, team agreement on the 3 proposals.
+   - *Order:* branch `preprocess` from `eda-train` (PR #16 still open) -> Step 0 + tests -> notebook on `data/v1` (fast) ->
+     `data/v1_full` -> v1 / variant_II / variant_IV copies -> pytest + `sim.checks` -> CHANGELOG + decision-record doc -> PR.
+   - *Gate:* tests pass; the notebook's section 2 table matches EDA §1; team agrees the 3 proposals above; then the team
+     fixes the Phase 3 feature list from the doc's "Phase 1 findings".
+   - *Out of scope:* resampling (Phase 4, class weights), scaling of weekly activity features (Phase 3 computes them; the
+     `linear` scaler is extended there), any look at months 6–7 labels.
+   **Phase 3 — weekly feature store (done 15 Oct 2026, branch `phase3-features`).** 28 features from the Phase 1 gate list
+   (`src/features/weekly.py`); stores built for v1_full and v1. Gate passed (`outputs/modelling/features/report.md`): the 14
+   shared features equal the EDA's query value by value on every account-week; 25 of 28 features separate a launderer's
+   first laundering week from normal weeks (95% account-level bootstrap); 30 tests pass on v1 and v1_full. **Speed shares
+   (decision 15 Oct 2026):** `out_1h_share_wk` / `out_24h_share_wk` use the EDA's definition (any payment out after the
+   latest payment in). A transfers-only redefinition was tried and dropped: it misses laundering through cash (1 h AUC
+   0.772 vs 0.951 for cash patterns; equal for transfer-only patterns), 0.035 AUC worse overall (paired 95% interval
+   0.021–0.050). Evidence: `outputs/modelling/features/report.md`, `python -m evaluation.speed_by_pattern`.
    **Decisions 8 Oct 2026:** weekly label = "mule account by this week" (a fake account
    counts from the day it opens; a real customer — witting/unwitting — from `launder_start_day`); alert budget
    = the rules' own alert count in each week. **Fixed cohort (8 Oct 2026):** main comparison = the 50,061 test
