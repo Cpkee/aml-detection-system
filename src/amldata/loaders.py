@@ -4,7 +4,8 @@ Three doors, so hidden answers never reach a model by accident:
 
   public(out)               model inputs only: `accounts` and `transactions`
   labels(out, ...)          the training answer `is_launderer`, for training/calibration accounts only
-                            (`profile=True` adds each launderer's hidden type for EDA; months 0-5 only)
+                            (`profile=True` adds each launderer's hidden type for EDA; months 0-5 only;
+                            with a cut-off, `open_by_day` says whether the bank had closed the account)
   evaluation(out)           every table; for scoring code in src/evaluation/ only
 
 Feature and model code must only use `public()` and `labels()`. tests/test_hidden_files.py fails if any
@@ -18,6 +19,7 @@ Example
     y = labels(as_of_day=377)                        # months 0-5 only; weekly labels at one calendar day
     y4 = labels(weeks_since_open=4)                  # weekly labels at the end of each account's week 4
     e = labels(profile=True)                         # + fake / witting / unwitting per launderer (EDA only)
+    keep = y4[y4["open_by_day"] == 1]                # drop accounts the bank closed by that cut-off
 """
 from __future__ import annotations
 import os
@@ -68,6 +70,12 @@ def labels(out: str = DEFAULT_OUT, months=TRAIN_MONTHS, as_of_day: int | None = 
       mule_by_day     1 if the account is a mule account by the cut-off: a fake account counts from the
                       day it opens (it was opened to launder), a real customer from the day they start
                       laundering (the agreed main label, team decision 8 Oct 2026)
+    and, for months 0-5 only, whether the account is still open:
+      open_by_day     0 once the bank has closed the account (aml_exit_day <= cut-off), else 1. A bank knows
+                      which accounts it closed; the simulator closes only after a confirmed alert, so a 0
+                      means a launderer. Account-weeks with 0 must not be used for training (Phase 2 plan).
+                      Left out when the request includes test months: scoring code reads closures through
+                      evaluation().
     The cut-off is either `as_of_day` (one calendar day for every account) or `weeks_since_open` (the end
     of week w of each account's own life: open_day + 7*w + 6, the clock used for the fixed-cohort
     comparison). Nothing else from the hidden files is returned. Test months (6-7) are refused unless
@@ -85,9 +93,10 @@ def labels(out: str = DEFAULT_OUT, months=TRAIN_MONTHS, as_of_day: int | None = 
     df = con.execute(f"""
         SELECT a.account_id, a.open_month, a.open_day, t.is_launderer, t.launder_start_day,
                (t.profile = 'fake') AS is_fake,
-               CASE WHEN t.is_launderer = 1 THEN t.profile END AS profile
+               CASE WHEN t.is_launderer = 1 THEN t.profile END AS profile, o.aml_exit_day
         FROM read_parquet('{_file(out, 'accounts')}') a
         JOIN read_parquet('{_file(out, 'accounts_truth')}') t USING (account_id)
+        LEFT JOIN read_parquet('{_file(out, 'aml_outcomes')}') o USING (account_id)
         WHERE a.open_month IN ({m})""").df()
     if as_of_day is not None or weeks_since_open is not None:
         cutoff = as_of_day if as_of_day is not None else df["open_day"] + 7 * int(weeks_since_open) + 6
@@ -96,7 +105,10 @@ def labels(out: str = DEFAULT_OUT, months=TRAIN_MONTHS, as_of_day: int | None = 
         started = launders & start.notna() & (start <= cutoff)
         df["started_by_day"] = started.astype(int)
         df["mule_by_day"] = (started | (launders & df["is_fake"])).astype(int)
-    drop = ["open_day", "launder_start_day", "is_fake"] + ([] if profile else ["profile"])
+        if not set(months) & set(TEST_MONTHS):
+            closed = df["aml_exit_day"].astype("float64") <= cutoff     # never closed: NaN -> False
+            df["open_by_day"] = (~closed).astype(int)
+    drop = ["open_day", "launder_start_day", "is_fake", "aml_exit_day"] + ([] if profile else ["profile"])
     return df.drop(columns=drop)
 
 

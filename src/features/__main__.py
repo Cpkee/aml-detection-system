@@ -10,9 +10,9 @@ ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DATA = "data/v1_full"
 
 
-def run_notebook(name: str, out: str, report: str | None) -> None:
+def run_notebook(name: str, out: str, report: str | None, report_root: str = "outputs/modelling/eda") -> None:
     """Execute notebooks/<name> on data folder `out` with EDA_DATA / EDA_REPORT set, and save the executed copy:
-    in place for the main dataset, else under the report folder."""
+    in place for the main dataset, else under the report folder (default <report_root>/<data folder name>)."""
     import nbformat
     from nbclient import NotebookClient
 
@@ -24,7 +24,7 @@ def run_notebook(name: str, out: str, report: str | None) -> None:
     NotebookClient(nb, timeout=3600, kernel_name="python3",
                    resources={"metadata": {"path": str(ROOT)}}).execute()
     main = os.path.normpath(out) == os.path.normpath(DEFAULT_DATA) and not report
-    dest = src if main else Path(report or f"outputs/modelling/eda/{os.path.basename(os.path.normpath(out))}") / name
+    dest = src if main else Path(report or f"{report_root}/{os.path.basename(os.path.normpath(out))}") / name
     dest.parent.mkdir(parents=True, exist_ok=True)
     nbformat.write(nb, dest)
     print(f"executed {src.relative_to(ROOT)} on {out} -> {dest}")
@@ -44,7 +44,11 @@ def main(argv=None):
     e.add_argument("--out", default="data/v1_full", help="data folder (default data/v1_full)")
     e.add_argument("--report", default=None,
                    help="report folder (default outputs/modelling/eda, or outputs/modelling/eda/<data folder name>)")
-    sub.add_parser("preprocess", help="Phase 2, not built yet")
+    p = sub.add_parser("preprocess", help="Phase 2 cleaning: execute notebooks/02_preprocess.ipynb -> "
+                                          "<out>/features/accounts_{linear,tree}.parquet + manifest, <report>/report.md")
+    p.add_argument("--out", default="data/v1_full", help="data folder (default data/v1_full); fitted on its months 0-4")
+    p.add_argument("--report", default=None,
+                   help="report folder (default outputs/modelling/preprocess, or .../preprocess/<data folder name>)")
 
     a = ap.parse_args(argv)
     if a.cmd == "weekly":
@@ -52,6 +56,8 @@ def main(argv=None):
         print(f"wrote {path}: {n:,} account-weeks")
     elif a.cmd == "eda":
         run_notebook("01_eda_train.ipynb", a.out, a.report)
+    elif a.cmd == "preprocess":
+        run_notebook("02_preprocess.ipynb", a.out, a.report, report_root="outputs/modelling/preprocess")
     else:
         raise SystemExit(f"`{a.cmd}` is not built yet (see the modelling plan)")
 
