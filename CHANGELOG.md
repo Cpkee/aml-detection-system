@@ -13,12 +13,14 @@ money paid out (any kind) within 1 h / 24 h of the latest payment in (any kind),
 in the Phase 1 EDA (Kee Chee Pheng, `notebooks/01_eda_train.ipynb`); it can exceed 1. The transfers-only, capped
 redefinition (Phase 3 commit 9fb3caf) is dropped. Evidence, v1_full months 0–4, each launderer's first laundering week
 (361) vs normal account-weeks:
-- 1 h: EDA definition AUC 0.954 vs 0.920 for the redefinition; paired account-level bootstrap difference +0.035
+- 1 h: EDA definition AUC 0.954 vs 0.919 for the redefinition; paired account-level bootstrap difference +0.035
   (95% interval +0.021 to +0.050). 24 h: no difference (+0.002 the other way, interval crosses 0).
 - Why (`python -m evaluation.speed_by_pattern`, hidden pattern labels, training months only): for launderers who use
-  transfers only (291) both definitions are equal (1 h AUC 0.953 vs 0.950). For the 70 whose pattern moves cash, the
-  redefinition is blind: 0.958 vs 0.792 (Cash_Withdrawal 0.966 vs 0.753, reads 0 for 9 of 10; Deposit-Send 0.953 vs
-  0.827; Smurfing 0.994 vs 0.487). It ignores cash deposits as money in and cash withdrawals as money out.
+  transfers only (297) both definitions are equal (1 h AUC 0.955 vs 0.951). For the 64 whose pattern moves cash, the
+  redefinition is blind: 0.951 vs 0.772 (Cash_Withdrawal 0.963 vs 0.727, reads 0 for all 9; Deposit-Send 0.944 vs
+  0.809; Smurfing 0.994 vs 0.487). It ignores cash deposits as money in and cash withdrawals as money out. A
+  launderer's pattern is the label on most of its laundering rows (rows forwarded from the previous chain member
+  carry that member's label).
 - The Phase 1 report's "swamped by everyday outflows" was right for the 24 h share (normal weeks average 0.59) but not
   for the 1 h share (only 2.5% of normal weeks have any money out within 1 h of money in). The EDA screen showed no
   signal because it scored weekly features at fixed weeks against `started_by_day`, not because of the definition.

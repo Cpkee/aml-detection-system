@@ -60,9 +60,14 @@ def run(out: str = amldata.DEFAULT_OUT, seed: int = 20261015) -> pd.DataFrame:
     ev = amldata.evaluation(out)
     ev.execute(f"PRAGMA memory_limit='{os.environ.get('EVAL_DUCKDB_MEMORY', '6GB')}'")
     months = ", ".join(map(str, TRAIN))
-    pattern = ev.execute(f"""SELECT t.account_id, any_value(r.laundering_type) AS pattern
-                             FROM transactions t JOIN transactions_truth r USING (txn_id) JOIN accounts a USING (account_id)
-                             WHERE r.is_laundering = 1 AND a.open_month IN ({months}) GROUP BY 1""").df()
+    # a launderer's own pattern = the label on most of its laundering rows; rows it receives from the previous member
+    # of its chain carry that member's pattern, so any_value() would be arbitrary. Ties: first name alphabetically.
+    pattern = ev.execute(f"""
+        WITH c AS (SELECT t.account_id, r.laundering_type, count(*) AS n
+                   FROM transactions t JOIN transactions_truth r USING (txn_id) JOIN accounts a USING (account_id)
+                   WHERE r.is_laundering = 1 AND a.open_month IN ({months}) GROUP BY 1, 2)
+        SELECT account_id, laundering_type AS pattern FROM c
+        QUALIFY row_number() OVER (PARTITION BY account_id ORDER BY n DESC, laundering_type) = 1""").df()
     tried = ev.execute(tried_sql(months, HORIZON)).df()
     store = weekly.load(out, (0, HORIZON))[["account_id", "weeks_since_open", "out_1h_share_wk"]]
     labs = []

@@ -220,7 +220,7 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
    first laundering week from normal weeks (95% account-level bootstrap); 30 tests pass on v1 and v1_full. **Speed shares
    (decision 15 Oct 2026):** `out_1h_share_wk` / `out_24h_share_wk` use the EDA's definition (any payment out after the
    latest payment in). A transfers-only redefinition was tried and dropped: it misses laundering through cash (1 h AUC
-   0.792 vs 0.958 for cash patterns; equal for transfer-only patterns), 0.035 AUC worse overall (paired 95% interval
+   0.772 vs 0.951 for cash patterns; equal for transfer-only patterns), 0.035 AUC worse overall (paired 95% interval
    0.021–0.050). Evidence: `outputs/modelling/features/report.md`, `python -m evaluation.speed_by_pattern`.
    **Decisions 8 Oct 2026:** weekly label = "mule account by this week" (a fake account
    counts from the day it opens; a real customer — witting/unwitting — from `launder_start_day`); alert budget

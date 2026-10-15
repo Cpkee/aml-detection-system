@@ -3,7 +3,7 @@
 data data/v1_full -> report outputs/modelling/features; EDA screen outputs/modelling/eda/feature_screen.csv
 ## 1. Store
 
-19,276,000 account-weeks = 244,000 accounts x 79 weeks; 28 features; code 9fb3caf; cut-off rule: rows with day <= open_day + 7*w + 6 (end of each account's week w, as amldata.labels)
+19,276,000 account-weeks = 244,000 accounts x 79 weeks; 28 features; code f8777d2; cut-off rule: rows with day <= open_day + 7*w + 6 (end of each account's week w, as amldata.labels)
 
 Share of account-weeks where a feature is undefined (e.g. no money in that week, fewer than 4 earlier weeks):
 
@@ -11,8 +11,8 @@ Share of account-weeks where a feature is undefined (e.g. no money in that week,
 |:----------------------|-------------:|
 | new_payer_share_wk    |       0.4643 |
 | passthrough_wk        |       0.4542 |
-| fwd_1h_share_wk       |       0.4643 |
-| fwd_24h_share_wk      |       0.4643 |
+| out_1h_share_wk       |       0.4542 |
+| out_24h_share_wk      |       0.4542 |
 | med_in_out_minutes_wk |       0.0126 |
 | self_vs_past_money_in |       0.6547 |
 | self_vs_past_payers   |       0.7255 |
@@ -22,29 +22,31 @@ Share of account-weeks where a feature is undefined (e.g. no money in that week,
 
 ## 2. Gate: Phase 1 screen reproduced
 
-(A) EDA query rerun vs published screen (56 AUCs, mule_by_day): max |difference| 5.6e-17 for count features, 1.3e-06 for the six float-sum money features
+(A) EDA query rerun vs published screen (64 AUCs, mule_by_day): max |difference| 5.6e-17 for count features, 1.4e-06 for the eight float-sum money features
 (B) store vs EDA panel, value by value over 4,450,113 account-weeks (months 0-4, weeks 0-26):
 
 | feature               | eda_name            |   account_weeks | null_pattern_equal   |   max_rel_diff |
 |:----------------------|:--------------------|----------------:|:---------------------|---------------:|
 | n_rows_wk             | n_rows              |         4450113 | True                 |        0.0e+00 |
-| money_in_wk           | money_in            |         4450113 | True                 |        5.0e-16 |
-| money_out_wk          | money_out           |         4450113 | True                 |        5.1e-16 |
+| money_in_wk           | money_in            |         4450113 | True                 |        4.2e-16 |
+| money_out_wk          | money_out           |         4450113 | True                 |        4.7e-16 |
 | max_in_wk             | max_in              |         4450113 | True                 |        0.0e+00 |
 | n_payers_wk           | n_payers            |         4450113 | True                 |        0.0e+00 |
 | n_payees_wk           | n_payees            |         4450113 | True                 |        0.0e+00 |
 | new_payer_share_wk    | new_payer_share     |         4450113 | True                 |        0.0e+00 |
 | passthrough_wk        | passthrough_wk      |         4450113 | True                 |        4.4e-16 |
+| out_1h_share_wk       | out_1h_share        |         4450113 | True                 |        3.9e-16 |
+| out_24h_share_wk      | out_24h_share       |         4450113 | True                 |        5.5e-16 |
 | med_in_out_minutes_wk | med_delay_min       |         4450113 | True                 |        0.0e+00 |
-| money_in_cum          | money_in_cum        |         4450113 | True                 |        8.3e-16 |
+| money_in_cum          | money_in_cum        |         4450113 | True                 |        8.1e-16 |
 | n_rows_cum            | n_rows_cum          |         4450113 | True                 |        0.0e+00 |
 | self_vs_past_money_in | self_vs_past_in     |         4450113 | True                 |        8.2e-14 |
 | self_vs_past_payers   | self_vs_past_payers |         4450113 | True                 |        0.0e+00 |
-| peer_ratio_money_in   | peer_ratio_in       |         4450113 | True                 |        5.3e-16 |
+| peer_ratio_money_in   | peer_ratio_in       |         4450113 | True                 |        4.4e-16 |
 
 Store AUC vs published AUC: max |difference| 1.6e-05 (largest for self_vs_past_money_in, week 8); differences come only from float ties, since (B) shows the values agree.
 
-GATE PASSED: (A) and (B) hold for all 14 shared features.
+GATE PASSED: (A) and (B) hold for all 16 shared features.
 
 ## 3. First-laundering-week signal
 
@@ -54,9 +56,9 @@ AUC of each feature, first laundering week vs normal account-weeks, 95% account-
 
 | feature                 |   auc |   ci_low |   ci_high | excludes_0.5   |
 |:------------------------|------:|---------:|----------:|:---------------|
-| fwd_1h_share_wk         | 0.919 |    0.902 |     0.936 | True           |
+| out_1h_share_wk         | 0.954 |    0.944 |     0.964 | True           |
 | n_in_wk                 | 0.915 |    0.904 |     0.927 | True           |
-| fwd_24h_share_wk        | 0.909 |    0.894 |     0.923 | True           |
+| out_24h_share_wk        | 0.907 |    0.900 |     0.914 | True           |
 | n_rows_wk               | 0.906 |    0.889 |     0.922 | True           |
 | money_out_wk            | 0.903 |    0.885 |     0.921 | True           |
 | self_vs_past_rows       | 0.877 |    0.853 |     0.898 | True           |
@@ -85,30 +87,30 @@ AUC of each feature, first laundering week vs normal account-weeks, 95% account-
 
 25 of 28 features have an interval that excludes 0.5 (no signal).
 
-Speed shares, old vs new definition (same account-weeks, 95% account-level bootstrap):
+Speed shares, kept vs dropped definition (same account-weeks, 95% account-level bootstrap):
 
-| feature          | definition                  |   auc |   ci_low |   ci_high |   mean_first_week |   mean_normal_week |
-|:-----------------|:----------------------------|------:|---------:|----------:|------------------:|-------------------:|
-| old_1h           | EDA (any payment out)       | 0.954 |    0.944 |     0.964 |             0.404 |              0.031 |
-| fwd_1h_share_wk  | Phase 3 (transfers, capped) | 0.919 |    0.902 |     0.936 |             0.366 |              0.007 |
-| old_24h          | EDA (any payment out)       | 0.907 |    0.900 |     0.913 |             0.731 |              0.588 |
-| fwd_24h_share_wk | Phase 3 (transfers, capped) | 0.909 |    0.895 |     0.923 |             0.544 |              0.109 |
+| feature          | definition                      |   auc |   ci_low |   ci_high |   mean_first_week |   mean_normal_week |
+|:-----------------|:--------------------------------|------:|---------:|----------:|------------------:|-------------------:|
+| out_1h_share_wk  | kept: EDA (any payment)         | 0.954 |    0.944 |     0.964 |             0.404 |              0.031 |
+| tried_1h         | dropped: transfers only, capped | 0.919 |    0.902 |     0.936 |             0.366 |              0.007 |
+| out_24h_share_wk | kept: EDA (any payment)         | 0.907 |    0.900 |     0.913 |             0.731 |              0.588 |
+| tried_24h        | dropped: transfers only, capped | 0.909 |    0.895 |     0.923 |             0.544 |              0.109 |
 
-Paired bootstrap of the AUC gain from the redefinition (same resampled accounts for both):
+Paired bootstrap of the AUC difference, kept minus dropped (same resampled accounts for both):
 
-| comparison                 |   auc_gain |   ci_low |   ci_high |   share_of_replicates_new_better |
-|:---------------------------|-----------:|---------:|----------:|---------------------------------:|
-| fwd_1h_share_wk - old_1h   |     -0.035 |   -0.050 |    -0.021 |                            0.000 |
-| fwd_24h_share_wk - old_24h |      0.002 |   -0.012 |     0.016 |                            0.632 |
-- fwd_1h_share_wk - old_1h: old better (gain -0.035, 95% interval -0.050 to -0.021)
-- fwd_24h_share_wk - old_24h: no clear difference (gain +0.002, 95% interval -0.012 to +0.016)
+| comparison                   |   auc_gain |   ci_low |   ci_high |   share_of_replicates_kept_better |
+|:-----------------------------|-----------:|---------:|----------:|----------------------------------:|
+| out_1h_share_wk - tried_1h   |      0.035 |    0.021 |     0.050 |                             1.000 |
+| out_24h_share_wk - tried_24h |     -0.002 |   -0.016 |     0.012 |                             0.368 |
+- out_1h_share_wk - tried_1h: kept better (difference +0.035, 95% interval +0.021 to +0.050)
+- out_24h_share_wk - tried_24h: no clear difference (difference -0.002, 95% interval -0.016 to +0.012)
 
 ## 4. Consistency checks
 
 - PASS: keys unique and complete
 - PASS: shares inside [0, 1]
-- PASS: 1 h share <= 24 h share
+- PASS: speed shares: 0 <= 1 h <= 24 h
 - PASS: running totals never fall
 - PASS: week-78 totals equal the transactions file
 
-done in 200s
+done in 186s
