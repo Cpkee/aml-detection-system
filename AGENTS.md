@@ -217,9 +217,11 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
    **Phase 3 — weekly feature store (done 15 Oct 2026, branch `phase3-features`).** 28 features from the Phase 1 gate list
    (`src/features/weekly.py`); stores built for v1_full and v1. Gate passed (`outputs/modelling/features/report.md`): the 14
    shared features equal the EDA's query value by value on every account-week; 25 of 28 features separate a launderer's
-   first laundering week from normal weeks (95% account-level bootstrap); 30 tests pass on v1 and v1_full. **Open for the
-   team:** the redefined 1 h speed share scores 0.035 AUC *below* the EDA's original (paired 95% interval −0.050 to
-   −0.021); 24 h shows no difference. Keep, replace, or add the original as a 29th feature.
+   first laundering week from normal weeks (95% account-level bootstrap); 30 tests pass on v1 and v1_full. **Speed shares
+   (decision 15 Oct 2026):** `out_1h_share_wk` / `out_24h_share_wk` use the EDA's definition (any payment out after the
+   latest payment in). A transfers-only redefinition was tried and dropped: it misses laundering through cash (1 h AUC
+   0.792 vs 0.958 for cash patterns; equal for transfer-only patterns), 0.035 AUC worse overall (paired 95% interval
+   0.021–0.050). Evidence: `outputs/modelling/features/report.md`, `python -m evaluation.speed_by_pattern`.
    **Decisions 8 Oct 2026:** weekly label = "mule account by this week" (a fake account
    counts from the day it opens; a real customer — witting/unwitting — from `launder_start_day`); alert budget
    = the rules' own alert count in each week. **Fixed cohort (8 Oct 2026):** main comparison = the 50,061 test

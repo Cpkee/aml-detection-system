@@ -70,24 +70,28 @@ def test_rebuild_is_byte_identical(tmp_path):
     assert open(p, "rb").read() == first
 
 
-def test_speed_counts_transfers_only_and_caps_at_the_inflow(tmp_path):
+def test_speed_counts_every_payment_out_after_the_latest_payment_in_including_cash(tmp_path):
     tx = _tx([
         ("S1", "A2", "in", "EXT_P", 11, "10:00:00", 200.0, 1, "ACH", "UK", "UK"),            # transfer in
         ("S2", "A2", "out", "EXT_Q", 11, "10:10:00", 80.0, 1, "ACH", "UK", "UK"),            # +10 min
-        ("S3", "A2", "out", "CARD_MERCHANTS", 11, "10:20:00", 30.0, 1, "Debit card", "UK", "UK"),  # not a transfer
+        ("S3", "A2", "out", "CARD_MERCHANTS", 11, "10:20:00", 30.0, 1, "Debit card", "UK", "UK"),  # card counts too
         ("S4", "A2", "out", "EXT_R", 11, "10:30:00", 50.0, 1, "Cross-border", "UK", "Spain"),  # +30 min
         ("S5", "A2", "out", "EXT_S", 11, "15:00:00", 40.0, 1, "ACH", "UK", "UK"),            # +5 h
-        ("S6", "A2", "out", "EXT_T", 11, "16:00:00", 90.0, 1, "ACH", "UK", "UK"),            # +6 h, over the cap
+        ("S6", "A2", "out", "EXT_T", 11, "16:00:00", 90.0, 1, "ACH", "UK", "UK"),            # +6 h
         ("S7", "A2", "in", "EXT_P", 12, "09:00:00", 10.0, 1, "ACH", "UK", "UK"),             # same payer again
+        ("S8", "A2", "in", "CASH", 13, "12:00:00", 100.0, 1, "Cash Deposit", "UK", "UK"),     # cash in ...
+        ("S9", "A2", "out", "CASH", 13, "12:30:00", 95.0, 1, "Cash Withdrawal", "UK", "UK"),  # ... cash out 30 min later
     ])
     f = _store(_write(tmp_path / "d", tx))
     w0 = f.loc[("A2", 0)]                                         # A2 opens day 10: days 10-16 are week 0
-    assert w0["fwd_1h_share_wk"] == (80 + 50) / 210               # card row ignored; within 1 h of the 200 in
-    assert w0["fwd_24h_share_wk"] == 200 / 210                    # 80 + 50 + 40 + only 30 of the 90 (cap 200)
-    assert w0["n_payers_wk"] == 1 and w0["n_payers_cum"] == 1    # one payer, paid twice
-    assert w0["n_payees_wk"] == 4                                 # card merchants are not payees
-    assert w0["abroad_out_share_cum"] == 50 / 290
-    assert pd.isna(f.loc[("A2", 1), "fwd_1h_share_wk"])            # no transfer in that week: no share, not 1.0
+    assert w0["money_in_wk"] == 310
+    assert w0["out_1h_share_wk"] == pytest.approx((80 + 30 + 50 + 95) / 310)   # incl. card and the cash leg
+    assert w0["out_24h_share_wk"] == pytest.approx((80 + 30 + 50 + 40 + 90 + 95) / 310)  # may exceed 1
+    assert w0["out_24h_share_wk"] > 1
+    assert w0["n_payers_wk"] == 1 and w0["n_payers_cum"] == 1    # one payer, paid twice; cash is not a payer
+    assert w0["n_payees_wk"] == 4                                 # card merchants and cash are not payees
+    assert w0["abroad_out_share_cum"] == pytest.approx(50 / 385)
+    assert pd.isna(f.loc[("A2", 1), "out_1h_share_wk"])            # no money in that week: undefined
 
 
 def test_self_vs_past_waits_for_four_weeks_and_peers_use_training_months(tmp_path):

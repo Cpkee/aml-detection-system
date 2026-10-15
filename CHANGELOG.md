@@ -6,6 +6,26 @@ Assumptions and Use" doc.
 
 
 
+## 15 Oct 2026 — Phase 3 speed shares: back to the EDA's definition (team decision 15 Oct 2026)
+
+No change to the simulated data. `out_1h_share_wk` / `out_24h_share_wk` replace `fwd_1h_share_wk` / `fwd_24h_share_wk`:
+money paid out (any kind) within 1 h / 24 h of the latest payment in (any kind), over the week's money in, exactly as
+in the Phase 1 EDA (Kee Chee Pheng, `notebooks/01_eda_train.ipynb`); it can exceed 1. The transfers-only, capped
+redefinition (Phase 3 commit 9fb3caf) is dropped. Evidence, v1_full months 0–4, each launderer's first laundering week
+(361) vs normal account-weeks:
+- 1 h: EDA definition AUC 0.954 vs 0.920 for the redefinition; paired account-level bootstrap difference +0.035
+  (95% interval +0.021 to +0.050). 24 h: no difference (+0.002 the other way, interval crosses 0).
+- Why (`python -m evaluation.speed_by_pattern`, hidden pattern labels, training months only): for launderers who use
+  transfers only (291) both definitions are equal (1 h AUC 0.953 vs 0.950). For the 70 whose pattern moves cash, the
+  redefinition is blind: 0.958 vs 0.792 (Cash_Withdrawal 0.966 vs 0.753, reads 0 for 9 of 10; Deposit-Send 0.953 vs
+  0.827; Smurfing 0.994 vs 0.487). It ignores cash deposits as money in and cash withdrawals as money out.
+- The Phase 1 report's "swamped by everyday outflows" was right for the 24 h share (normal weeks average 0.59) but not
+  for the 1 h share (only 2.5% of normal weeks have any money out within 1 h of money in). The EDA screen showed no
+  signal because it scored weekly features at fixed weeks against `started_by_day`, not because of the definition.
+Both speed shares now join the value-by-value gate (16 shared features). Tests updated: the synthetic test adds a cash
+deposit followed by a cash withdrawal; the pandas re-implementation and whole-store checks follow the EDA definition
+(speed shares may exceed 1; 0 ≤ 1 h ≤ 24 h still holds).
+
 ## 15 Oct 2026 — Modelling Phase 3: weekly feature store (28 features), gate passed on v1_full and v1
 
 No change to the simulated data (`data/v1` was rebuilt from BAF Base: identical to the team's copy, 0 rows differ in
@@ -26,9 +46,8 @@ Gate (`python -m features store-check` -> `notebooks/03_feature_store.ipynb`, re
   25 of 28 features exclude AUC 0.5; strongest `fwd_1h_share_wk` 0.919 (0.902–0.936), `n_in_wk` 0.915, `fwd_24h_share_wk`
   0.909, `n_rows_wk` 0.906; no signal for `self_vs_past_payers`, `n_payees_cum`, `abroad_out_share_cum`.
 - **Correction:** the redefined 1 h speed share is *not* better than the EDA's (any payment out after the latest payment
-  in): paired bootstrap gain −0.035 (−0.050 to −0.021); 24 h: +0.002 (−0.012 to +0.016). The EDA's "no signal" came from
-  screening weekly features at fixed weeks against `started_by_day`, not from the definition. Keep, replace or add the
-  old 1 h share: open for the team.
+  in): paired bootstrap gain −0.035 (−0.050 to −0.021); 24 h: +0.002 (−0.012 to +0.016). Resolved in the entry above:
+  the EDA's definition is restored.
 
 Tests: `tests/test_feature_store.py` (real data, 3 seeded samples of 300 random accounts + 60 launderers, weeks 0–78):
 all 28 features equal an independent pandas re-implementation; cutting test-month accounts' transactions at a random

@@ -110,32 +110,19 @@ def reference(acc: pd.DataFrame, tx: pd.DataFrame, w_max: int = W_MAX) -> pd.Dat
     first_payee_rows = t[payee].drop_duplicates(["account_id", "counterparty_id"])
     add("first_payers", first_payer_rows.groupby(["account_id", "w"]).size())
     add("first_payees", first_payee_rows.groupby(["account_id", "w"]).size())
-    ach_in = inn & (t["payment_type"] == "ACH")
-    add("transfer_in", t["amount"].where(ach_in, 0).groupby(by).sum())
     add("cash_in", t["amount"].where(inn & (t["payment_type"] == "Cash Deposit"), 0).groupby(by).sum())
     add("internal_out", t["amount"].where(out & t["counterparty_id"].str.startswith("A"), 0).groupby(by).sum())
     add("abroad_out", t["amount"].where(out & (t["receiver_bank_location"] != "UK"), 0).groupby(by).sum())
     add("hr_out", t["amount"].where(out & t["receiver_bank_location"].isin(weekly.HIGH_RISK), 0).groupby(by).sum())
 
-    # median minutes from the latest payment in (any kind) to each payment out
-    o = t[out][["account_id", "w", "ts"]].sort_values("ts")
+    # each payment out against the latest payment in (any kind): median minutes, and money out within 1 h / 24 h
+    o = t[out][["account_id", "w", "ts", "amount"]].sort_values("ts")
     i = t[inn][["account_id", "ts"]].rename(columns={"ts": "ts_in"}).sort_values("ts_in")
     d = pd.merge_asof(o, i, left_on="ts", right_on="ts_in", by="account_id").dropna(subset=["ts_in"])
-    add("med_in_out_minutes_wk", ((d["ts"] - d["ts_in"]) / 60.0).groupby([d["account_id"], d["w"]]).median(), fill=None)
-
-    # forwarding: transfers out after the latest transfer in, each inflow passed on at most once
-    ti = t[ach_in][["account_id", "ts", "amount"]].sort_values(["account_id", "ts", "amount"], kind="mergesort")
-    ti["in_id"] = ti.groupby("account_id").cumcount()
-    ti = ti.rename(columns={"ts": "ts_in", "amount": "in_amt"}).sort_values("ts_in")
-    to = t[out & t["payment_type"].isin(["ACH", "Cross-border"])][["account_id", "w", "ts", "amount"]].sort_values("ts")
-    f = pd.merge_asof(to, ti, left_on="ts", right_on="ts_in", by="account_id").dropna(subset=["ts_in"])
-    f = f.sort_values(["account_id", "in_id", "ts", "amount"], kind="mergesort")
-    delay = f["ts"] - f["ts_in"]
-    for lim, name in [(3600, "fwd_1h"), (86400, "fwd_24h")]:
-        amt = f["amount"].where(delay <= lim, 0.0)
-        prior = amt.groupby([f["account_id"], f["in_id"]]).cumsum() - amt
-        f[name] = np.where(delay <= lim, np.clip(np.minimum(f["amount"], f["in_amt"] - prior), 0, None), 0.0)
-        add(name, f.groupby(["account_id", "w"])[name].sum())
+    delay = d["ts"] - d["ts_in"]
+    add("med_in_out_minutes_wk", (delay / 60.0).groupby([d["account_id"], d["w"]]).median(), fill=None)
+    add("out_1h", d["amount"].where(delay <= 3600, 0).groupby([d["account_id"], d["w"]]).sum())
+    add("out_24h", d["amount"].where(delay <= 86400, 0).groupby([d["account_id"], d["w"]]).sum())
 
     g = g.reset_index()
     acct = g.groupby("account_id")
@@ -149,9 +136,8 @@ def reference(acc: pd.DataFrame, tx: pd.DataFrame, w_max: int = W_MAX) -> pd.Dat
     r["n_payers_cum"] = acct["first_payers"].cumsum()
     r["n_payees_cum"] = acct["first_payees"].cumsum()
     r["passthrough_wk"] = np.minimum(g["money_out_wk"], g["money_in_wk"]) / g["money_in_wk"].replace(0, np.nan)
-    for name in ["fwd_1h", "fwd_24h"]:
-        r[f"{name}_share_wk"] = np.where(g["transfer_in"] > 0, np.minimum(1.0, g[name] / g["transfer_in"].where(
-            g["transfer_in"] > 0, 1.0)), np.nan)
+    for name in ["out_1h", "out_24h"]:
+        r[f"{name}_share_wk"] = g[name] / g["money_in_wk"].replace(0, np.nan)
 
     def self_vs_past(x: pd.Series) -> pd.Series:
         vals, res = x.to_numpy(dtype=float), np.full(len(x), np.nan)
@@ -197,7 +183,7 @@ def test_every_feature_matches_an_independent_pandas_implementation(sample):
             bad[c] = f"{(~ok).sum()} of {len(ok)} differ, e.g. {s.loc[k, weekly.KEYS].tolist()}: store {a[k]} vs {b[k]}"
     assert not bad, bad
     # the sample really exercises the hard features (otherwise agreement would prove little)
-    assert (s["fwd_1h_share_wk"] > 0).sum() >= 50 and (s["internal_out_share_cum"] > 0).sum() >= 50
+    assert (s["out_1h_share_wk"] > 0).sum() >= 50 and (s["internal_out_share_cum"] > 0).sum() >= 50
     assert s["self_vs_past_money_in"].notna().sum() >= 1000 and s["peer_ratio_money_in"].notna().sum() >= 1000
 
 
@@ -249,12 +235,12 @@ def test_whole_store_invariants():
               "card_items_wk", "n_payers_wk", "n_payees_wk", "n_rows_cum", "money_in_cum", "money_out_cum",
               "n_payers_cum", "n_payees_cum"]
     assert q(" + ".join(f"count(*) FILTER (WHERE {c} IS NULL OR {c} < 0)" for c in counts).join(["SELECT ", " FROM s"]))[0] == 0
-    shares = ["new_payer_share_wk", "passthrough_wk", "fwd_1h_share_wk", "fwd_24h_share_wk", "internal_out_share_cum",
-              "cash_in_share_cum", "abroad_out_share_cum", "high_risk_out_share_cum"]
+    shares = ["new_payer_share_wk", "passthrough_wk", "internal_out_share_cum",
+              "cash_in_share_cum", "abroad_out_share_cum", "high_risk_out_share_cum"]   # out_*_share_wk may exceed 1
     assert q(" + ".join(f"count(*) FILTER (WHERE {c} < 0 OR {c} > 1 + 1e-12)" for c in shares).join(["SELECT ", " FROM s"]))[0] == 0
     assert q("""SELECT count(*) FROM s WHERE n_payers_wk > n_in_wk OR n_payees_wk > n_out_wk
                 OR max_in_wk > money_in_wk + 1e-6 OR max_out_wk > money_out_wk + 1e-6
-                OR fwd_1h_share_wk > fwd_24h_share_wk + 1e-12 OR high_risk_out_share_cum > abroad_out_share_cum + 1e-12
+                OR out_1h_share_wk < 0 OR out_1h_share_wk > out_24h_share_wk + 1e-12 OR high_risk_out_share_cum > abroad_out_share_cum + 1e-12
                 OR (weeks_since_open < 4 AND (self_vs_past_money_in IS NOT NULL OR self_vs_past_payers IS NOT NULL
                                               OR self_vs_past_rows IS NOT NULL))""")[0] == 0
     # running totals never fall

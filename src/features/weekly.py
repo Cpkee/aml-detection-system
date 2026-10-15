@@ -6,17 +6,18 @@ The store is written to <out>/features/weekly.parquet with a manifest (see manif
 
 The feature list is the one fixed at the Phase 1 gate (outputs/modelling/eda/report.md, section 8; phased plan,
 "Feature list for Phase 3"). Definitions follow the EDA panel (notebooks/01_eda_train.ipynb, section 3) so the
-gate's AUCs can be reproduced from the store; the speed shares are redefined as the EDA asked:
+gate's AUCs can be reproduced from the store:
 
   volume          rows, payments in / out, money in / out, largest payment in / out, card items (this week);
                   rows, money in, money out (cumulative)
   counterparties  distinct payers (not cash) and payees (not cash, not card), first-time payer share (this week);
                   distinct payers and payees to date (cumulative)
   pass-through    share of this week's money in that leaves this week: min(out, in) / in
-  speed           fwd_1h / fwd_24h_share_wk: transfers out (ACH, Cross-border) within 1 h / 24 h of the latest
-                  transfer in (ACH), each transfer in passing on at most its own amount, over this week's
-                  transfers in (capped at 1); med_in_out_minutes_wk: median minutes from the latest payment in to
-                  each payment out (the EDA's definition)
+  speed           out_1h / out_24h_share_wk: money paid out (any kind) within 1 h / 24 h of the latest payment in
+                  (any kind), over this week's money in (can exceed 1); med_in_out_minutes_wk: median minutes from
+                  the latest payment in to each payment out. All three are the EDA's definitions. A transfers-only,
+                  capped redefinition was tried and dropped (15 Oct 2026): it cannot see laundering through cash
+                  (1 h AUC 0.792 vs 0.958 for cash patterns); see outputs/modelling/features/report.md
   self vs past    (this week - median of earlier weeks) / MAD of earlier weeks, for money in, payers and rows;
                   NaN until 4 earlier weeks exist or when the MAD is 0
   peers           this week's money in / median money in of accounts with the same income and age band at the
@@ -41,7 +42,7 @@ FEATURES = [
     "n_rows_cum", "money_in_cum", "money_out_cum",
     "max_in_wk", "max_out_wk", "card_items_wk",
     "n_payers_wk", "n_payees_wk", "new_payer_share_wk", "n_payers_cum", "n_payees_cum",
-    "passthrough_wk", "fwd_1h_share_wk", "fwd_24h_share_wk", "med_in_out_minutes_wk",
+    "passthrough_wk", "out_1h_share_wk", "out_24h_share_wk", "med_in_out_minutes_wk",
     "self_vs_past_money_in", "self_vs_past_payers", "self_vs_past_rows",
     "peer_ratio_money_in",
     "internal_out_share_cum", "cash_in_share_cum", "abroad_out_share_cum", "high_risk_out_share_cum",
@@ -81,30 +82,16 @@ def base_sql(w_hi: int, month: int) -> str:
         FROM transactions x JOIN acc a USING (account_id)
         WHERE x.day <= a.open_day + 7 * {w_hi} + 6),
     ins AS (SELECT account_id, ts FROM t WHERE direction = 'in'),
-    delays AS (
-        SELECT o.account_id, o.w, median(o.ts - i.ts) / 60.0 AS med_in_out_minutes_wk
-        FROM (SELECT account_id, w, ts FROM t WHERE direction = 'out') o
-        ASOF JOIN ins i ON o.account_id = i.account_id AND o.ts >= i.ts
-        GROUP BY 1, 2),
-    tin AS (
-        SELECT account_id, ts, amount AS in_amt,
-               row_number() OVER (PARTITION BY account_id ORDER BY ts, amount) AS in_id
-        FROM t WHERE direction = 'in' AND payment_type = 'ACH'),
-    fo AS (
-        SELECT o.account_id, o.w, o.ts, o.amount, i.in_id, i.in_amt, o.ts - i.ts AS delay
-        FROM (SELECT account_id, w, ts, amount FROM t
-              WHERE direction = 'out' AND payment_type IN ('ACH', 'Cross-border')) o
-        ASOF JOIN tin i ON o.account_id = i.account_id AND o.ts >= i.ts),
-    fc AS (
+    outs AS (   -- each payment out, with the time since the latest payment in (NULL if none yet)
+        SELECT o.account_id, o.w, o.amount, o.ts - i.ts AS delay
+        FROM (SELECT account_id, w, ts, amount FROM t WHERE direction = 'out') o
+        ASOF LEFT JOIN ins i ON o.account_id = i.account_id AND o.ts >= i.ts),
+    speed AS (
         SELECT account_id, w,
-               CASE WHEN delay <= 3600 THEN greatest(0, least(amount, in_amt
-                    - coalesce(sum(amount) FILTER (WHERE delay <= 3600) OVER before, 0))) ELSE 0 END AS f1h,
-               CASE WHEN delay <= 86400 THEN greatest(0, least(amount, in_amt
-                    - coalesce(sum(amount) FILTER (WHERE delay <= 86400) OVER before, 0))) ELSE 0 END AS f24h
-        FROM fo
-        WINDOW before AS (PARTITION BY account_id, in_id ORDER BY ts, amount
-                          ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING)),
-    fwd AS (SELECT account_id, w, sum(f1h) AS fwd_1h, sum(f24h) AS fwd_24h FROM fc GROUP BY 1, 2),
+               coalesce(sum(amount) FILTER (WHERE delay <= 3600), 0)  AS out_1h,
+               coalesce(sum(amount) FILTER (WHERE delay <= 86400), 0) AS out_24h,
+               median(delay) / 60.0                                   AS med_in_out_minutes_wk
+        FROM outs GROUP BY 1, 2),
     wk AS (
         SELECT account_id, w,
                count(*)                                                                AS n_rows_wk,
@@ -125,7 +112,6 @@ def base_sql(w_hi: int, month: int) -> str:
                                                                                        AS first_seen_payers,
                count(*) FILTER (WHERE direction = 'out' AND counterparty_id NOT IN ('CASH', 'CARD_MERCHANTS')
                                 AND nth_dir_cp = 1)                                    AS first_seen_payees,
-               coalesce(sum(amount) FILTER (WHERE direction = 'in' AND payment_type = 'ACH'), 0) AS transfer_in_wk,
                coalesce(sum(amount) FILTER (WHERE direction = 'in' AND payment_type = 'Cash Deposit'), 0)
                                                                                        AS cash_in_wk,
                coalesce(sum(amount) FILTER (WHERE direction = 'out' AND counterparty_id LIKE 'A%'), 0)
@@ -144,12 +130,11 @@ def base_sql(w_hi: int, month: int) -> str:
            coalesce(n_payers_wk, 0) AS n_payers_wk, coalesce(n_payees_wk, 0) AS n_payees_wk,
            coalesce(n_new_payers_wk, 0) AS n_new_payers_wk,
            coalesce(first_seen_payers, 0) AS first_seen_payers, coalesce(first_seen_payees, 0) AS first_seen_payees,
-           coalesce(transfer_in_wk, 0) AS transfer_in_wk, coalesce(cash_in_wk, 0) AS cash_in_wk,
+           coalesce(cash_in_wk, 0) AS cash_in_wk,
            coalesce(internal_out_wk, 0) AS internal_out_wk, coalesce(abroad_out_wk, 0) AS abroad_out_wk,
            coalesce(high_risk_out_wk, 0) AS high_risk_out_wk,
-           coalesce(fwd_1h, 0) AS fwd_1h, coalesce(fwd_24h, 0) AS fwd_24h, med_in_out_minutes_wk
-    FROM grid g LEFT JOIN wk USING (account_id, w) LEFT JOIN fwd USING (account_id, w)
-         LEFT JOIN delays USING (account_id, w)"""
+           coalesce(out_1h, 0) AS out_1h, coalesce(out_24h, 0) AS out_24h, med_in_out_minutes_wk
+    FROM grid g LEFT JOIN wk USING (account_id, w) LEFT JOIN speed USING (account_id, w)"""
 
 
 def peer_sql(parts: str) -> str:
@@ -182,9 +167,8 @@ def final_sql(parts: str, peers: str, w_lo: int, w_hi: int) -> str:
                sum(first_seen_payers) OVER cum                             AS n_payers_cum,
                sum(first_seen_payees) OVER cum                             AS n_payees_cum,
                least(money_out_wk, money_in_wk) / nullif(money_in_wk, 0)   AS passthrough_wk,
-               -- least() skips NULLs in DuckDB, so weeks without a transfer in must be NULL explicitly
-               CASE WHEN transfer_in_wk > 0 THEN least(1.0, fwd_1h / transfer_in_wk) END  AS fwd_1h_share_wk,
-               CASE WHEN transfer_in_wk > 0 THEN least(1.0, fwd_24h / transfer_in_wk) END AS fwd_24h_share_wk,
+               out_1h / nullif(money_in_wk, 0)                             AS out_1h_share_wk,
+               out_24h / nullif(money_in_wk, 0)                            AS out_24h_share_wk,
                med_in_out_minutes_wk,
                {", ".join(self_vs_past)},
                CAST(money_in_wk AS DOUBLE) / nullif(p.peer_median_money_in, 0) AS peer_ratio_money_in,
