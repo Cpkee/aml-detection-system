@@ -6,6 +6,27 @@ Assumptions and Use" doc.
 
 
 
+## 10 Oct 2026 — Modelling Phase 2 (in progress): `open_by_day`, cleaning notebook `notebooks/02_preprocess.ipynb`
+
+No change to the simulated data. New derived files per data folder: `<out>/features/accounts_linear.parquet`,
+`accounts_tree.parquet` and `preprocess_manifest.json`, written by `python -m features preprocess` (all Phase 2 code is in
+the notebook, team decision 10 Oct 2026); committed report and fitted numbers in `outputs/modelling/preprocess/`.
+- `amldata.labels()` returns `open_by_day` with any cut-off for months 0–5 (0 once the bank has closed the account;
+  only confirmed launderers are closed); withheld when test months are requested. Phase 3 drops training account-weeks
+  with 0.
+- Recipe fitted per dataset on its own months 0–4 (team decision 10 Oct 2026): BAF negative codes -> NaN + flag in 6
+  columns, `velocity_6h` clipped at 0 (its negative rows are all in months 5–7), categories frozen from months 0–4;
+  `linear` mode (median fill, log, one-hot, standardise) and `tree` mode (NaN kept, raw, `category` dtype).
+- **Log change (team decision 10 Oct 2026):** the Phase 2 plan logged 9 columns in `linear` mode; the log made 4 of them
+  more lopsided on v1_full months 0–4 (skew `intended_balcon_amount` 1.34 -> −1.15, `velocity_6h` 0.34 -> −1.20,
+  `velocity_24h` 0.32 -> −0.34, `velocity_4w` 0.11 -> −0.45), so they are no longer logged. By the same rule
+  `current_address_months_count` (1.41 -> −0.54) was added. Logged now: `days_since_request`, `prev_address_months_count`,
+  `current_address_months_count`, `session_length_in_minutes`, `bank_branch_count_8w`, `zip_count_4w`. The notebook
+  asserts that every logged column is less skewed after the log.
+- Run on v1_full, v1, variant_II and variant_IV (15 Oct 2026): all 25 notebook checks pass on each; v1_full and v1 match
+  the EDA report §1 exactly; 56 `linear` / 35 `tree` features. Both notebooks now find the repo root themselves, so
+  "Run All" in VS Code works without `PYTHONPATH`.
+
 ## 9 Oct 2026 — Modelling Phase 1: EDA on the training months (`python -m features eda`)
 
 No data change. `notebooks/01_eda_train.ipynb` (executed by `python -m features eda`) reads months 0–4 through `amldata` only (month 5 untouched, test months
