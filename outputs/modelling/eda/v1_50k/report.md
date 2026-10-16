@@ -216,10 +216,10 @@ candidate pairs with |Spearman| > 0.8 at week 12 (keep one of each for logistic 
 | peer_ratio_in       | income_fit_in       |     0.9971 |
 | money_in            | peer_ratio_in       |     0.9969 |
 | max_in              | peer_ratio_in       |     0.9964 |
-| money_in            | self_vs_past_in     |     0.9178 |
-| self_vs_past_in     | income_fit_in       |     0.9171 |
-| max_in              | self_vs_past_in     |     0.9169 |
-| self_vs_past_in     | peer_ratio_in       |     0.9152 |
+| money_in            | self_vs_past_in     |     0.9177 |
+| self_vs_past_in     | income_fit_in       |     0.9170 |
+| max_in              | self_vs_past_in     |     0.9168 |
+| self_vs_past_in     | peer_ratio_in       |     0.9151 |
 | n_payers            | self_vs_past_payers |     0.9072 |
 | money_in            | n_payers            |     0.8784 |
 | n_payers            | income_fit_in       |     0.8783 |
@@ -228,7 +228,7 @@ candidate pairs with |Spearman| > 0.8 at week 12 (keep one of each for logistic 
 | max_in              | n_payers            |     0.8722 |
 | money_in            | passthrough_wk      |    -0.8604 |
 | max_in              | passthrough_wk      |    -0.8573 |
-| n_payers            | self_vs_past_in     |     0.8532 |
+| n_payers            | self_vs_past_in     |     0.8531 |
 | passthrough_wk      | income_fit_in       |    -0.8502 |
 | n_rows              | n_payees            |     0.8386 |
 | passthrough_wk      | peer_ratio_in       |    -0.8385 |
@@ -256,15 +256,30 @@ each candidate feature and the simulator setting it rests on; the 42 sensitivity
 | night_share                                  | normal.hour_weights only; laundering uses the same hour weights, so no signal is expected                                |
 | application columns                          | profiles.in_window_mix (73% of launderers are BAF fraud rows): the whole application signal rests on this one assumption |
 
+payment network, months 0-4: 258,221 links between 33,801 accounts (92 launderers); mixed links 1,208; launderer-launderer links 35
+links per account (the 2xy test assumes these are about equal):
+| group     |   link_ends |   accounts |   mean_links |
+|:----------|------------:|-----------:|-------------:|
+| normal    |      515164 |      33709 |         15.3 |
+| launderer |        1278 |         92 |         13.9 |
+
+the homophily test: r clearly below 2xy = launderers link to each other more than chance
+|                                                         |   launderer share |   expected mixed share (2xy) |   observed mixed share (r) |   r / 2xy |      z |   p (one-sided, r < 2xy) |   launderer-launderer links expected |   launderer-launderer links found |
+|:--------------------------------------------------------|------------------:|-----------------------------:|---------------------------:|----------:|-------:|-------------------------:|-------------------------------------:|----------------------------------:|
+| homophily test (x = share of accounts)                  |          0.002722 |                     0.005429 |                   0.004678 |    0.8617 | -5.191 |                1.045e-07 |                                1.913 |                                35 |
+| allowing for links per account (x = share of link ends) |          0.002475 |                     0.004937 |                   0.004678 |    0.9476 | -1.877 |                0.03029   |                                1.581 |                                35 |
+
 |   src_l |       edges |   accounts |   launderer_share_of_payees |
 |--------:|------------:|-----------:|----------------------------:|
 |       0 | 257618.0000 | 33697.0000 |                      0.0023 |
 |       1 |    638.0000 |    89.0000 |                      0.0549 |
 
-base launderer rate in months 0-4: 0.2722%. A launderer's internal payees are launderers 5.49% of the time (20x the base rate); a normal account's 0.235%.
-  -> this is the L8 homophily test. A ratio well above 1 says the chains and the big network leave a trace in
-     the public transactions, so graph features (Phase 6) have something to find. Only edges with both ends
-     in months 0-4 are counted, so no test-month account enters the test.
+lift: base launderer rate in months 0-4: 0.2722%. A launderer's internal payees are launderers 5.49% of the time (20x the base rate); a normal account's 0.235%.
+  -> homophily test: r = 0.468% vs 2xy = 0.543% (r / 2xy 0.86, z -5.2); allowing for links per account r / expected 0.95, z -1.9.
+     r / 2xy looks modest only because launderers are 0.3% of accounts: nearly all their links are mixed links
+     either way. The same fact, easier to read: 35 launderer-launderer links vs 2 expected by chance (18x; 22x allowing for links per account), and the 20x lift above.
+     So the chains and the big network leave a trace in the public transactions, and graph features (Phase 6)
+     have something to find. Only links with both ends in months 0-4 are counted, so no test-month account enters.
 
 ==============================================================================
 7. BENFORD'S LAW ON ALL AMOUNTS (realism check for comment 1; not a feature)
@@ -322,4 +337,4 @@ keep them cumulative rather than weekly if kept at all.
 Application columns: keep all 29 after Phase 2 cleaning; LightGBM ignores useless ones and L1 logistic
 regression drops them. Candidate pairs above |0.8| correlation: keep one for the logistic model.
 
-done in 6s
+done in 7s
