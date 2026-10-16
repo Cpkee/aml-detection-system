@@ -86,7 +86,7 @@ level's launderer rate as the score. A small p with 400 positives is support, no
 ==============================================================================
 3. A WEEK OF ACTIVITY, BY WEEK SINCE OPENING (weeks 0-26) + LABEL MATURITY
 ==============================================================================
-account-week panel for months (0, 1, 2, 3, 4), weeks 0-26: 4,450,113 rows in 20s
+account-week panel for months (0, 1, 2, 3, 4), weeks 0-26: 4,450,113 rows in 23s
 medians per account-week, launderers (1) vs normal (0), weeks 0, 1, 4, 8, 12, 26:
 |         |         n |   rows_med |   in_med |   out_med |   payers_avg |   payees_med |   cash_avg |   internal_avg |   abroad_avg |   new_payer_avg |   out_24h_avg |
 |:--------|----------:|-----------:|---------:|----------:|-------------:|-------------:|-----------:|---------------:|-------------:|----------------:|--------------:|
@@ -100,7 +100,7 @@ medians per account-week, launderers (1) vs normal (0), weeks 0, 1, 4, 8, 12, 26
 | (8, 1)  |    455.00 |       5.00 |    42.09 |    697.18 |         0.69 |         3.00 |       0.08 |           0.01 |         0.00 |            0.47 |          0.54 |
 | (12, 0) | 164364.00 |       5.00 |    55.62 |    605.25 |         0.68 |         3.00 |       0.09 |           0.02 |         0.00 |            0.46 |          0.55 |
 | (12, 1) |    455.00 |       5.00 |   298.24 |    753.00 |         1.06 |         3.00 |       0.09 |           0.04 |         0.01 |            0.54 |          0.50 |
-| (26, 0) | 164364.00 |       6.00 |    74.10 |    660.91 |         0.73 |         3.00 |       0.08 |           0.03 |         0.00 |            0.49 |          0.62 |
+| (26, 0) | 164364.00 |       6.00 |    74.10 |    660.92 |         0.73 |         3.00 |       0.08 |           0.03 |         0.00 |            0.49 |          0.62 |
 | (26, 1) |    455.00 |       5.00 |     0.00 |    588.25 |         0.66 |         3.00 |       0.07 |           0.02 |         0.00 |            0.55 |          0.60 |
 
   -> before any laundering starts, launderers' weeks should look like everyone else's: the simulator gives
@@ -119,7 +119,7 @@ activity that stops (weeks 0-77): accounts whose last active week is before week
      already leaves them out (rows with n_rows = 0). Decision needed: let labels() return 'open at week w' for
      months 0-5, since a bank knows which accounts it closed.
 
-label maturity on training accounts (2s): launderers labelled under each label, by week
+label maturity on training accounts (4s): launderers labelled under each label, by week
 |   week |   mule_by_day |   started_by_day |   is_launderer |
 |-------:|--------------:|-----------------:|---------------:|
 |      0 |           320 |                0 |            455 |
@@ -256,15 +256,30 @@ each candidate feature and the simulator setting it rests on; the 42 sensitivity
 | night_share                                  | normal.hour_weights only; laundering uses the same hour weights, so no signal is expected                                |
 | application columns                          | profiles.in_window_mix (73% of launderers are BAF fraud rows): the whole application signal rests on this one assumption |
 
+payment network, months 0-4: 1,257,205 links between 164,814 accounts (450 launderers); mixed links 5,663; launderer-launderer links 163
+links per account (the 2xy test assumes these are about equal):
+| group     |   link_ends |   accounts |   mean_links |
+|:----------|------------:|-----------:|-------------:|
+| normal    |     2508421 |     164364 |         15.3 |
+| launderer |        5989 |        450 |         13.3 |
+
+the homophily test: r clearly below 2xy = launderers link to each other more than chance
+|                                                         |   launderer share |   expected mixed share (2xy) |   observed mixed share (r) |   r / 2xy |       z |   p (one-sided, r < 2xy) |   launderer-launderer links expected |   launderer-launderer links found |
+|:--------------------------------------------------------|------------------:|-----------------------------:|---------------------------:|----------:|--------:|-------------------------:|-------------------------------------:|----------------------------------:|
+| homophily test (x = share of accounts)                  |          0.00273  |                     0.005446 |                   0.004504 |    0.8271 | -14.34  |                5.972e-47 |                                9.372 |                               163 |
+| allowing for links per account (x = share of link ends) |          0.002382 |                     0.004752 |                   0.004504 |    0.9478 |  -4.043 |                2.643e-05 |                                7.133 |                               163 |
+
 |   src_l |        edges |    accounts |   launderer_share_of_payees |
 |--------:|-------------:|------------:|----------------------------:|
 |       0 | 1254238.0000 | 164270.0000 |                      0.0023 |
 |       1 |    2994.0000 |    433.0000 |                      0.0544 |
 
-base launderer rate in months 0-4: 0.2761%. A launderer's internal payees are launderers 5.44% of the time (20x the base rate); a normal account's 0.226%.
-  -> this is the L8 homophily test. A ratio well above 1 says the chains and the big network leave a trace in
-     the public transactions, so graph features (Phase 6) have something to find. Only edges with both ends
-     in months 0-4 are counted, so no test-month account enters the test.
+lift: base launderer rate in months 0-4: 0.2761%. A launderer's internal payees are launderers 5.44% of the time (20x the base rate); a normal account's 0.226%.
+  -> homophily test: r = 0.450% vs 2xy = 0.545% (r / 2xy 0.83, z -14.3); allowing for links per account r / expected 0.95, z -4.0.
+     r / 2xy looks modest only because launderers are 0.3% of accounts: nearly all their links are mixed links
+     either way. The same fact, easier to read: 163 launderer-launderer links vs 9 expected by chance (17x; 23x allowing for links per account), and the 20x lift above.
+     So the chains and the big network leave a trace in the public transactions, and graph features (Phase 6)
+     have something to find. Only links with both ends in months 0-4 are counted, so no test-month account enters.
 
 ==============================================================================
 7. BENFORD'S LAW ON ALL AMOUNTS (realism check for comment 1; not a feature)
@@ -322,4 +337,4 @@ keep them cumulative rather than weekly if kept at all.
 Application columns: keep all 29 after Phase 2 cleaning; LightGBM ignores useless ones and L1 logistic
 regression drops them. Candidate pairs above |0.8| correlation: keep one for the logistic model.
 
-done in 34s
+done in 41s

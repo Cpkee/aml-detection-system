@@ -138,7 +138,9 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
    spread over weeks 1–75; 361 of 455 start inside the 26-week horizon. Activity screen (open weeks only): cumulative rows and
    money in, rows and payers this week, median in->out delay carry signal once a burst exists (AUC 0.70–0.86 vs started);
    weekly abroad / high-risk / cash shares carry none; speed shares need redefining as transfers out after transfers in.
-   Homophily: a launderer's internal payees are launderers 5.4% of the time, 20x the base rate -> graph features worthwhile.
+   Homophily (payment links inside the bank, both ends months 0–4): mixed launderer–normal links r = 0.450% vs 2xy = 0.545%
+   (z −14; 0.95 of expected, z −4.0, allowing for links per account); 163 launderer–launderer links vs ~9 by chance; a
+   launderer's payees are launderers 5.4% of the time, 20x the base rate -> graph features worthwhile.
    **Closure footprint (decided 15 Oct 2026):** every open account has a weekly card row, so a zero-row week = closed by the
    bank = a confirmed launderer (116 of 455 training launderers stop early, 1 normal account). Post-closure account-weeks
    are dropped from training and the scoring pool via `labels(...)["open_by_day"]` (months 0–5). Do not use a zero-row week

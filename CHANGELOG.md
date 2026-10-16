@@ -6,6 +6,18 @@ Assumptions and Use" doc.
 
 
 
+## 16 Oct 2026 — EDA §6: the homophily test is now the r < 2xy test
+
+No data change. `notebooks/01_eda_train.ipynb` §6 called a lift (how often a launderer's payees are launderers vs the
+base rate) "the L8 homophily test"; it was not that test. §6 now runs the homophily test itself on the payment network
+inside the bank (one undirected link per pair of accounts that paid each other, both ends opened in months 0–4): with x the
+launderer share of accounts, homophily means the share of launderer–normal links r is clearly below 2xy (one-sided z-test).
+A second row allows for how many links each account has (x = launderer share of link ends). v1_full: r = 0.450% vs 2xy =
+0.545% (r / 2xy 0.83, z −14.3); allowing for links per account 0.95, z −4.0; 163 launderer–launderer links vs 9 expected
+by chance (17x). The lift (20x) is kept as the measure of strength. r / 2xy looks modest only because launderers are 0.3%
+of accounts. v1 (50k): 0.86, z −5.2; 0.95, z −1.9. Re-running the notebook also moved a few weekly money AUCs and
+correlations in the 7th–8th digit (DuckDB sums in parallel, in no fixed order); nothing else changed.
+
 ## 15 Oct 2026 — Phase 3 speed shares: back to the EDA's definition (team decision 15 Oct 2026)
 
 No change to the simulated data. `out_1h_share_wk` / `out_24h_share_wk` replace `fwd_1h_share_wk` / `fwd_24h_share_wk`:
