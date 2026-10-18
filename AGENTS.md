@@ -132,12 +132,17 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
    `outputs/modelling/eda/report.md` + `univariate_tests.csv` + `feature_screen.csv`; 50k copy under `eda/v1_50k/`) -> 2 cleaning
    (BAF −1 codes -> NaN + flag; `credit_risk_score` negatives are real) -> 3 feature store -> 4 models -> 5 harness (dry-run on
    month 5 first) -> 6 extensions (fake-mix stress test first). Dropped as un-rewardable by the simulator: round/under-limit
-   amounts, quiet-then-active. **EDA findings 9 Oct 2026 (244k, months 0–4, 455 launderers):** at opening only fake
-   accounts separate (housing_status, device_os, keep_alive_session, address months, credit score; AUC 0.60–0.69 vs 0.5);
-   real-customer mules do not (ceiling on earliness). Fakes start laundering in weeks 8–17 (median 13), real customers
+   amounts, quiet-then-active. **EDA findings 9 Oct 2026, corrected 18 Oct (244k, months 0–4, 455 launderers):** at opening
+   fake accounts separate (housing_status, device_os, keep_alive_session, address months, credit score; AUC 0.60–0.69 vs
+   0.5); real-customer mules separate mainly on age (customer_age AUC 0.25: ~65% under 30 vs 27% of normal accounts, from
+   the simulator's Cifas age weights `profiles.real_mule_age_weights`; fakes skew older, so the all-launderer AUC of 0.53
+   hid it), weakly on housing_status (0.57) and income (0.45); whether age may be a model input is open (fairness).
+   Fakes start laundering in weeks 8–17 (median 13), real customers
    spread over weeks 1–75; 361 of 455 start inside the 26-week horizon. Activity screen (open weeks only): cumulative rows and
-   money in, rows and payers this week, median in->out delay carry signal once a burst exists (AUC 0.70–0.86 vs started);
-   weekly abroad / high-risk / cash shares carry none; speed shares need redefining as transfers out after transfers in.
+   money in, rows and payers this week, median in->out delay and the 1 h / 24 h speed shares carry signal once a burst
+   exists (AUC 0.70–0.86 vs started; speed 0.78 / 0.75 at week 8); weekly abroad / high-risk / cash shares carry none.
+   (Correction 18 Oct: the EDA's AUC helper ranked missing values highest, which hid the share features and led to a
+   wrong "redefine the speed shares" proposal; `notebooks/03_feature_store.ipynb` and `eda_sim_v1.py` had the same helper.)
    Homophily (payment links inside the bank, both ends months 0–4): mixed launderer–normal links r = 0.450% vs 2xy = 0.545%
    (z −14; 0.95 of expected, z −4.0, allowing for links per account); 163 launderer–launderer links vs ~9 by chance; a
    launderer's payees are launderers 5.4% of the time, 20x the base rate -> graph features worthwhile.

@@ -6,6 +6,28 @@ Assumptions and Use" doc.
 
 
 
+## 18 Oct 2026 — EDA fixes: missing values rank lowest in the AUC; real mules separate on age
+
+No data change. Two corrections to `notebooks/01_eda_train.ipynb`, re-run on v1_full and v1 (50k):
+- **AUC helper.** `auc()` used pandas `rank(na_option="bottom")`, which gives NaN the *highest* rank, while its docstring
+  said lowest. Share features are NaN in weeks with no money in (about half of normal weeks), so those weeks ranked above
+  every launderer and the shares looked like noise. Now `na_option="top"` (NaN lowest, as the Phase 3 bootstrap already
+  did). v1_full, best |AUC − 0.5| against started launderers: `out_1h_share` 0.02 -> 0.28, `out_24h_share` 0.05 -> 0.25,
+  `new_payer_share` 0.11 -> 0.21, `passthrough_wk` 0.11 -> 0.20, self-vs-past 0.14 -> 0.17. The Phase 1 proposal to
+  redefine the speed shares came from this bug; the store already keeps the EDA's definition (decision 15 Oct 2026).
+  The same helper in `notebooks/03_feature_store.ipynb` (gate comparison and screen; its first-week bootstrap was
+  correct and is unchanged) and `src/sim/eda/eda_sim_v1.py` is fixed too. Notebook 03 re-run on v1_full (store rebuilt,
+  deterministic) and v1: gate (A) still within 1e-5. `eda_sim_v1` re-run on v1_full: no AUC changed (no NaN in its
+  features), so its report was left as committed.
+- **§2 application columns by type.** The table was sorted by the all-launderer AUC and cut at 16 rows, which hid
+  `customer_age`: AUC 0.65 for fake accounts but 0.25 for real-customer mules (about 65% under 30 vs 27% of normal
+  accounts, from `profiles.real_mule_age_weights`), 0.53 for all. §2 now sorts by the largest of the three separations,
+  shows every column, and gives each AUC a 95% interval (resampling the launderers). Real mules: 8 columns' intervals
+  exclude 0.5 on v1_full (age, housing_status, keep_alive_session, income, phone_home_valid, has_other_cards,
+  bank_months_count, phone_mobile_valid); 1 on v1 (age, 20 real mules). The "real-customer mules do not separate at
+  opening" finding is corrected in CLAUDE.md / AGENTS.md and the decision-record doc. Whether age may be a model input
+  is open (fairness).
+
 ## 16 Oct 2026 — EDA §6: the homophily test is now the r < 2xy test
 
 No data change. `notebooks/01_eda_train.ipynb` §6 called a lift (how often a launderer's payees are launderers vs the

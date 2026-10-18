@@ -57,31 +57,47 @@ application columns with |Spearman| > 0.5 (candidates to drop one of, for logist
 ==============================================================================
 2. APPLICATION COLUMNS VS is_launderer (months 0-4), BY HIDDEN TYPE
 ==============================================================================
-univariate AUC vs the label (0.5 = none), for all launderers, fake accounts and real-customer mules,
-with Mann-Whitney / Welch t (numeric) or chi-square + Cramer's V (categorical). Categorical AUC uses the
-level's launderer rate as the score. A small p with 400 positives is support, not proof of usefulness.
-| feature                          | kind        |   auc_all |   auc_fake_vs_normal |   auc_real_vs_normal |   mann_whitney_p |   chi2_p |   cramers_v |
-|:---------------------------------|:------------|----------:|---------------------:|---------------------:|-----------------:|---------:|------------:|
-| housing_status                   | categorical |    0.6840 |               0.7453 |               0.4633 |         nan      |   0.0000 |      0.0476 |
-| device_os                        | categorical |    0.6723 |               0.7342 |               0.4496 |         nan      |   0.0000 |      0.0356 |
-| keep_alive_session               | numeric     |    0.3706 |               0.3434 |               0.4684 |           0.0000 | nan      |    nan      |
-| credit_risk_score                | numeric     |    0.6234 |               0.6735 |               0.4429 |           0.0000 | nan      |    nan      |
-| current_address_months_count     | numeric     |    0.6190 |               0.6420 |               0.5364 |           0.0001 | nan      |    nan      |
-| name_email_similarity            | numeric     |    0.3962 |               0.3744 |               0.4745 |           0.0006 | nan      |    nan      |
-| proposed_credit_limit            | numeric     |    0.6035 |               0.6341 |               0.4937 |           0.0001 | nan      |    nan      |
-| date_of_birth_distinct_emails_4w | numeric     |    0.3970 |               0.3634 |               0.5183 |           0.0006 | nan      |    nan      |
-| income                           | numeric     |    0.5897 |               0.6344 |               0.4289 |           0.0026 | nan      |    nan      |
-| prev_address_months_count        | numeric     |    0.4108 |               0.4012 |               0.4457 |           0.0003 | nan      |    nan      |
-| payment_type                     | categorical |    0.5718 |               0.5762 |               0.5563 |         nan      |   0.1583 |      0.0140 |
-| customer_age                     | numeric     |    0.5656 |               0.6351 |               0.3156 |           0.0245 | nan      |    nan      |
-| has_other_cards                  | numeric     |    0.4440 |               0.4452 |               0.4397 |           0.0097 | nan      |    nan      |
-| employment_status                | categorical |    0.5542 |               0.5903 |               0.4242 |         nan      |   0.3080 |      0.0145 |
-| phone_home_valid                 | numeric     |    0.4470 |               0.4377 |               0.4807 |           0.0373 | nan      |    nan      |
-| bank_branch_count_8w             | numeric     |    0.4490 |               0.4398 |               0.4821 |           0.0896 | nan      |    nan      |
+univariate AUC vs the label (0.5 = none) with a 95% interval, for all launderers, fake accounts and real-customer
+mules, with Mann-Whitney (numeric) or chi-square + Cramer's V (categorical). Categorical AUC uses the level's
+launderer rate as the score. Sorted by the largest of the three separations. A small p is support, not proof.
+| feature                          | kind        | auc_all             | auc_fake_vs_normal   | auc_real_vs_normal   |   mann_whitney_p |   chi2_p |   cramers_v |
+|:---------------------------------|:------------|:--------------------|:---------------------|:---------------------|-----------------:|---------:|------------:|
+| housing_status                   | categorical | 0.684 (0.624-0.739) | 0.745 (0.686-0.799)  | 0.463 (0.348-0.570)  |         nan      |   0.0000 |      0.0476 |
+| device_os                        | categorical | 0.672 (0.619-0.723) | 0.734 (0.680-0.777)  | 0.450 (0.331-0.570)  |         nan      |   0.0000 |      0.0356 |
+| customer_age                     | numeric     | 0.566 (0.505-0.629) | 0.635 (0.574-0.701)  | 0.316 (0.211-0.438)  |           0.0245 | nan      |    nan      |
+| credit_risk_score                | numeric     | 0.623 (0.558-0.686) | 0.674 (0.606-0.734)  | 0.443 (0.305-0.592)  |           0.0000 | nan      |    nan      |
+| keep_alive_session               | numeric     | 0.371 (0.327-0.420) | 0.343 (0.295-0.392)  | 0.468 (0.368-0.568)  |           0.0000 | nan      |    nan      |
+| current_address_months_count     | numeric     | 0.619 (0.572-0.667) | 0.642 (0.593-0.695)  | 0.536 (0.440-0.644)  |           0.0001 | nan      |    nan      |
+| date_of_birth_distinct_emails_4w | numeric     | 0.397 (0.336-0.457) | 0.363 (0.296-0.423)  | 0.518 (0.427-0.617)  |           0.0006 | nan      |    nan      |
+| income                           | numeric     | 0.590 (0.527-0.649) | 0.634 (0.574-0.697)  | 0.429 (0.305-0.561)  |           0.0026 | nan      |    nan      |
+| proposed_credit_limit            | numeric     | 0.604 (0.541-0.653) | 0.634 (0.569-0.702)  | 0.494 (0.395-0.606)  |           0.0001 | nan      |    nan      |
+| name_email_similarity            | numeric     | 0.396 (0.344-0.451) | 0.374 (0.307-0.442)  | 0.474 (0.355-0.583)  |           0.0006 | nan      |    nan      |
+| prev_address_months_count        | numeric     | 0.411 (0.377-0.445) | 0.401 (0.369-0.437)  | 0.446 (0.369-0.539)  |           0.0003 | nan      |    nan      |
+| employment_status                | categorical | 0.554 (0.511-0.601) | 0.590 (0.548-0.633)  | 0.424 (0.330-0.518)  |         nan      |   0.3080 |      0.0145 |
+| payment_type                     | categorical | 0.572 (0.521-0.626) | 0.576 (0.516-0.636)  | 0.556 (0.434-0.682)  |         nan      |   0.1583 |      0.0140 |
+| phone_home_valid                 | numeric     | 0.447 (0.404-0.496) | 0.438 (0.389-0.493)  | 0.481 (0.381-0.581)  |           0.0373 | nan      |    nan      |
+| has_other_cards                  | numeric     | 0.444 (0.411-0.477) | 0.445 (0.410-0.480)  | 0.440 (0.390-0.515)  |           0.0097 | nan      |    nan      |
+| bank_branch_count_8w             | numeric     | 0.449 (0.389-0.513) | 0.440 (0.370-0.514)  | 0.482 (0.350-0.606)  |           0.0896 | nan      |    nan      |
+| velocity_6h                      | numeric     | 0.497 (0.438-0.559) | 0.482 (0.419-0.549)  | 0.554 (0.420-0.673)  |           0.9334 | nan      |    nan      |
+| velocity_24h                     | numeric     | 0.503 (0.452-0.557) | 0.491 (0.432-0.554)  | 0.546 (0.416-0.656)  |           0.9188 | nan      |    nan      |
+| phone_mobile_valid               | numeric     | 0.477 (0.434-0.515) | 0.482 (0.441-0.524)  | 0.459 (0.359-0.534)  |           0.1754 | nan      |    nan      |
+| email_is_free                    | numeric     | 0.536 (0.487-0.585) | 0.539 (0.476-0.594)  | 0.526 (0.426-0.626)  |           0.1667 | nan      |    nan      |
+| device_distinct_emails_8w        | numeric     | 0.522 (0.484-0.559) | 0.517 (0.469-0.565)  | 0.538 (0.489-0.613)  |           0.0296 | nan      |    nan      |
+| zip_count_4w                     | numeric     | 0.523 (0.465-0.582) | 0.536 (0.465-0.603)  | 0.476 (0.361-0.587)  |           0.4500 | nan      |    nan      |
+| days_since_request               | numeric     | 0.490 (0.426-0.554) | 0.496 (0.428-0.567)  | 0.466 (0.295-0.625)  |           0.7326 | nan      |    nan      |
+| intended_balcon_amount           | numeric     | 0.484 (0.434-0.535) | 0.482 (0.431-0.538)  | 0.491 (0.384-0.593)  |           0.5878 | nan      |    nan      |
+| velocity_4w                      | numeric     | 0.488 (0.436-0.539) | 0.486 (0.427-0.548)  | 0.494 (0.391-0.602)  |           0.6834 | nan      |    nan      |
+| session_length_in_minutes        | numeric     | 0.488 (0.433-0.544) | 0.486 (0.424-0.547)  | 0.492 (0.371-0.617)  |           0.6800 | nan      |    nan      |
+| foreign_request                  | numeric     | 0.503 (0.486-0.524) | 0.507 (0.486-0.535)  | 0.486 (nan-nan)      |           0.7475 | nan      |    nan      |
+| bank_months_count                | numeric     | 0.505 (0.433-0.572) | 0.510 (0.431-0.584)  | 0.488 (0.342-0.635)  |           0.8692 | nan      |    nan      |
+| source                           | categorical | 0.507 (0.496-0.524) | 0.510 (0.496-0.531)  | 0.496 (nan-nan)      |         nan      |   0.3103 |      0.0055 |
 
-11 of 29 columns significant at p < 0.01 against all launderers; columns with |AUC-0.5| >= 0.05 for real-customer mules: ['device_os', 'credit_risk_score', 'income', 'prev_address_months_count', 'payment_type', 'customer_age', 'has_other_cards', 'employment_status', 'velocity_6h']
-  -> if that last list is empty or short, real-customer mules are indistinguishable at opening (the
-     'ceiling on earliness' trap): the application can only buy a head start on fake accounts.
+11 of 29 columns significant at p < 0.01 against all launderers.
+columns whose 95% interval excludes 0.5, by separation: fake accounts 15: ['housing_status', 'device_os', 'customer_age', 'credit_risk_score', 'keep_alive_session', 'current_address_months_count', 'date_of_birth_distinct_emails_4w', 'income', 'proposed_credit_limit', 'name_email_similarity', 'prev_address_months_count', 'employment_status', 'payment_type', 'phone_home_valid', 'has_other_cards']
+real-customer mules 1: ['customer_age']
+  -> the two types separate on different columns, sometimes in opposite directions: customer_age has AUC 0.64 for fakes and 0.32 for real mules, 0.57 for all.
+     Real mules' age signal comes from the simulator setting profiles.real_mule_age_weights (Cifas mule ages): an
+     assumption the report must name. Whether age may be a model input is a team decision (fairness, Variant II).
 
 ==============================================================================
 3. A WEEK OF ACTIVITY, BY WEEK SINCE OPENING (weeks 0-26) + LABEL MATURITY
@@ -156,23 +172,23 @@ AUC against mule_by_day (main label) by week since opening; 0.5 = no signal:
 |:--------------------|-------:|-------:|-------:|-------:|----------:|
 | n_rows_cum          | 0.5091 | 0.5378 | 0.6798 | 0.7626 |    0.2626 |
 | money_in_cum        | 0.6258 | 0.6176 | 0.6971 | 0.6972 |    0.1972 |
-| med_delay_min       | 0.5297 | 0.4972 | 0.3315 | 0.4804 |    0.1685 |
-| self_vs_past_in     | 0.5119 | 0.4795 | 0.4531 | 0.3395 |    0.1605 |
-| self_vs_past_payers | 0.5136 | 0.4918 | 0.4424 | 0.3533 |    0.1467 |
+| self_vs_past_in     | 0.4769 | 0.5104 | 0.5941 | 0.6925 |    0.1925 |
+| med_delay_min       | 0.5298 | 0.4972 | 0.3315 | 0.4804 |    0.1685 |
+| self_vs_past_payers | 0.4801 | 0.5138 | 0.5924 | 0.6590 |    0.1590 |
+| out_1h_share        | 0.5097 | 0.4813 | 0.6449 | 0.5374 |    0.1449 |
 | money_out           | 0.5762 | 0.6307 | 0.6009 | 0.5639 |    0.1307 |
+| out_24h_share       | 0.5106 | 0.4917 | 0.6256 | 0.5307 |    0.1256 |
+| passthrough_wk      | 0.5010 | 0.4812 | 0.6211 | 0.5093 |    0.1211 |
+| new_payer_share     | 0.4935 | 0.4899 | 0.6142 | 0.5241 |    0.1142 |
 | n_payers            | 0.5078 | 0.5023 | 0.6092 | 0.5322 |    0.1092 |
+| peer_ratio_in       | 0.5450 | 0.5125 | 0.6036 | 0.5693 |    0.1036 |
 | income_fit_in       | 0.5226 | 0.4941 | 0.5936 | 0.5690 |    0.0936 |
 | money_in            | 0.5222 | 0.4923 | 0.5925 | 0.5690 |    0.0925 |
-| peer_ratio_in       | 0.4885 | 0.4790 | 0.5798 | 0.5624 |    0.0798 |
 | max_in              | 0.5224 | 0.4907 | 0.5743 | 0.5652 |    0.0743 |
 | n_rows              | 0.5344 | 0.5586 | 0.5382 | 0.4970 |    0.0586 |
 | cash_share          | 0.5169 | 0.5151 | 0.4572 | 0.4468 |    0.0532 |
-| passthrough_wk      | 0.4845 | 0.5304 | 0.4547 | 0.4548 |    0.0453 |
 | night_share         | 0.5014 | 0.5069 | 0.5424 | 0.4780 |    0.0424 |
-| new_payer_share     | 0.4801 | 0.5416 | 0.4784 | 0.4595 |    0.0416 |
-| out_24h_share       | 0.4940 | 0.5409 | 0.4593 | 0.4762 |    0.0409 |
 | n_payees            | 0.5157 | 0.5198 | 0.4664 | 0.5104 |    0.0336 |
-| out_1h_share        | 0.4932 | 0.5305 | 0.4785 | 0.4829 |    0.0305 |
 | abroad_share        | 0.4960 | 0.5174 | 0.5100 | 0.5048 |    0.0174 |
 | internal_share      | 0.5056 | 0.5170 | 0.5118 | 0.5035 |    0.0170 |
 | hr_share            | 0.4994 | 0.5065 | 0.5063 | 0.4992 |    0.0065 |
@@ -183,23 +199,23 @@ launderers started by week: {4: 0, 8: 4, 12: 46, 26: 60} (real-customer mules: {
 |:--------------------|----:|----:|-------:|-------:|
 | n_rows_cum          | nan | nan | 0.8234 | 0.7625 |
 | money_in_cum        | nan | nan | 0.7441 | 0.6972 |
+| self_vs_past_in     | nan | nan | 0.6771 | 0.6925 |
 | med_delay_min       | nan | nan | 0.2200 | 0.4804 |
-| self_vs_past_in     | nan | nan | 0.4098 | 0.3395 |
-| self_vs_past_payers | nan | nan | 0.3912 | 0.3533 |
+| self_vs_past_payers | nan | nan | 0.6638 | 0.6590 |
+| out_1h_share        | nan | nan | 0.7522 | 0.5374 |
 | money_out           | nan | nan | 0.6621 | 0.5639 |
+| out_24h_share       | nan | nan | 0.7274 | 0.5307 |
+| passthrough_wk      | nan | nan | 0.7114 | 0.5093 |
+| new_payer_share     | nan | nan | 0.6875 | 0.5241 |
 | n_payers            | nan | nan | 0.6945 | 0.5322 |
+| peer_ratio_in       | nan | nan | 0.6828 | 0.5693 |
 | income_fit_in       | nan | nan | 0.6737 | 0.5690 |
 | money_in            | nan | nan | 0.6721 | 0.5690 |
-| peer_ratio_in       | nan | nan | 0.6591 | 0.5625 |
 | max_in              | nan | nan | 0.6433 | 0.5652 |
 | n_rows              | nan | nan | 0.6178 | 0.4970 |
 | cash_share          | nan | nan | 0.4703 | 0.4468 |
-| passthrough_wk      | nan | nan | 0.4056 | 0.4548 |
 | night_share         | nan | nan | 0.5670 | 0.4780 |
-| new_payer_share     | nan | nan | 0.4359 | 0.4595 |
-| out_24h_share       | nan | nan | 0.4215 | 0.4762 |
 | n_payees            | nan | nan | 0.5045 | 0.5104 |
-| out_1h_share        | nan | nan | 0.4463 | 0.4829 |
 | abroad_share        | nan | nan | 0.5178 | 0.5048 |
 | internal_share      | nan | nan | 0.5159 | 0.5035 |
 | hr_share            | nan | nan | 0.5102 | 0.4992 |
@@ -216,10 +232,10 @@ candidate pairs with |Spearman| > 0.8 at week 12 (keep one of each for logistic 
 | peer_ratio_in       | income_fit_in       |     0.9971 |
 | money_in            | peer_ratio_in       |     0.9969 |
 | max_in              | peer_ratio_in       |     0.9964 |
-| money_in            | self_vs_past_in     |     0.9177 |
-| self_vs_past_in     | income_fit_in       |     0.9170 |
-| max_in              | self_vs_past_in     |     0.9168 |
-| self_vs_past_in     | peer_ratio_in       |     0.9151 |
+| money_in            | self_vs_past_in     |     0.9178 |
+| self_vs_past_in     | income_fit_in       |     0.9171 |
+| max_in              | self_vs_past_in     |     0.9169 |
+| self_vs_past_in     | peer_ratio_in       |     0.9152 |
 | n_payers            | self_vs_past_payers |     0.9072 |
 | money_in            | n_payers            |     0.8784 |
 | n_payers            | income_fit_in       |     0.8783 |
@@ -228,7 +244,7 @@ candidate pairs with |Spearman| > 0.8 at week 12 (keep one of each for logistic 
 | max_in              | n_payers            |     0.8722 |
 | money_in            | passthrough_wk      |    -0.8604 |
 | max_in              | passthrough_wk      |    -0.8573 |
-| n_payers            | self_vs_past_in     |     0.8531 |
+| n_payers            | self_vs_past_in     |     0.8532 |
 | passthrough_wk      | income_fit_in       |    -0.8502 |
 | n_rows              | n_payees            |     0.8386 |
 | passthrough_wk      | peer_ratio_in       |    -0.8385 |
@@ -307,34 +323,34 @@ rows 14,975,916; chi-square 64,664 (any large sample rejects); Nigrini MAD 0.007
 |:--------------------|----------------:|-------------------:|----------:|:-----------------------------------------------|
 | n_rows_cum          |          0.2626 |             0.3234 |    1.0000 | keep                                           |
 | med_delay_min       |          0.1685 |             0.2800 |    0.9999 | keep                                           |
+| out_1h_share        |          0.1449 |             0.2522 |    0.5251 | keep                                           |
 | money_in_cum        |          0.1972 |             0.2441 |    1.0000 | keep                                           |
+| out_24h_share       |          0.1256 |             0.2274 |    0.5251 | keep                                           |
+| passthrough_wk      |          0.1211 |             0.2114 |    0.5251 | keep                                           |
 | n_payers            |          0.1092 |             0.1945 |    1.0000 | keep                                           |
+| self_vs_past_in     |          0.1925 |             0.1925 |    0.3810 | keep                                           |
+| new_payer_share     |          0.1142 |             0.1875 |    0.5145 | keep                                           |
+| peer_ratio_in       |          0.1036 |             0.1828 |    0.9436 | keep                                           |
 | income_fit_in       |          0.0936 |             0.1737 |    1.0000 | keep                                           |
 | money_in            |          0.0925 |             0.1721 |    1.0000 | keep                                           |
+| self_vs_past_payers |          0.1590 |             0.1638 |    0.3115 | keep                                           |
 | money_out           |          0.1307 |             0.1621 |    1.0000 | keep                                           |
-| self_vs_past_in     |          0.1605 |             0.1605 |    0.3810 | keep                                           |
-| peer_ratio_in       |          0.0798 |             0.1591 |    0.9436 | keep                                           |
-| self_vs_past_payers |          0.1467 |             0.1467 |    0.3115 | keep                                           |
 | max_in              |          0.0743 |             0.1433 |    1.0000 | keep                                           |
 | n_rows              |          0.0586 |             0.1178 |    1.0000 | keep                                           |
-| passthrough_wk      |          0.0453 |             0.0944 |    0.5251 | keep                                           |
-| out_24h_share       |          0.0409 |             0.0785 |    0.5251 | keep                                           |
 | night_share         |          0.0424 |             0.0670 |    1.0000 | keep; expected: same hour weights for everyone |
-| new_payer_share     |          0.0416 |             0.0641 |    0.5145 | keep                                           |
-| out_1h_share        |          0.0305 |             0.0537 |    0.5251 | keep                                           |
 | cash_share          |          0.0532 |             0.0532 |    1.0000 | keep                                           |
 | abroad_share        |          0.0174 |             0.0178 |    1.0000 | drop (no signal at any screened week)          |
 | internal_share      |          0.0170 |             0.0159 |    1.0000 | drop (no signal at any screened week)          |
 | n_payees            |          0.0336 |             0.0104 |    1.0000 | drop (no signal at any screened week)          |
 | hr_share            |          0.0065 |             0.0102 |    1.0000 | drop (no signal at any screened week)          |
 
-Speed features as screened here (out_1h_share, out_24h_share) are swamped by everyday outflows: the ASOF join
-pairs every card, direct-debit or cash row with the latest payment in, so normal accounts also 'forward' about
-half of their money in within a day. Phase 3 should define them as transfers OUT (ACH, Cross-border) within
-1h / 24h after each transfer IN, capped at that payment's amount; med_delay_min already carries the signal.
+Speed features separate started launderers: best |AUC - 0.5| vs started_by_day 0.25 (out_1h_share) and 0.23 (out_24h_share).
+They are NaN in weeks with no money in (set in only 53% of screened account-weeks), and the AUC ranks NaN lowest. Correction 18 Oct 2026: the first version of
+this notebook ranked NaN highest by mistake, which made the speed shares look swamped by everyday outflows and led to
+a proposal to redefine them; the store keeps this definition (decision 15 Oct 2026).
 abroad_share, hr_share and cash_share are rare events at week level (launderers send ~1.6% of transfers abroad);
 keep them cumulative rather than weekly if kept at all.
 Application columns: keep all 29 after Phase 2 cleaning; LightGBM ignores useless ones and L1 logistic
 regression drops them. Candidate pairs above |0.8| correlation: keep one for the logistic model.
 
-done in 7s
+done in 6s

@@ -146,7 +146,7 @@ def auc_vs_label(x: pd.Series, y: np.ndarray) -> float:
     n_pos, n_neg = y.sum(), (~y).sum()
     if n_pos == 0 or n_neg == 0:
         return np.nan
-    r = pd.Series(x).rank(method="average", na_option="bottom").to_numpy()
+    r = pd.Series(x).rank(method="average", na_option="top").to_numpy()  # "top" = NaN gets the lowest ranks
     return (r[y].sum() - n_pos * (n_pos + 1) / 2) / (n_pos * n_neg)
 
 
