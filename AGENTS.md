@@ -136,7 +136,8 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
    fake accounts separate (housing_status, device_os, keep_alive_session, address months, credit score; AUC 0.60–0.69 vs
    0.5); real-customer mules separate mainly on age (customer_age AUC 0.25: ~65% under 30 vs 27% of normal accounts, from
    the simulator's Cifas age weights `profiles.real_mule_age_weights`; fakes skew older, so the all-launderer AUC of 0.53
-   hid it), weakly on housing_status (0.57) and income (0.45); whether age may be a model input is open (fairness).
+   hid it), weakly on housing_status (0.57) and income (0.45); age is allowed as a model input (decision 19 Oct 2026;
+   Variant II tests fairness).
    Fakes start laundering in weeks 8–17 (median 13), real customers
    spread over weeks 1–75; 361 of 455 start inside the 26-week horizon. Activity screen (open weeks only): cumulative rows and
    money in, rows and payers this week, median in->out delay and the 1 h / 24 h speed shares carry signal once a burst

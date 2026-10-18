@@ -25,7 +25,7 @@ Share of account-weeks where a feature is undefined (e.g. no money in that week,
 
 ## 2. Gate: Phase 1 screen reproduced
 
-(A) EDA query rerun vs published screen (64 AUCs, mule_by_day): max |difference| 5.6e-17 for count features, 4.1e-06 for the eight float-sum money features
+(A) EDA query rerun vs published screen (64 AUCs, mule_by_day): max |difference| 2.2e-16 for count features, 8.6e-06 for the eight float-sum money features
 (B) store vs EDA panel, value by value over 912,627 account-weeks (months 0-4, weeks 0-26):
 
 | feature               | eda_name            |   account_weeks | null_pattern_equal   |   max_rel_diff |
@@ -116,4 +116,4 @@ Paired bootstrap of the AUC difference, kept minus dropped (same resampled accou
 - PASS: running totals never fall
 - PASS: week-78 totals equal the transactions file
 
-done in 125s
+done in 113s
