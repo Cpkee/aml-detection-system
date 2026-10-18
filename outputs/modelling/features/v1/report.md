@@ -3,7 +3,7 @@
 data data/v1 -> report outputs/modelling/features/v1; EDA screen outputs/modelling/eda/v1_50k/feature_screen.csv
 ## 1. Store
 
-3,950,000 account-weeks = 50,000 accounts x 79 weeks; 28 features; code f8777d2; cut-off rule: rows with day <= open_day + 7*w + 6 (end of each account's week w, as amldata.labels)
+3,950,000 account-weeks = 50,000 accounts x 79 weeks; 28 features; code 09096c6 (uncommitted changes); cut-off rule: rows with day <= open_day + 7*w + 6 (end of each account's week w, as amldata.labels)
 
 Share of account-weeks where a feature is undefined (e.g. no money in that week, fewer than 4 earlier weeks):
 
@@ -25,14 +25,14 @@ Share of account-weeks where a feature is undefined (e.g. no money in that week,
 
 ## 2. Gate: Phase 1 screen reproduced
 
-(A) EDA query rerun vs published screen (64 AUCs, mule_by_day): max |difference| 5.6e-17 for count features, 8.2e-07 for the eight float-sum money features
+(A) EDA query rerun vs published screen (64 AUCs, mule_by_day): max |difference| 5.6e-17 for count features, 4.1e-06 for the eight float-sum money features
 (B) store vs EDA panel, value by value over 912,627 account-weeks (months 0-4, weeks 0-26):
 
 | feature               | eda_name            |   account_weeks | null_pattern_equal   |   max_rel_diff |
 |:----------------------|:--------------------|----------------:|:---------------------|---------------:|
 | n_rows_wk             | n_rows              |          912627 | True                 |        0.0e+00 |
-| money_in_wk           | money_in            |          912627 | True                 |        3.6e-16 |
-| money_out_wk          | money_out           |          912627 | True                 |        5.0e-16 |
+| money_in_wk           | money_in            |          912627 | True                 |        3.5e-16 |
+| money_out_wk          | money_out           |          912627 | True                 |        5.1e-16 |
 | max_in_wk             | max_in              |          912627 | True                 |        0.0e+00 |
 | n_payers_wk           | n_payers            |          912627 | True                 |        0.0e+00 |
 | n_payees_wk           | n_payees            |          912627 | True                 |        0.0e+00 |
@@ -41,7 +41,7 @@ Share of account-weeks where a feature is undefined (e.g. no money in that week,
 | out_1h_share_wk       | out_1h_share        |          912627 | True                 |        3.8e-16 |
 | out_24h_share_wk      | out_24h_share       |          912627 | True                 |        5.0e-16 |
 | med_in_out_minutes_wk | med_delay_min       |          912627 | True                 |        0.0e+00 |
-| money_in_cum          | money_in_cum        |          912627 | True                 |        8.9e-16 |
+| money_in_cum          | money_in_cum        |          912627 | True                 |        7.8e-16 |
 | n_rows_cum            | n_rows_cum          |          912627 | True                 |        0.0e+00 |
 | self_vs_past_money_in | self_vs_past_in     |          912627 | True                 |        8.0e-14 |
 | self_vs_past_payers   | self_vs_past_payers |          912627 | True                 |        0.0e+00 |
@@ -116,4 +116,4 @@ Paired bootstrap of the AUC difference, kept minus dropped (same resampled accou
 - PASS: running totals never fall
 - PASS: week-78 totals equal the transactions file
 
-done in 139s
+done in 125s
