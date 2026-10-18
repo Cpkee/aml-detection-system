@@ -22,27 +22,27 @@ Share of account-weeks where a feature is undefined (e.g. no money in that week,
 
 ## 2. Gate: Phase 1 screen reproduced
 
-(A) EDA query rerun vs published screen (64 AUCs, mule_by_day): max |difference| 5.6e-17 for count features, 7.0e-07 for the eight float-sum money features
+(A) EDA query rerun vs published screen (64 AUCs, mule_by_day): max |difference| 2.2e-16 for count features, 1.3e-06 for the eight float-sum money features
 (B) store vs EDA panel, value by value over 4,450,113 account-weeks (months 0-4, weeks 0-26):
 
 | feature               | eda_name            |   account_weeks | null_pattern_equal   |   max_rel_diff |
 |:----------------------|:--------------------|----------------:|:---------------------|---------------:|
 | n_rows_wk             | n_rows              |         4450113 | True                 |        0.0e+00 |
-| money_in_wk           | money_in            |         4450113 | True                 |        4.4e-16 |
-| money_out_wk          | money_out           |         4450113 | True                 |        4.6e-16 |
+| money_in_wk           | money_in            |         4450113 | True                 |        4.1e-16 |
+| money_out_wk          | money_out           |         4450113 | True                 |        5.4e-16 |
 | max_in_wk             | max_in              |         4450113 | True                 |        0.0e+00 |
 | n_payers_wk           | n_payers            |         4450113 | True                 |        0.0e+00 |
 | n_payees_wk           | n_payees            |         4450113 | True                 |        0.0e+00 |
 | new_payer_share_wk    | new_payer_share     |         4450113 | True                 |        0.0e+00 |
 | passthrough_wk        | passthrough_wk      |         4450113 | True                 |        4.4e-16 |
-| out_1h_share_wk       | out_1h_share        |         4450113 | True                 |        3.9e-16 |
+| out_1h_share_wk       | out_1h_share        |         4450113 | True                 |        4.1e-16 |
 | out_24h_share_wk      | out_24h_share       |         4450113 | True                 |        5.5e-16 |
 | med_in_out_minutes_wk | med_delay_min       |         4450113 | True                 |        0.0e+00 |
 | money_in_cum          | money_in_cum        |         4450113 | True                 |        7.9e-16 |
 | n_rows_cum            | n_rows_cum          |         4450113 | True                 |        0.0e+00 |
 | self_vs_past_money_in | self_vs_past_in     |         4450113 | True                 |        8.2e-14 |
 | self_vs_past_payers   | self_vs_past_payers |         4450113 | True                 |        0.0e+00 |
-| peer_ratio_money_in   | peer_ratio_in       |         4450113 | True                 |        4.7e-16 |
+| peer_ratio_money_in   | peer_ratio_in       |         4450113 | True                 |        4.5e-16 |
 
 Store AUC vs published AUC: max |difference| 1.7e-05 (largest for self_vs_past_money_in, week 8); differences come only from float ties, since (B) shows the values agree.
 
@@ -113,4 +113,4 @@ Paired bootstrap of the AUC difference, kept minus dropped (same resampled accou
 - PASS: running totals never fall
 - PASS: week-78 totals equal the transactions file
 
-done in 159s
+done in 139s

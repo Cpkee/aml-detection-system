@@ -97,12 +97,12 @@ columns whose 95% interval excludes 0.5, by separation: fake accounts 21: ['cust
 real-customer mules 8: ['customer_age', 'housing_status', 'keep_alive_session', 'income', 'phone_home_valid', 'has_other_cards', 'bank_months_count', 'phone_mobile_valid']
   -> the two types separate on different columns, sometimes in opposite directions: customer_age has AUC 0.65 for fakes and 0.25 for real mules, 0.53 for all.
      Real mules' age signal comes from the simulator setting profiles.real_mule_age_weights (Cifas mule ages): an
-     assumption the report must name. Whether age may be a model input is a team decision (fairness, Variant II).
+     assumption the report must name. Age is allowed as a model input (decision 19 Oct 2026); Variant II tests fairness.
 
 ==============================================================================
 3. A WEEK OF ACTIVITY, BY WEEK SINCE OPENING (weeks 0-26) + LABEL MATURITY
 ==============================================================================
-account-week panel for months (0, 1, 2, 3, 4), weeks 0-26: 4,450,113 rows in 18s
+account-week panel for months (0, 1, 2, 3, 4), weeks 0-26: 4,450,113 rows in 15s
 medians per account-week, launderers (1) vs normal (0), weeks 0, 1, 4, 8, 12, 26:
 |         |         n |   rows_med |   in_med |   out_med |   payers_avg |   payees_med |   cash_avg |   internal_avg |   abroad_avg |   new_payer_avg |   out_24h_avg |
 |:--------|----------:|-----------:|---------:|----------:|-------------:|-------------:|-----------:|---------------:|-------------:|----------------:|--------------:|
@@ -116,7 +116,7 @@ medians per account-week, launderers (1) vs normal (0), weeks 0, 1, 4, 8, 12, 26
 | (8, 1)  |    455.00 |       5.00 |    42.09 |    697.18 |         0.69 |         3.00 |       0.08 |           0.01 |         0.00 |            0.47 |          0.54 |
 | (12, 0) | 164364.00 |       5.00 |    55.62 |    605.25 |         0.68 |         3.00 |       0.09 |           0.02 |         0.00 |            0.46 |          0.55 |
 | (12, 1) |    455.00 |       5.00 |   298.24 |    753.00 |         1.06 |         3.00 |       0.09 |           0.04 |         0.01 |            0.54 |          0.50 |
-| (26, 0) | 164364.00 |       6.00 |    74.10 |    660.91 |         0.73 |         3.00 |       0.08 |           0.03 |         0.00 |            0.49 |          0.62 |
+| (26, 0) | 164364.00 |       6.00 |    74.10 |    660.92 |         0.73 |         3.00 |       0.08 |           0.03 |         0.00 |            0.49 |          0.62 |
 | (26, 1) |    455.00 |       5.00 |     0.00 |    588.25 |         0.66 |         3.00 |       0.07 |           0.02 |         0.00 |            0.55 |          0.60 |
 
   -> before any laundering starts, launderers' weeks should look like everyone else's: the simulator gives
@@ -128,12 +128,11 @@ activity that stops (weeks 0-77): accounts whose last active week is before week
 |              0 |     164364 |                        1 |                    82 |        12820392 |
 |              1 |        455 |                      116 |                  6003 |           35490 |
 
-  -> every open account has at least a weekly card row, so a week with no rows means the account is closed,
-     and in this data only the bank's rules close accounts, only after a confirmed (true) alert. Weeks after a
-     closure are therefore a label giveaway that a live model never sees (the harness removes closed accounts
-     from the pool as caught). Phase 3/4 must drop account-weeks after closure from TRAINING; the screen below
-     already leaves them out (rows with n_rows = 0). Decision needed: let labels() return 'open at week w' for
-     months 0-5, since a bank knows which accounts it closed.
+  -> 116 of 455 launderers stop early, against 1 normal account(s). Only the bank's rules close accounts, only after a
+     confirmed (true) alert, so weeks after a closure are a label giveaway a live model never sees (the harness
+     counts closed accounts as caught). A zero-row week is not a clean closure test: normal accounts have 82 too.
+     labels() returns open_by_day (decision 10 Oct 2026: 0 once the bank has closed the account; a bank knows its
+     closures). The screen below and Phase 3/4 drop account-weeks with open_by_day = 0.
 
 label maturity on training accounts (3s): launderers labelled under each label, by week
 |   week |   mule_by_day |   started_by_day |   is_launderer |
@@ -166,59 +165,59 @@ launderers whose start lies inside the main horizon (week <= 26): 361 of 455; by
 ==============================================================================
 5. CANDIDATE FEATURE SCREEN AT WEEKS 4, 8, 12, 26 (months 0-4)
 ==============================================================================
-Account-weeks with activity only (closed accounts left out); AUCs with fewer than 20 positives shown as NaN.
+Accounts the bank has not closed (open_by_day = 1); AUCs with fewer than 20 positives shown as NaN.
 AUC against mule_by_day (main label) by week since opening; 0.5 = no signal:
 | feature             |      4 |      8 |     12 |     26 |   max_sep |
 |:--------------------|-------:|-------:|-------:|-------:|----------:|
-| n_rows_cum          | 0.4945 | 0.5057 | 0.6079 | 0.7087 |    0.2087 |
-| money_in_cum        | 0.5787 | 0.5909 | 0.6505 | 0.6689 |    0.1689 |
-| money_out           | 0.5674 | 0.5721 | 0.6431 | 0.5704 |    0.1431 |
-| self_vs_past_payers | 0.5124 | 0.5047 | 0.5634 | 0.6421 |    0.1421 |
-| self_vs_past_in     | 0.5159 | 0.4980 | 0.5676 | 0.6393 |    0.1393 |
-| med_delay_min       | 0.5054 | 0.4787 | 0.3693 | 0.4649 |    0.1307 |
-| out_1h_share        | 0.5068 | 0.5091 | 0.6189 | 0.5229 |    0.1189 |
-| n_rows              | 0.5018 | 0.5031 | 0.6127 | 0.5141 |    0.1127 |
-| out_24h_share       | 0.5172 | 0.5047 | 0.6097 | 0.5302 |    0.1097 |
-| n_payers            | 0.5048 | 0.5062 | 0.5978 | 0.5224 |    0.0978 |
-| income_fit_in       | 0.5026 | 0.5002 | 0.5953 | 0.5097 |    0.0953 |
-| money_in            | 0.5031 | 0.5002 | 0.5953 | 0.5095 |    0.0953 |
-| peer_ratio_in       | 0.4787 | 0.4995 | 0.5925 | 0.5077 |    0.0925 |
-| max_in              | 0.4998 | 0.4979 | 0.5812 | 0.5075 |    0.0812 |
-| new_payer_share     | 0.5080 | 0.5082 | 0.5732 | 0.5255 |    0.0732 |
-| passthrough_wk      | 0.5081 | 0.5094 | 0.5730 | 0.5268 |    0.0730 |
-| n_payees            | 0.5074 | 0.5044 | 0.5583 | 0.5062 |    0.0583 |
-| night_share         | 0.4908 | 0.5145 | 0.5320 | 0.5012 |    0.0320 |
-| internal_share      | 0.5023 | 0.4860 | 0.5209 | 0.4867 |    0.0209 |
-| cash_share          | 0.4952 | 0.4835 | 0.4870 | 0.4974 |    0.0165 |
-| abroad_share        | 0.4978 | 0.4978 | 0.5066 | 0.5016 |    0.0066 |
-| hr_share            | 0.5009 | 0.4994 | 0.5008 | 0.4994 |    0.0009 |
+| n_rows_cum          | 0.4945 | 0.5057 | 0.6036 | 0.7088 |    0.2088 |
+| money_in_cum        | 0.5787 | 0.5909 | 0.6453 | 0.6689 |    0.1689 |
+| money_out           | 0.5674 | 0.5721 | 0.6422 | 0.5704 |    0.1422 |
+| self_vs_past_payers | 0.5124 | 0.5047 | 0.5639 | 0.6421 |    0.1421 |
+| self_vs_past_in     | 0.5159 | 0.4980 | 0.5698 | 0.6393 |    0.1393 |
+| med_delay_min       | 0.5054 | 0.4787 | 0.3742 | 0.4649 |    0.1258 |
+| out_1h_share        | 0.5068 | 0.5091 | 0.6210 | 0.5229 |    0.1210 |
+| n_rows              | 0.5018 | 0.5031 | 0.6161 | 0.5141 |    0.1161 |
+| out_24h_share       | 0.5172 | 0.5047 | 0.6104 | 0.5303 |    0.1104 |
+| n_payers            | 0.5048 | 0.5062 | 0.5980 | 0.5224 |    0.0980 |
+| money_in            | 0.5031 | 0.5002 | 0.5970 | 0.5095 |    0.0970 |
+| income_fit_in       | 0.5026 | 0.5002 | 0.5969 | 0.5097 |    0.0969 |
+| peer_ratio_in       | 0.4787 | 0.4995 | 0.5937 | 0.5077 |    0.0937 |
+| max_in              | 0.4998 | 0.4979 | 0.5828 | 0.5075 |    0.0828 |
+| new_payer_share     | 0.5080 | 0.5082 | 0.5751 | 0.5255 |    0.0751 |
+| passthrough_wk      | 0.5081 | 0.5094 | 0.5732 | 0.5269 |    0.0732 |
+| n_payees            | 0.5074 | 0.5044 | 0.5619 | 0.5062 |    0.0619 |
+| night_share         | 0.4908 | 0.5146 | 0.5295 | 0.5012 |    0.0295 |
+| internal_share      | 0.5023 | 0.4860 | 0.5232 | 0.4867 |    0.0232 |
+| cash_share          | 0.4952 | 0.4835 | 0.4872 | 0.4974 |    0.0165 |
+| abroad_share        | 0.4978 | 0.4978 | 0.5069 | 0.5016 |    0.0069 |
+| hr_share            | 0.5009 | 0.4994 | 0.5024 | 0.4994 |    0.0024 |
 
 AUC against started_by_day (accounts whose laundering has started vs normal):
-launderers started by week: {4: 12, 8: 31, 12: 167, 26: 277} (real-customer mules: {4: 12, 8: 19, 12: 18, 26: 32})
+launderers started by week: {4: 12, 8: 31, 12: 157, 26: 277} (real-customer mules: {4: 12, 8: 19, 12: 18, 26: 32})
 | feature             |   4 |      8 |     12 |     26 |
 |:--------------------|----:|-------:|-------:|-------:|
-| n_rows_cum          | nan | 0.8642 | 0.7745 | 0.7088 |
-| money_in_cum        | nan | 0.6488 | 0.7302 | 0.6689 |
-| money_out           | nan | 0.7329 | 0.7480 | 0.5703 |
-| self_vs_past_payers | nan | 0.6664 | 0.6344 | 0.6421 |
-| self_vs_past_in     | nan | 0.6459 | 0.6697 | 0.6393 |
-| med_delay_min       | nan | 0.2110 | 0.2228 | 0.4649 |
-| out_1h_share        | nan | 0.7833 | 0.7430 | 0.5229 |
-| n_rows              | nan | 0.8045 | 0.7462 | 0.5141 |
-| out_24h_share       | nan | 0.7546 | 0.7264 | 0.5303 |
-| n_payers            | nan | 0.7580 | 0.7031 | 0.5224 |
-| income_fit_in       | nan | 0.7084 | 0.6871 | 0.5097 |
-| money_in            | nan | 0.7088 | 0.6869 | 0.5095 |
-| peer_ratio_in       | nan | 0.7094 | 0.6843 | 0.5077 |
-| max_in              | nan | 0.6812 | 0.6585 | 0.5075 |
-| new_payer_share     | nan | 0.7096 | 0.6477 | 0.5255 |
-| passthrough_wk      | nan | 0.7012 | 0.6592 | 0.5269 |
-| n_payees            | nan | 0.6906 | 0.6483 | 0.5062 |
-| night_share         | nan | 0.5638 | 0.5615 | 0.5011 |
-| internal_share      | nan | 0.5050 | 0.5527 | 0.4867 |
-| cash_share          | nan | 0.5022 | 0.4595 | 0.4974 |
-| abroad_share        | nan | 0.4963 | 0.5141 | 0.5016 |
-| hr_share            | nan | 0.4994 | 0.5023 | 0.4994 |
+| n_rows_cum          | nan | 0.8642 | 0.7761 | 0.7088 |
+| money_in_cum        | nan | 0.6488 | 0.7245 | 0.6689 |
+| money_out           | nan | 0.7329 | 0.7527 | 0.5703 |
+| self_vs_past_payers | nan | 0.6664 | 0.6400 | 0.6421 |
+| self_vs_past_in     | nan | 0.6459 | 0.6808 | 0.6393 |
+| med_delay_min       | nan | 0.2110 | 0.2236 | 0.4649 |
+| out_1h_share        | nan | 0.7833 | 0.7553 | 0.5229 |
+| n_rows              | nan | 0.8045 | 0.7617 | 0.5141 |
+| out_24h_share       | nan | 0.7546 | 0.7353 | 0.5303 |
+| n_payers            | nan | 0.7580 | 0.7102 | 0.5224 |
+| money_in            | nan | 0.7088 | 0.6962 | 0.5095 |
+| income_fit_in       | nan | 0.7084 | 0.6963 | 0.5097 |
+| peer_ratio_in       | nan | 0.7094 | 0.6925 | 0.5077 |
+| max_in              | nan | 0.6812 | 0.6668 | 0.5075 |
+| new_payer_share     | nan | 0.7096 | 0.6564 | 0.5255 |
+| passthrough_wk      | nan | 0.7012 | 0.6651 | 0.5269 |
+| n_payees            | nan | 0.6906 | 0.6613 | 0.5062 |
+| night_share         | nan | 0.5638 | 0.5582 | 0.5011 |
+| internal_share      | nan | 0.5050 | 0.5595 | 0.4867 |
+| cash_share          | nan | 0.5022 | 0.4581 | 0.4974 |
+| abroad_share        | nan | 0.4964 | 0.5152 | 0.5016 |
+| hr_share            | nan | 0.4994 | 0.5057 | 0.4994 |
 
   -> mule_by_day counts fake accounts from week 0 even while their activity is still normal, so activity
      features look weak against it in early weeks by construction. started_by_day shows what activity
@@ -231,21 +230,21 @@ candidate pairs with |Spearman| > 0.8 at week 12 (keep one of each for logistic 
 | max_in              | income_fit_in       |     0.9993 |
 | peer_ratio_in       | income_fit_in       |     0.9984 |
 | money_in            | peer_ratio_in       |     0.9983 |
-| max_in              | peer_ratio_in       |     0.9977 |
+| max_in              | peer_ratio_in       |     0.9978 |
 | money_in            | self_vs_past_in     |     0.9188 |
 | self_vs_past_in     | income_fit_in       |     0.9187 |
 | self_vs_past_in     | peer_ratio_in       |     0.9180 |
-| max_in              | self_vs_past_in     |     0.9178 |
+| max_in              | self_vs_past_in     |     0.9177 |
 | n_payers            | self_vs_past_payers |     0.9056 |
 | money_in            | n_payers            |     0.8791 |
 | n_payers            | income_fit_in       |     0.8791 |
 | n_payers            | peer_ratio_in       |     0.8787 |
 | self_vs_past_in     | self_vs_past_payers |     0.8758 |
-| max_in              | n_payers            |     0.8728 |
-| money_in            | passthrough_wk      |    -0.8587 |
-| passthrough_wk      | income_fit_in       |    -0.8569 |
-| max_in              | passthrough_wk      |    -0.8554 |
-| n_payers            | self_vs_past_in     |     0.8544 |
+| max_in              | n_payers            |     0.8729 |
+| money_in            | passthrough_wk      |    -0.8588 |
+| passthrough_wk      | income_fit_in       |    -0.8570 |
+| max_in              | passthrough_wk      |    -0.8555 |
+| n_payers            | self_vs_past_in     |     0.8543 |
 | passthrough_wk      | peer_ratio_in       |    -0.8495 |
 | n_rows              | n_payees            |     0.8374 |
 | money_in            | self_vs_past_payers |     0.8323 |
@@ -317,33 +316,35 @@ rows 72,978,776; chi-square 320,829 (any large sample rejects); Nigrini MAD 0.00
      mix is not absurd, nothing more. Each launderer has 3-15 laundering payments, far too few for Benford.
 
 ==============================================================================
-8. PROPOSED FEATURE LIST FOR PHASE 3 (the team fixes it at the gate)
+8. PROPOSED FEATURE LIST FOR PHASE 3 (the team fixed it on 15 Oct 2026)
 ==============================================================================
-| feature             |   best_sep_mule |   best_sep_started |   nonnull | proposal                                       |
-|:--------------------|----------------:|-------------------:|----------:|:-----------------------------------------------|
-| n_rows_cum          |          0.2087 |             0.3642 |    1.0000 | keep                                           |
-| n_rows              |          0.1127 |             0.3045 |    1.0000 | keep                                           |
-| med_delay_min       |          0.1307 |             0.2890 |    0.9999 | keep                                           |
-| out_1h_share        |          0.1189 |             0.2833 |    0.5246 | keep                                           |
-| n_payers            |          0.0978 |             0.2580 |    1.0000 | keep                                           |
-| out_24h_share       |          0.1097 |             0.2546 |    0.5246 | keep                                           |
-| money_out           |          0.1431 |             0.2480 |    1.0000 | keep                                           |
-| money_in_cum        |          0.1689 |             0.2302 |    1.0000 | keep                                           |
-| new_payer_share     |          0.0732 |             0.2096 |    0.5137 | keep                                           |
-| peer_ratio_in       |          0.0925 |             0.2094 |    0.9712 | keep                                           |
-| money_in            |          0.0953 |             0.2088 |    1.0000 | keep                                           |
-| income_fit_in       |          0.0953 |             0.2084 |    1.0000 | keep                                           |
-| passthrough_wk      |          0.0730 |             0.2012 |    0.5246 | keep                                           |
-| n_payees            |          0.0583 |             0.1906 |    1.0000 | keep                                           |
-| max_in              |          0.0812 |             0.1812 |    1.0000 | keep                                           |
-| self_vs_past_in     |          0.1393 |             0.1697 |    0.3740 | keep                                           |
-| self_vs_past_payers |          0.1421 |             0.1664 |    0.3062 | keep                                           |
-| night_share         |          0.0320 |             0.0638 |    1.0000 | keep; expected: same hour weights for everyone |
-| internal_share      |          0.0209 |             0.0527 |    1.0000 | keep                                           |
-| cash_share          |          0.0165 |             0.0405 |    1.0000 | drop (no signal at any screened week)          |
-| abroad_share        |          0.0066 |             0.0141 |    1.0000 | drop (no signal at any screened week)          |
-| hr_share            |          0.0009 |             0.0023 |    1.0000 | drop (no signal at any screened week)          |
+| feature             |   best_sep_mule |   best_sep_started |   looks_separating |   nonnull | proposal                                                                          |
+|:--------------------|----------------:|-------------------:|-------------------:|----------:|:----------------------------------------------------------------------------------|
+| n_rows_cum          |          0.2088 |             0.3642 |                  3 |    1.0000 | keep                                                                              |
+| n_rows              |          0.1161 |             0.3045 |                  2 |    1.0000 | keep                                                                              |
+| med_delay_min       |          0.1258 |             0.2890 |                  2 |    0.9999 | keep                                                                              |
+| out_1h_share        |          0.1210 |             0.2833 |                  2 |    0.5246 | keep                                                                              |
+| n_payers            |          0.0980 |             0.2580 |                  2 |    1.0000 | keep                                                                              |
+| out_24h_share       |          0.1104 |             0.2546 |                  2 |    0.5246 | keep                                                                              |
+| money_out           |          0.1422 |             0.2527 |                  4 |    1.0000 | keep                                                                              |
+| money_in_cum        |          0.1689 |             0.2245 |                  4 |    1.0000 | keep                                                                              |
+| new_payer_share     |          0.0751 |             0.2096 |                  2 |    0.5137 | keep                                                                              |
+| peer_ratio_in       |          0.0937 |             0.2094 |                  2 |    0.9712 | keep                                                                              |
+| money_in            |          0.0970 |             0.2088 |                  2 |    1.0000 | keep                                                                              |
+| income_fit_in       |          0.0969 |             0.2084 |                  2 |    1.0000 | keep                                                                              |
+| passthrough_wk      |          0.0732 |             0.2012 |                  2 |    0.5246 | keep                                                                              |
+| n_payees            |          0.0619 |             0.1906 |                  2 |    1.0000 | keep                                                                              |
+| max_in              |          0.0828 |             0.1812 |                  2 |    1.0000 | keep                                                                              |
+| self_vs_past_in     |          0.1393 |             0.1808 |                  3 |    0.3740 | keep                                                                              |
+| self_vs_past_payers |          0.1421 |             0.1664 |                  3 |    0.3062 | keep                                                                              |
+| night_share         |          0.0295 |             0.0638 |                  1 |    1.0000 | keep; the simulator gives everyone the same hour weights (team dropped it 15 Oct) |
+| internal_share      |          0.0232 |             0.0595 |                  1 |    1.0000 | keep                                                                              |
+| cash_share          |          0.0165 |             0.0419 |                  0 |    1.0000 | drop (no screened week passes both tests)                                         |
+| abroad_share        |          0.0069 |             0.0152 |                  0 |    1.0000 | drop (no screened week passes both tests)                                         |
+| hr_share            |          0.0024 |             0.0057 |                  0 |    1.0000 | drop (no screened week passes both tests)                                         |
 
+looks_separating: in how many of up to 8 looks (4 weeks x 2 labels) |AUC - 0.5| >= 0.05 and the 95% interval
+excludes 0.5. Both tests are needed: rare-event shares (mostly 0) get narrow intervals around tiny effects.
 Speed features separate started launderers: best |AUC - 0.5| vs started_by_day 0.28 (out_1h_share) and 0.25 (out_24h_share).
 They are NaN in weeks with no money in (set in only 52% of screened account-weeks), and the AUC ranks NaN lowest. Correction 18 Oct 2026: the first version of
 this notebook ranked NaN highest by mistake, which made the speed shares look swamped by everyday outflows and led to
@@ -353,4 +354,4 @@ keep them cumulative rather than weekly if kept at all.
 Application columns: keep all 29 after Phase 2 cleaning; LightGBM ignores useless ones and L1 logistic
 regression drops them. Candidate pairs above |0.8| correlation: keep one for the logistic model.
 
-done in 33s
+done in 28s
