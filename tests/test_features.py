@@ -146,3 +146,9 @@ def test_load_filters_months_and_columns(tmp_path):
     assert list(df.columns) == ["account_id", "weeks_since_open", "money_in_wk"]
     assert set(df["account_id"]) == {"A3"} and list(df["weeks_since_open"]) == [0, 1, 2]
     assert df.loc[df["weeks_since_open"] == 2, "money_in_wk"].item() == 999.0
+
+
+def test_build_refuses_the_partial_last_week(tmp_path):
+    folder = _write(tmp_path / "d", BASE)
+    with pytest.raises(ValueError, match="only 2 days"):
+        weekly.build(folder, (0, weekly.LAST_WEEK + 1), force=True)

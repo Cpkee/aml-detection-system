@@ -75,9 +75,11 @@ def check(out: str, features: list[str] | None = None, weeks: tuple[int, int] | 
         problems.append(f"feature list differs: store has {m['features']}, caller expects {list(features)}")
     if weeks is not None and (weeks[0] < m["weeks"][0] or weeks[1] > m["weeks"][1]):
         problems.append(f"store covers weeks {m['weeks']}, caller needs {list(weeks)}")
-    from .weekly import code_sha256                 # imported here: weekly imports this module
+    from .weekly import LAST_WEEK, code_sha256      # imported here: weekly imports this module
     if m.get("code_sha256") != code_sha256():
         problems.append("the feature code changed since the store was built (or the store predates the code check)")
+    if m["weeks"][1] > LAST_WEEK:
+        problems.append(f"the store holds weeks after {LAST_WEEK} (week {LAST_WEEK + 1} has only 2 days of data)")
     if "peer_medians_sha256" in m and m["peer_medians_sha256"] != _sha256(
             os.path.join(out, "features", "peer_medians.parquet")):
         problems.append("the frozen peer medians changed since the store was built")

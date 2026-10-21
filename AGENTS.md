@@ -23,8 +23,9 @@ PYTHONPATH=src python -m sim.checks --baf data/raw/BAF_Base.csv         # 10 che
 PYTHONPATH=src BAF_PATH=data/raw/BAF_Base.csv python -m pytest -q tests  # must pass before any commit
 ```
 Modelling (plan: "Modelling: phased plan" tab of the decision-record doc; Phases 0–3 done):
-`PYTHONPATH=src python -m features weekly --out data/v1_full --weeks 0-78` builds `<out>/features/weekly.parquet` (28 features
-from the Phase 1 gate list, see `src/features/weekly.py`; money summed as exact pence; 19.3M account-weeks, ~4 min, ~4.2 GB) +
+`PYTHONPATH=src python -m features weekly --out data/v1_full --weeks 0-77` builds `<out>/features/weekly.parquet` (28 features
+from the Phase 1 gate list, see `src/features/weekly.py`; money summed as exact pence; weeks 0–77, since week 78 holds only 2 days of data; 19.0M
+account-weeks, ~4 min, ~4.2 GB) +
 `peer_medians.parquet` (frozen from months 0–4) + `features_manifest.json` (feature list, cut-off rule, code commit, hash of the
 data's `run_manifest.json` and of the peer medians, and a fingerprint of the feature SQL; `features.weekly.load()` and
 `features.manifest.check()` refuse a stale store, including one built by different feature code).
@@ -127,7 +128,7 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
 2. ~~Full-size run~~ done 7 Oct 2026, regenerated 8 Oct after the R6 fix: rules at 93.4% (see above).
 3. Modelling. **Decisions 9 Oct 2026** (phased plan in the doc tab "Modelling: phased plan"): one pooled account-week
    model (row per account per week since opening, label `mule_by_day`, `weeks_since_open` a feature); horizon weeks 0–26 main,
-   0–78 appendix; a model flag is permanent (caught at first flag, leaves the pool); class weights main + one 1:20 undersampling
+   0–77 appendix (week 78 holds only 2 days, dropped 22 Oct 2026); a model flag is permanent (caught at first flag, leaves the pool); class weights main + one 1:20 undersampling
    ablation, no SMOTE; features precomputed to `data/<run>/features/` with a manifest; lightgbm + torch (CPU) + networkx.
    Phases: 0 setup ~~done 9 Oct~~ -> 1 EDA ~~done 9 Oct~~ (`notebooks/01_eda_train.ipynb`, run by `python -m features eda`; months 0–4 only, month 5 untouched;
    `outputs/modelling/eda/report.md` + `univariate_tests.csv` + `feature_screen.csv`; 50k copy under `eda/v1_50k/`) -> 2 cleaning

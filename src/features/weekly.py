@@ -2,6 +2,8 @@
 
 Week w of an account runs from open_day + 7w to open_day + 7w + 6 (its cut-off), the clock used by
 `amldata.labels(weeks_since_open=w)`. A feature for week w may use only transactions with day <= that cut-off.
+The store holds weeks 0-77: each account's data ends 547 days after opening, so week 78 (days 546-552) would hold
+only 2 days and look like a sudden drop in activity (left out 22 Oct 2026).
 The store is written to <out>/features/weekly.parquet with a manifest (see manifest.py).
 
 The feature list is the one fixed at the Phase 1 gate (outputs/modelling/eda/report.md, section 8; phased plan,
@@ -53,6 +55,7 @@ MONEY = ["money_in_wk", "money_out_wk", "money_in_cum", "money_out_cum", "max_in
 PEER_MONTHS = (0, 1, 2, 3, 4)                         # peer medians come from training months only
 HIGH_RISK = ("Mexico", "Turkey", "Morocco", "UAE")   # configs/sim.yaml countries.high_risk (SAML-D)
 SELF_MIN_WEEKS = 4
+LAST_WEEK = 77                                        # week 78 holds only 2 of its 7 days (see the docstring)
 PEERS = "peer_medians.parquet"
 # weekly totals that are 0 in a week with no rows (the median delay stays NULL: there is no delay to measure)
 ZERO_FILL = ["n_rows_wk", "n_in_wk", "n_out_wk", "money_in_wk", "money_out_wk", "max_in_wk", "max_out_wk",
@@ -189,12 +192,14 @@ def code_sha256() -> str:
     return hashlib.sha256(sql.encode()).hexdigest()
 
 
-def build(out: str = amldata.DEFAULT_OUT, weeks: tuple[int, int] = (0, 78), force: bool = False):
+def build(out: str = amldata.DEFAULT_OUT, weeks: tuple[int, int] = (0, LAST_WEEK), force: bool = False):
     """Write <out>/features/weekly.parquet (+ peer medians and manifest). Returns (path, rows).
 
     Accounts are processed one opening month at a time to bound memory (~13M transaction rows per month at
     244k accounts); weeks before `weeks[0]` are still computed because cumulative and self-vs-past features
     need them, then left out of the store."""
+    if weeks[1] > LAST_WEEK:
+        raise ValueError(f"weeks go up to {LAST_WEEK}: week {LAST_WEEK + 1} holds only 2 days of data")
     folder = os.path.join(out, "features")
     path = os.path.join(folder, "weekly.parquet")
     if os.path.exists(path) and not force:
