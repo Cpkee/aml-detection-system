@@ -59,45 +59,45 @@ application columns with |Spearman| > 0.5 (Phase 2 proposes keeping both of each
 2. APPLICATION COLUMNS VS is_launderer (months 0-4), BY HIDDEN TYPE
 ==============================================================================
 univariate AUC vs the label (0.5 = none) with a 95% interval, for all launderers, fake accounts and real-customer
-mules, with Mann-Whitney (numeric) or chi-square + Cramer's V (categorical). Categorical AUC uses the level's
+mules, with Mann-Whitney (numeric) or chi-square, Cramer's V and information gain (categorical). Categorical AUC uses the level's
 launderer rate as the score. Sorted by the largest of the three separations. A small p is support, not proof.
-| feature                              | kind         | auc_all             | auc_fake_vs_normal   | auc_real_vs_normal   |   mann_whitney_p |   chi2_p |   cramers_v |
-|:-------------------------------------|:-------------|:--------------------|:---------------------|:---------------------|-----------------:|---------:|------------:|
-| housing_status                       | categorical  | 0.684 (0.631-0.741) | 0.745 (0.689-0.805)  | 0.463 (0.347-0.576)  |         nan      |   0.0000 |      0.0476 |
-| device_os                            | categorical  | 0.672 (0.624-0.721) | 0.734 (0.685-0.785)  | 0.450 (0.340-0.560)  |         nan      |   0.0000 |      0.0356 |
-| customer_age                         | numeric      | 0.566 (0.505-0.623) | 0.635 (0.569-0.703)  | 0.316 (0.210-0.425)  |           0.0245 | nan      |    nan      |
-| credit_risk_score                    | numeric      | 0.623 (0.561-0.685) | 0.674 (0.606-0.745)  | 0.443 (0.306-0.580)  |           0.0000 | nan      |    nan      |
-| keep_alive_session                   | numeric      | 0.371 (0.322-0.420) | 0.343 (0.295-0.392)  | 0.468 (0.368-0.568)  |           0.0000 | nan      |    nan      |
-| current_address_months_count         | numeric      | 0.619 (0.572-0.666) | 0.642 (0.590-0.692)  | 0.536 (0.432-0.638)  |           0.0001 | nan      |    nan      |
-| date_of_birth_distinct_emails_4w     | numeric      | 0.397 (0.340-0.453) | 0.363 (0.294-0.432)  | 0.518 (0.421-0.611)  |           0.0006 | nan      |    nan      |
-| income                               | numeric      | 0.590 (0.534-0.646) | 0.634 (0.572-0.703)  | 0.429 (0.310-0.554)  |           0.0026 | nan      |    nan      |
-| proposed_credit_limit                | numeric      | 0.604 (0.548-0.656) | 0.634 (0.568-0.702)  | 0.494 (0.394-0.591)  |           0.0001 | nan      |    nan      |
-| name_email_similarity                | numeric      | 0.396 (0.340-0.451) | 0.374 (0.308-0.440)  | 0.474 (0.354-0.585)  |           0.0006 | nan      |    nan      |
-| prev_address_months_count            | numeric      | 0.411 (0.376-0.446) | 0.401 (0.367-0.440)  | 0.446 (0.369-0.537)  |           0.0003 | nan      |    nan      |
-| prev_address_months_count_missing    | missing flag | 0.588 (0.550-0.620) | 0.597 (0.563-0.632)  | 0.553 (0.453-0.628)  |           0.0003 | nan      |    nan      |
-| employment_status                    | categorical  | 0.554 (0.510-0.594) | 0.590 (0.544-0.635)  | 0.424 (0.330-0.518)  |         nan      |   0.3080 |      0.0145 |
-| payment_type                         | categorical  | 0.572 (0.518-0.624) | 0.576 (0.512-0.635)  | 0.556 (0.440-0.673)  |         nan      |   0.1583 |      0.0140 |
-| intended_balcon_amount_missing       | missing flag | 0.571 (0.533-0.603) | 0.574 (0.539-0.608)  | 0.561 (0.461-0.636)  |           0.0023 | nan      |    nan      |
-| bank_months_count_missing            | missing flag | 0.551 (0.502-0.600) | 0.546 (0.490-0.601)  | 0.572 (0.472-0.672)  |           0.0243 | nan      |    nan      |
-| phone_home_valid                     | numeric      | 0.447 (0.398-0.496) | 0.438 (0.389-0.493)  | 0.481 (0.381-0.581)  |           0.0373 | nan      |    nan      |
-| has_other_cards                      | numeric      | 0.444 (0.411-0.477) | 0.445 (0.410-0.487)  | 0.440 (0.390-0.515)  |           0.0097 | nan      |    nan      |
-| bank_branch_count_8w                 | numeric      | 0.449 (0.387-0.508) | 0.440 (0.365-0.515)  | 0.482 (0.363-0.601)  |           0.0896 | nan      |    nan      |
-| velocity_6h                          | numeric      | 0.497 (0.441-0.555) | 0.482 (0.417-0.545)  | 0.554 (0.419-0.675)  |           0.9334 | nan      |    nan      |
-| velocity_24h                         | numeric      | 0.503 (0.451-0.555) | 0.491 (0.432-0.550)  | 0.546 (0.427-0.656)  |           0.9188 | nan      |    nan      |
-| phone_mobile_valid                   | numeric      | 0.477 (0.439-0.510) | 0.482 (0.441-0.517)  | 0.459 (0.359-0.534)  |           0.1754 | nan      |    nan      |
-| email_is_free                        | numeric      | 0.536 (0.487-0.585) | 0.539 (0.490-0.594)  | 0.526 (0.426-0.626)  |           0.1667 | nan      |    nan      |
-| device_distinct_emails_8w            | numeric      | 0.522 (0.484-0.559) | 0.517 (0.469-0.565)  | 0.538 (0.489-0.613)  |           0.0296 | nan      |    nan      |
-| zip_count_4w                         | numeric      | 0.523 (0.464-0.578) | 0.536 (0.468-0.605)  | 0.476 (0.360-0.587)  |           0.4500 | nan      |    nan      |
-| days_since_request                   | numeric      | 0.490 (0.427-0.551) | 0.496 (0.425-0.565)  | 0.466 (0.313-0.618)  |           0.7326 | nan      |    nan      |
-| intended_balcon_amount               | numeric      | 0.484 (0.435-0.532) | 0.482 (0.424-0.535)  | 0.491 (0.384-0.589)  |           0.5878 | nan      |    nan      |
-| velocity_4w                          | numeric      | 0.488 (0.435-0.539) | 0.486 (0.423-0.548)  | 0.494 (0.387-0.594)  |           0.6834 | nan      |    nan      |
-| session_length_in_minutes            | numeric      | 0.488 (0.432-0.541) | 0.486 (0.421-0.550)  | 0.492 (0.367-0.608)  |           0.6800 | nan      |    nan      |
-| foreign_request                      | numeric      | 0.503 (0.486-0.524) | 0.507 (0.486-0.535)  | 0.486 (nan-nan)      |           0.7475 | nan      |    nan      |
-| bank_months_count                    | numeric      | 0.505 (0.439-0.569) | 0.510 (0.430-0.589)  | 0.488 (0.351-0.624)  |           0.8692 | nan      |    nan      |
-| source                               | categorical  | 0.507 (0.496-0.524) | 0.510 (0.496-0.531)  | 0.496 (nan-nan)      |         nan      |   0.3103 |      0.0055 |
-| current_address_months_count_missing | missing flag | 0.498 (nan-nan)     | 0.498 (nan-nan)      | 0.498 (nan-nan)      |           0.5313 | nan      |    nan      |
-| session_length_in_minutes_missing    | missing flag | 0.499 (nan-nan)     | 0.499 (nan-nan)      | 0.499 (nan-nan)      |           0.6957 | nan      |    nan      |
-| device_distinct_emails_8w_missing    | missing flag | 0.500 (nan-nan)     | 0.500 (nan-nan)      | 0.500 (nan-nan)      |           0.8626 | nan      |    nan      |
+| feature                              | kind         | auc_all             | auc_fake_vs_normal   | auc_real_vs_normal   |   mann_whitney_p |   chi2_p |   cramers_v |   info_gain_bits |
+|:-------------------------------------|:-------------|:--------------------|:---------------------|:---------------------|-----------------:|---------:|------------:|-----------------:|
+| housing_status                       | categorical  | 0.684 (0.631-0.741) | 0.745 (0.689-0.805)  | 0.463 (0.347-0.576)  |         nan      |   0.0000 |      0.0476 |           0.0012 |
+| device_os                            | categorical  | 0.672 (0.624-0.721) | 0.734 (0.685-0.785)  | 0.450 (0.340-0.560)  |         nan      |   0.0000 |      0.0356 |           0.0008 |
+| customer_age                         | numeric      | 0.566 (0.505-0.623) | 0.635 (0.569-0.703)  | 0.316 (0.210-0.425)  |           0.0245 | nan      |    nan      |         nan      |
+| credit_risk_score                    | numeric      | 0.623 (0.561-0.685) | 0.674 (0.606-0.745)  | 0.443 (0.306-0.580)  |           0.0000 | nan      |    nan      |         nan      |
+| keep_alive_session                   | numeric      | 0.371 (0.322-0.420) | 0.343 (0.295-0.392)  | 0.468 (0.368-0.568)  |           0.0000 | nan      |    nan      |         nan      |
+| current_address_months_count         | numeric      | 0.619 (0.572-0.666) | 0.642 (0.590-0.692)  | 0.536 (0.432-0.638)  |           0.0001 | nan      |    nan      |         nan      |
+| date_of_birth_distinct_emails_4w     | numeric      | 0.397 (0.340-0.453) | 0.363 (0.294-0.432)  | 0.518 (0.421-0.611)  |           0.0006 | nan      |    nan      |         nan      |
+| income                               | numeric      | 0.590 (0.534-0.646) | 0.634 (0.572-0.703)  | 0.429 (0.310-0.554)  |           0.0026 | nan      |    nan      |         nan      |
+| proposed_credit_limit                | numeric      | 0.604 (0.548-0.656) | 0.634 (0.568-0.702)  | 0.494 (0.394-0.591)  |           0.0001 | nan      |    nan      |         nan      |
+| name_email_similarity                | numeric      | 0.396 (0.340-0.451) | 0.374 (0.308-0.440)  | 0.474 (0.354-0.585)  |           0.0006 | nan      |    nan      |         nan      |
+| prev_address_months_count            | numeric      | 0.411 (0.376-0.446) | 0.401 (0.367-0.440)  | 0.446 (0.369-0.537)  |           0.0003 | nan      |    nan      |         nan      |
+| prev_address_months_count_missing    | missing flag | 0.588 (0.550-0.620) | 0.597 (0.563-0.632)  | 0.553 (0.453-0.628)  |           0.0003 | nan      |    nan      |         nan      |
+| employment_status                    | categorical  | 0.554 (0.510-0.594) | 0.590 (0.544-0.635)  | 0.424 (0.330-0.518)  |         nan      |   0.3080 |      0.0145 |           0.0002 |
+| payment_type                         | categorical  | 0.572 (0.518-0.624) | 0.576 (0.512-0.635)  | 0.556 (0.440-0.673)  |         nan      |   0.1583 |      0.0140 |           0.0002 |
+| intended_balcon_amount_missing       | missing flag | 0.571 (0.533-0.603) | 0.574 (0.539-0.608)  | 0.561 (0.461-0.636)  |           0.0023 | nan      |    nan      |         nan      |
+| bank_months_count_missing            | missing flag | 0.551 (0.502-0.600) | 0.546 (0.490-0.601)  | 0.572 (0.472-0.672)  |           0.0243 | nan      |    nan      |         nan      |
+| phone_home_valid                     | numeric      | 0.447 (0.398-0.496) | 0.438 (0.389-0.493)  | 0.481 (0.381-0.581)  |           0.0373 | nan      |    nan      |         nan      |
+| has_other_cards                      | numeric      | 0.444 (0.411-0.477) | 0.445 (0.410-0.487)  | 0.440 (0.390-0.515)  |           0.0097 | nan      |    nan      |         nan      |
+| bank_branch_count_8w                 | numeric      | 0.449 (0.387-0.508) | 0.440 (0.365-0.515)  | 0.482 (0.363-0.601)  |           0.0896 | nan      |    nan      |         nan      |
+| velocity_6h                          | numeric      | 0.497 (0.441-0.555) | 0.482 (0.417-0.545)  | 0.554 (0.419-0.675)  |           0.9334 | nan      |    nan      |         nan      |
+| velocity_24h                         | numeric      | 0.503 (0.451-0.555) | 0.491 (0.432-0.550)  | 0.546 (0.427-0.656)  |           0.9188 | nan      |    nan      |         nan      |
+| phone_mobile_valid                   | numeric      | 0.477 (0.439-0.510) | 0.482 (0.441-0.517)  | 0.459 (0.359-0.534)  |           0.1754 | nan      |    nan      |         nan      |
+| email_is_free                        | numeric      | 0.536 (0.487-0.585) | 0.539 (0.490-0.594)  | 0.526 (0.426-0.626)  |           0.1667 | nan      |    nan      |         nan      |
+| device_distinct_emails_8w            | numeric      | 0.522 (0.484-0.559) | 0.517 (0.469-0.565)  | 0.538 (0.489-0.613)  |           0.0296 | nan      |    nan      |         nan      |
+| zip_count_4w                         | numeric      | 0.523 (0.464-0.578) | 0.536 (0.468-0.605)  | 0.476 (0.360-0.587)  |           0.4500 | nan      |    nan      |         nan      |
+| days_since_request                   | numeric      | 0.490 (0.427-0.551) | 0.496 (0.425-0.565)  | 0.466 (0.313-0.618)  |           0.7326 | nan      |    nan      |         nan      |
+| intended_balcon_amount               | numeric      | 0.484 (0.435-0.532) | 0.482 (0.424-0.535)  | 0.491 (0.384-0.589)  |           0.5878 | nan      |    nan      |         nan      |
+| velocity_4w                          | numeric      | 0.488 (0.435-0.539) | 0.486 (0.423-0.548)  | 0.494 (0.387-0.594)  |           0.6834 | nan      |    nan      |         nan      |
+| session_length_in_minutes            | numeric      | 0.488 (0.432-0.541) | 0.486 (0.421-0.550)  | 0.492 (0.367-0.608)  |           0.6800 | nan      |    nan      |         nan      |
+| foreign_request                      | numeric      | 0.503 (0.486-0.524) | 0.507 (0.486-0.535)  | 0.486 (nan-nan)      |           0.7475 | nan      |    nan      |         nan      |
+| bank_months_count                    | numeric      | 0.505 (0.439-0.569) | 0.510 (0.430-0.589)  | 0.488 (0.351-0.624)  |           0.8692 | nan      |    nan      |         nan      |
+| source                               | categorical  | 0.507 (0.496-0.524) | 0.510 (0.496-0.531)  | 0.496 (nan-nan)      |         nan      |   0.3103 |      0.0055 |           0.0000 |
+| current_address_months_count_missing | missing flag | 0.498 (nan-nan)     | 0.498 (nan-nan)      | 0.498 (nan-nan)      |           0.5313 | nan      |    nan      |         nan      |
+| session_length_in_minutes_missing    | missing flag | 0.499 (nan-nan)     | 0.499 (nan-nan)      | 0.499 (nan-nan)      |           0.6957 | nan      |    nan      |         nan      |
+| device_distinct_emails_8w_missing    | missing flag | 0.500 (nan-nan)     | 0.500 (nan-nan)      | 0.500 (nan-nan)      |           0.8626 | nan      |    nan      |         nan      |
 
 11 of 29 BAF columns significant at p < 0.01 against all launderers (6 missing flags not counted).
 columns whose 95% interval excludes 0.5, by separation: fake accounts 17: ['housing_status', 'device_os', 'customer_age', 'credit_risk_score', 'keep_alive_session', 'current_address_months_count', 'date_of_birth_distinct_emails_4w', 'income', 'proposed_credit_limit', 'name_email_similarity', 'prev_address_months_count', 'prev_address_months_count_missing', 'employment_status', 'payment_type', 'intended_balcon_amount_missing', 'phone_home_valid', 'has_other_cards']
@@ -158,7 +158,7 @@ before laundering starts: weeks 0-7, launderers before their start week vs norma
 | out_1h_share        | 0.531 (0.484-0.580) | 0.484 (0.412-0.560) |
 | out_24h_share       | 0.485 (0.414-0.554) | 0.554 (0.434-0.664) |
 | med_delay_min       | 0.518 (0.447-0.588) | 0.473 (0.335-0.609) |
-| cash_share          | 0.549 (0.485-0.611) | 0.641 (0.523-0.745) |
+| cash_share          | 0.549 (0.485-0.611) | 0.640 (0.523-0.745) |
 | internal_share      | 0.505 (0.442-0.564) | 0.505 (0.400-0.610) |
 | abroad_share        | 0.506 (0.485-0.534) | 0.478 (nan-nan)     |
 | hr_share            | 0.502 (0.495-0.516) | 0.495 (nan-nan)     |
@@ -180,7 +180,7 @@ the same AUCs inside each BAF income band (normal banking scales with BAF income
 | fake      | money_in_cum  | 0.616 |                    0.507 |
 | fake      | peer_ratio_in | 0.605 |                    0.525 |
 | fake      | income_fit_in | 0.609 |                    0.520 |
-| real mule | cash_share    | 0.641 |                  nan     |
+| real mule | cash_share    | 0.640 |                  nan     |
 
 share in the top BAF income band (0.9): fake 39%, real mules 20%, normal 20%
   -> inside an income band, 6 of 7 gaps fall below 0.05: before laundering starts,
@@ -282,10 +282,10 @@ candidate pairs with |Spearman| > 0.8 at week 12 (keep one of each for logistic 
 | peer_ratio_in       | income_fit_in       |     0.9971 |
 | money_in            | peer_ratio_in       |     0.9969 |
 | max_in              | peer_ratio_in       |     0.9964 |
-| money_in            | self_vs_past_in     |     0.9178 |
-| self_vs_past_in     | income_fit_in       |     0.9171 |
-| max_in              | self_vs_past_in     |     0.9169 |
-| self_vs_past_in     | peer_ratio_in       |     0.9152 |
+| money_in            | self_vs_past_in     |     0.9177 |
+| self_vs_past_in     | income_fit_in       |     0.9170 |
+| max_in              | self_vs_past_in     |     0.9168 |
+| self_vs_past_in     | peer_ratio_in       |     0.9151 |
 | n_payers            | self_vs_past_payers |     0.9072 |
 | money_in            | n_payers            |     0.8785 |
 | n_payers            | income_fit_in       |     0.8784 |
@@ -294,7 +294,7 @@ candidate pairs with |Spearman| > 0.8 at week 12 (keep one of each for logistic 
 | max_in              | n_payers            |     0.8722 |
 | money_in            | passthrough_wk      |    -0.8604 |
 | max_in              | passthrough_wk      |    -0.8573 |
-| n_payers            | self_vs_past_in     |     0.8532 |
+| n_payers            | self_vs_past_in     |     0.8531 |
 | passthrough_wk      | income_fit_in       |    -0.8502 |
 | n_rows              | n_payees            |     0.8386 |
 | passthrough_wk      | peer_ratio_in       |    -0.8385 |
@@ -335,7 +335,7 @@ the homophily test: r clearly below 2xy = launderers link to each other more tha
 | homophily test (x = share of accounts)                  |          0.002722 |                     0.005429 |                   0.004678 |    0.8617 | -5.191 |                1.045e-07 |                                1.913 |                                35 |
 | allowing for links per account (x = share of link ends) |          0.002475 |                     0.004937 |                   0.004678 |    0.9476 | -1.877 |                0.03029   |                                1.581 |                                35 |
 
-label-shuffle test (1,000 shuffles): mixed links 1,208 observed vs 1,402 on average (range 1,290-1,537), p = 0.0010; launderer-launderer links 35 vs 1.9 (range 0-8), p = 0.0010. p = 1/1001 = no shuffle reached the observed value.
+label-shuffle test (1,000 shuffles): mixed links 1,208 observed vs 1,401 on average (range 1,289-1,522), p = 0.0010; launderer-launderer links 35 vs 1.8 (range 0-6), p = 0.0010. p = 1/1001 = no shuffle reached the observed value.
 launderer-launderer links: 2 of 35 begin before both ends have started laundering, 2 before at least one end has.
 |   src_l |       edges |   accounts |   launderer_share_of_payees |
 |--------:|------------:|-----------:|----------------------------:|
@@ -409,4 +409,4 @@ abroad_share, hr_share and cash_share are rare events at week level; the store k
 Application columns: keep all 29 after Phase 2 cleaning; LightGBM ignores useless ones and L1 logistic
 regression drops them. Candidate pairs above |0.8| correlation: keep one for the logistic model.
 
-done in 7s
+done in 6s

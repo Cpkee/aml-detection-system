@@ -6,6 +6,20 @@ Assumptions and Use" doc.
 
 
 
+## 21 Oct 2026 — EDA: simpler code (no result changes)
+
+No data change. `notebooks/01_eda_train.ipynb` cleanups, re-run on v1_full and v1 (50k); every number in the reports
+is unchanged apart from known float-sum noise (~1e-6) and the two items below.
+- No global warning filters (they hid nothing: a run without them prints no warnings); the report path is two plain lines.
+- §2: the Welch t-test p-value (computed, never shown; Mann-Whitney already tests the numeric columns) is dropped;
+  information gain, which the plan lists, is now shown for the categorical columns.
+- §3: the closure table is one `GROUP BY` instead of correlated subqueries (same table).
+- §6: no redundant `lab_` query; `x` / `s` renamed `share_accounts` / `share_ends`; `two_xy()` takes its inputs instead
+  of reading globals. Names no longer reused across cells (`lab_`, `s`).
+- §6 shuffle test: the account list is sorted before shuffling, so it gives the same numbers every run (DuckDB returns
+  rows in no fixed order). v1_full: 163 launderer–launderer links vs 9.6 on average (the 21 Oct run said 9.3), mixed
+  links 5,663 vs 6,843; p = 0.001 as before.
+
 ## 21 Oct 2026 — EDA: claims tested directly (pre-start weeks, graph timing, shuffle test, missing flags)
 
 No data change. `notebooks/01_eda_train.ipynb`, re-run on v1_full and v1 (50k). v1_full numbers:
