@@ -7,6 +7,7 @@ import os
 
 import pandas as pd
 import pytest
+import yaml
 
 from amldata import HIDDEN
 from features import manifest, weekly
@@ -121,3 +122,27 @@ def test_manifest_refuses_stale_store(tmp_path):
         json.dump({"seed": 2, "set": []}, f)                       # the data run changed underneath
     with pytest.raises(ValueError):
         weekly.load(folder)
+
+
+def test_manifest_refuses_store_built_by_other_feature_code(tmp_path, monkeypatch):
+    folder = _write(tmp_path / "d", BASE)
+    weekly.build(folder, (0, 3), force=True)
+    manifest.check(folder, weekly.FEATURES, (0, 3))
+    monkeypatch.setattr(weekly, "code_sha256", lambda: "different feature code")
+    with pytest.raises(ValueError, match="feature code changed"):
+        weekly.load(folder)
+
+
+def test_high_risk_countries_match_the_simulator_config():
+    with open(os.path.join(os.path.dirname(__file__), "..", "configs", "sim.yaml")) as f:
+        cfg = yaml.safe_load(f)
+    assert list(weekly.HIGH_RISK) == cfg["countries"]["high_risk"]["value"]
+
+
+def test_load_filters_months_and_columns(tmp_path):
+    folder = _write(tmp_path / "d", BASE)
+    weekly.build(folder, (0, 3), force=True)
+    df = weekly.load(folder, weeks=(0, 2), months=(1,), columns=["money_in_wk"])
+    assert list(df.columns) == ["account_id", "weeks_since_open", "money_in_wk"]
+    assert set(df["account_id"]) == {"A3"} and list(df["weeks_since_open"]) == [0, 1, 2]
+    assert df.loc[df["weeks_since_open"] == 2, "money_in_wk"].item() == 999.0

@@ -1,8 +1,9 @@
 """Manifest for a feature store, so models and scoring never read features built from other code or data.
 
-<out>/features/features_manifest.json records the feature-code commit, the feature list, the cut-off rule,
-the weeks built and a hash of the data run's run_manifest.json. `check(out, features=...)` refuses a store whose
-code, data or feature list differ from what the caller expects, the same pattern as the simulator's run manifest.
+<out>/features/features_manifest.json records the feature-code commit, a fingerprint of the feature SQL, the
+feature list, the cut-off rule, the weeks built, a hash of the data run's run_manifest.json and of the frozen peer
+medians. `check(out, features=...)` refuses a store whose code, data or feature list differ from what the caller
+expects, the same pattern as the simulator's run manifest.
 """
 from __future__ import annotations
 import hashlib
@@ -74,6 +75,9 @@ def check(out: str, features: list[str] | None = None, weeks: tuple[int, int] | 
         problems.append(f"feature list differs: store has {m['features']}, caller expects {list(features)}")
     if weeks is not None and (weeks[0] < m["weeks"][0] or weeks[1] > m["weeks"][1]):
         problems.append(f"store covers weeks {m['weeks']}, caller needs {list(weeks)}")
+    from .weekly import code_sha256                 # imported here: weekly imports this module
+    if m.get("code_sha256") != code_sha256():
+        problems.append("the feature code changed since the store was built (or the store predates the code check)")
     if "peer_medians_sha256" in m and m["peer_medians_sha256"] != _sha256(
             os.path.join(out, "features", "peer_medians.parquet")):
         problems.append("the frozen peer medians changed since the store was built")
