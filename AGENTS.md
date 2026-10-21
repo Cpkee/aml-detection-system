@@ -142,11 +142,15 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
    spread over weeks 1–75; 361 of 455 start inside the 26-week horizon. Activity screen (open weeks only): cumulative rows and
    money in, rows and payers this week, median in->out delay and the 1 h / 24 h speed shares carry signal once a burst
    exists (AUC 0.70–0.86 vs started; speed 0.78 / 0.75 at week 8); weekly abroad / high-risk / cash shares carry none.
+   Before the start (weeks 0–7, tested 21 Oct) activity adds nothing beyond the application: fakes' money in is higher
+   (AUC 0.58) only through their higher BAF income (31% top band vs 20%); inside an income band 0.51.
    (Correction 18 Oct: the EDA's AUC helper ranked missing values highest, which hid the share features and led to a
    wrong "redefine the speed shares" proposal; `notebooks/03_feature_store.ipynb` and `eda_sim_v1.py` had the same helper.)
    Homophily (payment links inside the bank, both ends months 0–4): mixed launderer–normal links r = 0.450% vs 2xy = 0.545%
    (z −14; 0.95 of expected, z −4.0, allowing for links per account); 163 launderer–launderer links vs ~9 by chance; a
-   launderer's payees are launderers 5.4% of the time, 20x the base rate -> graph features worthwhile.
+   launderer's payees are launderers 5.4% of the time, 20x the base rate -> graph features worthwhile. Label-shuffle test
+   (1,000 shuffles) p = 0.001. Only 1 of the 163 links exists before both ends start laundering, so graph features find
+   network partners after a burst starts, not before (21 Oct 2026).
    **Closure footprint (decided 15 Oct 2026):** every open account has a weekly card row, so a zero-row week = closed by the
    bank = a confirmed launderer (116 of 455 training launderers stop early, 1 normal account). Post-closure account-weeks
    are dropped from training and the scoring pool via `labels(...)["open_by_day"]` (months 0–5). Do not use a zero-row week
