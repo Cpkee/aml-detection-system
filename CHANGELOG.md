@@ -6,6 +6,27 @@ Assumptions and Use" doc.
 
 
 
+## 21 Oct 2026 — EDA: claims tested directly (pre-start weeks, graph timing, shuffle test, missing flags)
+
+No data change. `notebooks/01_eda_train.ipynb`, re-run on v1_full and v1 (50k). v1_full numbers:
+- **Before laundering starts (§3).** The claim "activity carries nothing before a burst" is now tested: weeks 0–7
+  (no fake starts before week 8), each launderer's weeks before its start vs normal accounts, one mean per account so
+  the interval is honest. Counts, payers and speed match. Fakes' money features are higher (money in AUC 0.58) only
+  through BAF income: 31% of fakes are in the top income band vs 20% of normal accounts, normal money scales with income
+  (`src/sim/normal.py`), and inside an income band the AUC is 0.51. The weekly table now uses open weeks only and says
+  which columns are medians and which are means.
+- **Graph (§6).** Label-shuffle test (labels moved between accounts, each keeps its links, 1,000 shuffles): 163
+  launderer–launderer links vs 9.3 on average, p = 0.001; mixed links 5,663 vs 6,845, p = 0.001. Only 1 of the 163
+  links exists before both ends start laundering (4 before at least one): graph features can find network partners
+  once a burst starts, not give a head start.
+- **Missing flags (§2).** BAF's missing codes are scored as 0/1 flags: fakes `prev_address` 0.60, `intended_balcon`
+  0.58, `bank_months` 0.57; real mules `intended_balcon_amount_missing` 0.45.
+- **Text:** §1 `velocity_6h` note computed (0 negative rows in months 0–4), skew table without 0/1 columns, Phase 2
+  decisions quoted for log and correlated pairs; §5 says what fixed weeks hide and points to Phase 3's first-week view;
+  §8 hard-coded "~1.6% abroad" removed.
+- **Bootstrap intervals** now sort the placement values first, so they no longer depend on the order DuckDB returns
+  rows (run-to-run differences fall from ~0.01 to the known ~2e-6 float-sum noise). Point AUCs unchanged.
+
 ## 19 Oct 2026 — EDA tidy: closure filter, keep/drop rule with intervals, age allowed
 
 No data change. `notebooks/01_eda_train.ipynb`, re-run on v1_full and v1 (50k); `notebooks/03_feature_store.ipynb`

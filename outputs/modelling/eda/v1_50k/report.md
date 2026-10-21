@@ -10,16 +10,16 @@ accounts in months (0, 1, 2, 3, 4): 33,801; launderers 92 (0.272%); by type: {'f
 24 numeric and 5 categorical application columns; true NaN: 0
 
 BAF codes: share of rows with a negative value (BAF writes missing as -1 or a negative amount):
-|                              |   share_negative |       min | note                                                |
-|:-----------------------------|-----------------:|----------:|:----------------------------------------------------|
-| intended_balcon_amount       |           0.7284 |  -11.0921 | missing code -> NaN + flag                          |
-| prev_address_months_count    |           0.6947 |   -1.0000 | missing code -> NaN + flag                          |
-| bank_months_count            |           0.2563 |   -1.0000 | missing code -> NaN + flag                          |
-| credit_risk_score            |           0.0174 | -164.0000 | real values: the score runs negative; keep as is    |
-| current_address_months_count |           0.0042 |   -1.0000 | missing code -> NaN + flag                          |
-| session_length_in_minutes    |           0.0017 |   -1.0000 | missing code -> NaN + flag                          |
-| device_distinct_emails_8w    |           0.0003 |   -1.0000 | missing code -> NaN + flag                          |
-| velocity_6h                  |           0.0000 |  136.1220 | 9 rows of generator noise at full size -> clip at 0 |
+|                              |   share_negative |       min | note                                                  |
+|:-----------------------------|-----------------:|----------:|:------------------------------------------------------|
+| intended_balcon_amount       |           0.7284 |  -11.0921 | missing code -> NaN + flag                            |
+| prev_address_months_count    |           0.6947 |   -1.0000 | missing code -> NaN + flag                            |
+| bank_months_count            |           0.2563 |   -1.0000 | missing code -> NaN + flag                            |
+| credit_risk_score            |           0.0174 | -164.0000 | real values: the score runs negative; keep as is      |
+| current_address_months_count |           0.0042 |   -1.0000 | missing code -> NaN + flag                            |
+| session_length_in_minutes    |           0.0017 |   -1.0000 | missing code -> NaN + flag                            |
+| device_distinct_emails_8w    |           0.0003 |   -1.0000 | missing code -> NaN + flag                            |
+| velocity_6h                  |           0.0000 |  136.1220 | 0 negative rows here; Phase 2 clips at 0 (fixed rule) |
 
 categorical levels:
 |                   |   levels | values                                |
@@ -30,23 +30,24 @@ categorical levels:
 | source            |        2 | INTERNET, TELEAPP                     |
 | device_os         |        5 | linux, macintosh, other, windows, x11 |
 
-skew of numeric columns (|skew| > 2 -> log1p for logistic regression and the autoencoder):
-|                              |    skew |   distinct |
-|:-----------------------------|--------:|-----------:|
-| days_since_request           |  8.8728 | 33792.0000 |
-| foreign_request              |  5.8182 |     2.0000 |
-| prev_address_months_count    |  3.9902 |   326.0000 |
-| session_length_in_minutes    |  3.2229 | 33743.0000 |
-| bank_branch_count_8w         |  2.7123 |  1889.0000 |
-| intended_balcon_amount       |  2.4292 | 33800.0000 |
-| device_distinct_emails_8w    |  2.3752 |     4.0000 |
-| phone_mobile_valid           | -2.3743 |     2.0000 |
-| current_address_months_count |  1.4123 |   397.0000 |
-| zip_count_4w                 |  1.3635 |  4832.0000 |
-| has_other_cards              |  1.3493 |     2.0000 |
-| proposed_credit_limit        |  1.1695 |    12.0000 |
+skew of numeric columns with more than 2 values (Phase 2 logs a column for the linear models only where log1p
+brings its skew closer to 0):
+|                                  |   skew |   distinct |
+|:---------------------------------|-------:|-----------:|
+| days_since_request               | 8.8728 | 33792.0000 |
+| prev_address_months_count        | 3.9902 |   326.0000 |
+| session_length_in_minutes        | 3.2229 | 33743.0000 |
+| bank_branch_count_8w             | 2.7123 |  1889.0000 |
+| intended_balcon_amount           | 2.4292 | 33800.0000 |
+| device_distinct_emails_8w        | 2.3752 |     4.0000 |
+| current_address_months_count     | 1.4123 |   397.0000 |
+| zip_count_4w                     | 1.3635 |  4832.0000 |
+| proposed_credit_limit            | 1.1695 |    12.0000 |
+| date_of_birth_distinct_emails_4w | 0.5518 |    39.0000 |
+| customer_age                     | 0.4963 |     9.0000 |
+| bank_months_count                | 0.4745 |    30.0000 |
 
-application columns with |Spearman| > 0.5 (candidates to drop one of, for logistic regression):
+application columns with |Spearman| > 0.5 (Phase 2 proposes keeping both of each pair; regularisation handles them):
 | a                         | b                            |   spearman |
 |:--------------------------|:-----------------------------|-----------:|
 | prev_address_months_count | current_address_months_count |    -0.6637 |
@@ -60,40 +61,46 @@ application columns with |Spearman| > 0.5 (candidates to drop one of, for logist
 univariate AUC vs the label (0.5 = none) with a 95% interval, for all launderers, fake accounts and real-customer
 mules, with Mann-Whitney (numeric) or chi-square + Cramer's V (categorical). Categorical AUC uses the level's
 launderer rate as the score. Sorted by the largest of the three separations. A small p is support, not proof.
-| feature                          | kind        | auc_all             | auc_fake_vs_normal   | auc_real_vs_normal   |   mann_whitney_p |   chi2_p |   cramers_v |
-|:---------------------------------|:------------|:--------------------|:---------------------|:---------------------|-----------------:|---------:|------------:|
-| housing_status                   | categorical | 0.684 (0.624-0.739) | 0.745 (0.686-0.799)  | 0.463 (0.348-0.570)  |         nan      |   0.0000 |      0.0476 |
-| device_os                        | categorical | 0.672 (0.619-0.723) | 0.734 (0.680-0.777)  | 0.450 (0.331-0.570)  |         nan      |   0.0000 |      0.0356 |
-| customer_age                     | numeric     | 0.566 (0.505-0.629) | 0.635 (0.574-0.701)  | 0.316 (0.211-0.438)  |           0.0245 | nan      |    nan      |
-| credit_risk_score                | numeric     | 0.623 (0.558-0.686) | 0.674 (0.606-0.734)  | 0.443 (0.305-0.592)  |           0.0000 | nan      |    nan      |
-| keep_alive_session               | numeric     | 0.371 (0.327-0.420) | 0.343 (0.295-0.392)  | 0.468 (0.368-0.568)  |           0.0000 | nan      |    nan      |
-| current_address_months_count     | numeric     | 0.619 (0.572-0.667) | 0.642 (0.593-0.695)  | 0.536 (0.440-0.644)  |           0.0001 | nan      |    nan      |
-| date_of_birth_distinct_emails_4w | numeric     | 0.397 (0.336-0.457) | 0.363 (0.296-0.423)  | 0.518 (0.427-0.617)  |           0.0006 | nan      |    nan      |
-| income                           | numeric     | 0.590 (0.527-0.649) | 0.634 (0.574-0.697)  | 0.429 (0.305-0.561)  |           0.0026 | nan      |    nan      |
-| proposed_credit_limit            | numeric     | 0.604 (0.541-0.653) | 0.634 (0.569-0.702)  | 0.494 (0.395-0.606)  |           0.0001 | nan      |    nan      |
-| name_email_similarity            | numeric     | 0.396 (0.344-0.451) | 0.374 (0.307-0.442)  | 0.474 (0.355-0.583)  |           0.0006 | nan      |    nan      |
-| prev_address_months_count        | numeric     | 0.411 (0.377-0.445) | 0.401 (0.369-0.437)  | 0.446 (0.369-0.539)  |           0.0003 | nan      |    nan      |
-| employment_status                | categorical | 0.554 (0.511-0.601) | 0.590 (0.548-0.633)  | 0.424 (0.330-0.518)  |         nan      |   0.3080 |      0.0145 |
-| payment_type                     | categorical | 0.572 (0.521-0.626) | 0.576 (0.516-0.636)  | 0.556 (0.434-0.682)  |         nan      |   0.1583 |      0.0140 |
-| phone_home_valid                 | numeric     | 0.447 (0.404-0.496) | 0.438 (0.389-0.493)  | 0.481 (0.381-0.581)  |           0.0373 | nan      |    nan      |
-| has_other_cards                  | numeric     | 0.444 (0.411-0.477) | 0.445 (0.410-0.480)  | 0.440 (0.390-0.515)  |           0.0097 | nan      |    nan      |
-| bank_branch_count_8w             | numeric     | 0.449 (0.389-0.513) | 0.440 (0.370-0.514)  | 0.482 (0.350-0.606)  |           0.0896 | nan      |    nan      |
-| velocity_6h                      | numeric     | 0.497 (0.438-0.559) | 0.482 (0.419-0.549)  | 0.554 (0.420-0.673)  |           0.9334 | nan      |    nan      |
-| velocity_24h                     | numeric     | 0.503 (0.452-0.557) | 0.491 (0.432-0.554)  | 0.546 (0.416-0.656)  |           0.9188 | nan      |    nan      |
-| phone_mobile_valid               | numeric     | 0.477 (0.434-0.515) | 0.482 (0.441-0.524)  | 0.459 (0.359-0.534)  |           0.1754 | nan      |    nan      |
-| email_is_free                    | numeric     | 0.536 (0.487-0.585) | 0.539 (0.476-0.594)  | 0.526 (0.426-0.626)  |           0.1667 | nan      |    nan      |
-| device_distinct_emails_8w        | numeric     | 0.522 (0.484-0.559) | 0.517 (0.469-0.565)  | 0.538 (0.489-0.613)  |           0.0296 | nan      |    nan      |
-| zip_count_4w                     | numeric     | 0.523 (0.465-0.582) | 0.536 (0.465-0.603)  | 0.476 (0.361-0.587)  |           0.4500 | nan      |    nan      |
-| days_since_request               | numeric     | 0.490 (0.426-0.554) | 0.496 (0.428-0.567)  | 0.466 (0.295-0.625)  |           0.7326 | nan      |    nan      |
-| intended_balcon_amount           | numeric     | 0.484 (0.434-0.535) | 0.482 (0.431-0.538)  | 0.491 (0.384-0.593)  |           0.5878 | nan      |    nan      |
-| velocity_4w                      | numeric     | 0.488 (0.436-0.539) | 0.486 (0.427-0.548)  | 0.494 (0.391-0.602)  |           0.6834 | nan      |    nan      |
-| session_length_in_minutes        | numeric     | 0.488 (0.433-0.544) | 0.486 (0.424-0.547)  | 0.492 (0.371-0.617)  |           0.6800 | nan      |    nan      |
-| foreign_request                  | numeric     | 0.503 (0.486-0.524) | 0.507 (0.486-0.535)  | 0.486 (nan-nan)      |           0.7475 | nan      |    nan      |
-| bank_months_count                | numeric     | 0.505 (0.433-0.572) | 0.510 (0.431-0.584)  | 0.488 (0.342-0.635)  |           0.8692 | nan      |    nan      |
-| source                           | categorical | 0.507 (0.496-0.524) | 0.510 (0.496-0.531)  | 0.496 (nan-nan)      |         nan      |   0.3103 |      0.0055 |
+| feature                              | kind         | auc_all             | auc_fake_vs_normal   | auc_real_vs_normal   |   mann_whitney_p |   chi2_p |   cramers_v |
+|:-------------------------------------|:-------------|:--------------------|:---------------------|:---------------------|-----------------:|---------:|------------:|
+| housing_status                       | categorical  | 0.684 (0.631-0.741) | 0.745 (0.689-0.805)  | 0.463 (0.347-0.576)  |         nan      |   0.0000 |      0.0476 |
+| device_os                            | categorical  | 0.672 (0.624-0.721) | 0.734 (0.685-0.785)  | 0.450 (0.340-0.560)  |         nan      |   0.0000 |      0.0356 |
+| customer_age                         | numeric      | 0.566 (0.505-0.623) | 0.635 (0.569-0.703)  | 0.316 (0.210-0.425)  |           0.0245 | nan      |    nan      |
+| credit_risk_score                    | numeric      | 0.623 (0.561-0.685) | 0.674 (0.606-0.745)  | 0.443 (0.306-0.580)  |           0.0000 | nan      |    nan      |
+| keep_alive_session                   | numeric      | 0.371 (0.322-0.420) | 0.343 (0.295-0.392)  | 0.468 (0.368-0.568)  |           0.0000 | nan      |    nan      |
+| current_address_months_count         | numeric      | 0.619 (0.572-0.666) | 0.642 (0.590-0.692)  | 0.536 (0.432-0.638)  |           0.0001 | nan      |    nan      |
+| date_of_birth_distinct_emails_4w     | numeric      | 0.397 (0.340-0.453) | 0.363 (0.294-0.432)  | 0.518 (0.421-0.611)  |           0.0006 | nan      |    nan      |
+| income                               | numeric      | 0.590 (0.534-0.646) | 0.634 (0.572-0.703)  | 0.429 (0.310-0.554)  |           0.0026 | nan      |    nan      |
+| proposed_credit_limit                | numeric      | 0.604 (0.548-0.656) | 0.634 (0.568-0.702)  | 0.494 (0.394-0.591)  |           0.0001 | nan      |    nan      |
+| name_email_similarity                | numeric      | 0.396 (0.340-0.451) | 0.374 (0.308-0.440)  | 0.474 (0.354-0.585)  |           0.0006 | nan      |    nan      |
+| prev_address_months_count            | numeric      | 0.411 (0.376-0.446) | 0.401 (0.367-0.440)  | 0.446 (0.369-0.537)  |           0.0003 | nan      |    nan      |
+| prev_address_months_count_missing    | missing flag | 0.588 (0.550-0.620) | 0.597 (0.563-0.632)  | 0.553 (0.453-0.628)  |           0.0003 | nan      |    nan      |
+| employment_status                    | categorical  | 0.554 (0.510-0.594) | 0.590 (0.544-0.635)  | 0.424 (0.330-0.518)  |         nan      |   0.3080 |      0.0145 |
+| payment_type                         | categorical  | 0.572 (0.518-0.624) | 0.576 (0.512-0.635)  | 0.556 (0.440-0.673)  |         nan      |   0.1583 |      0.0140 |
+| intended_balcon_amount_missing       | missing flag | 0.571 (0.533-0.603) | 0.574 (0.539-0.608)  | 0.561 (0.461-0.636)  |           0.0023 | nan      |    nan      |
+| bank_months_count_missing            | missing flag | 0.551 (0.502-0.600) | 0.546 (0.490-0.601)  | 0.572 (0.472-0.672)  |           0.0243 | nan      |    nan      |
+| phone_home_valid                     | numeric      | 0.447 (0.398-0.496) | 0.438 (0.389-0.493)  | 0.481 (0.381-0.581)  |           0.0373 | nan      |    nan      |
+| has_other_cards                      | numeric      | 0.444 (0.411-0.477) | 0.445 (0.410-0.487)  | 0.440 (0.390-0.515)  |           0.0097 | nan      |    nan      |
+| bank_branch_count_8w                 | numeric      | 0.449 (0.387-0.508) | 0.440 (0.365-0.515)  | 0.482 (0.363-0.601)  |           0.0896 | nan      |    nan      |
+| velocity_6h                          | numeric      | 0.497 (0.441-0.555) | 0.482 (0.417-0.545)  | 0.554 (0.419-0.675)  |           0.9334 | nan      |    nan      |
+| velocity_24h                         | numeric      | 0.503 (0.451-0.555) | 0.491 (0.432-0.550)  | 0.546 (0.427-0.656)  |           0.9188 | nan      |    nan      |
+| phone_mobile_valid                   | numeric      | 0.477 (0.439-0.510) | 0.482 (0.441-0.517)  | 0.459 (0.359-0.534)  |           0.1754 | nan      |    nan      |
+| email_is_free                        | numeric      | 0.536 (0.487-0.585) | 0.539 (0.490-0.594)  | 0.526 (0.426-0.626)  |           0.1667 | nan      |    nan      |
+| device_distinct_emails_8w            | numeric      | 0.522 (0.484-0.559) | 0.517 (0.469-0.565)  | 0.538 (0.489-0.613)  |           0.0296 | nan      |    nan      |
+| zip_count_4w                         | numeric      | 0.523 (0.464-0.578) | 0.536 (0.468-0.605)  | 0.476 (0.360-0.587)  |           0.4500 | nan      |    nan      |
+| days_since_request                   | numeric      | 0.490 (0.427-0.551) | 0.496 (0.425-0.565)  | 0.466 (0.313-0.618)  |           0.7326 | nan      |    nan      |
+| intended_balcon_amount               | numeric      | 0.484 (0.435-0.532) | 0.482 (0.424-0.535)  | 0.491 (0.384-0.589)  |           0.5878 | nan      |    nan      |
+| velocity_4w                          | numeric      | 0.488 (0.435-0.539) | 0.486 (0.423-0.548)  | 0.494 (0.387-0.594)  |           0.6834 | nan      |    nan      |
+| session_length_in_minutes            | numeric      | 0.488 (0.432-0.541) | 0.486 (0.421-0.550)  | 0.492 (0.367-0.608)  |           0.6800 | nan      |    nan      |
+| foreign_request                      | numeric      | 0.503 (0.486-0.524) | 0.507 (0.486-0.535)  | 0.486 (nan-nan)      |           0.7475 | nan      |    nan      |
+| bank_months_count                    | numeric      | 0.505 (0.439-0.569) | 0.510 (0.430-0.589)  | 0.488 (0.351-0.624)  |           0.8692 | nan      |    nan      |
+| source                               | categorical  | 0.507 (0.496-0.524) | 0.510 (0.496-0.531)  | 0.496 (nan-nan)      |         nan      |   0.3103 |      0.0055 |
+| current_address_months_count_missing | missing flag | 0.498 (nan-nan)     | 0.498 (nan-nan)      | 0.498 (nan-nan)      |           0.5313 | nan      |    nan      |
+| session_length_in_minutes_missing    | missing flag | 0.499 (nan-nan)     | 0.499 (nan-nan)      | 0.499 (nan-nan)      |           0.6957 | nan      |    nan      |
+| device_distinct_emails_8w_missing    | missing flag | 0.500 (nan-nan)     | 0.500 (nan-nan)      | 0.500 (nan-nan)      |           0.8626 | nan      |    nan      |
 
-11 of 29 columns significant at p < 0.01 against all launderers.
-columns whose 95% interval excludes 0.5, by separation: fake accounts 15: ['housing_status', 'device_os', 'customer_age', 'credit_risk_score', 'keep_alive_session', 'current_address_months_count', 'date_of_birth_distinct_emails_4w', 'income', 'proposed_credit_limit', 'name_email_similarity', 'prev_address_months_count', 'employment_status', 'payment_type', 'phone_home_valid', 'has_other_cards']
+11 of 29 BAF columns significant at p < 0.01 against all launderers (6 missing flags not counted).
+columns whose 95% interval excludes 0.5, by separation: fake accounts 17: ['housing_status', 'device_os', 'customer_age', 'credit_risk_score', 'keep_alive_session', 'current_address_months_count', 'date_of_birth_distinct_emails_4w', 'income', 'proposed_credit_limit', 'name_email_similarity', 'prev_address_months_count', 'prev_address_months_count_missing', 'employment_status', 'payment_type', 'intended_balcon_amount_missing', 'phone_home_valid', 'has_other_cards']
 real-customer mules 1: ['customer_age']
   -> the two types separate on different columns, sometimes in opposite directions: customer_age has AUC 0.64 for fakes and 0.32 for real mules, 0.57 for all.
      Real mules' age signal comes from the simulator setting profiles.real_mule_age_weights (Cifas mule ages): an
@@ -103,36 +110,6 @@ real-customer mules 1: ['customer_age']
 3. A WEEK OF ACTIVITY, BY WEEK SINCE OPENING (weeks 0-26) + LABEL MATURITY
 ==============================================================================
 account-week panel for months (0, 1, 2, 3, 4), weeks 0-26: 912,627 rows in 2s
-medians per account-week, launderers (1) vs normal (0), weeks 0, 1, 4, 8, 12, 26:
-|         |        n |   rows_med |   in_med |   out_med |   payers_avg |   payees_med |   cash_avg |   internal_avg |   abroad_avg |   new_payer_avg |   out_24h_avg |
-|:--------|---------:|-----------:|---------:|----------:|-------------:|-------------:|-----------:|---------------:|-------------:|----------------:|--------------:|
-| (0, 0)  | 33709.00 |       6.00 |    34.04 |    665.96 |         0.63 |         3.00 |       0.08 |           0.01 |         0.00 |            1.00 |          0.57 |
-| (0, 1)  |    92.00 |       5.00 |    67.87 |    694.62 |         0.64 |         3.00 |       0.08 |           0.00 |         0.01 |            1.00 |          0.64 |
-| (1, 0)  | 33709.00 |       6.00 |    34.20 |    662.90 |         0.63 |         3.00 |       0.08 |           0.01 |         0.00 |            0.78 |          0.59 |
-| (1, 1)  |    92.00 |       5.00 |     0.00 |    672.26 |         0.54 |         3.00 |       0.08 |           0.01 |         0.00 |            0.82 |          0.60 |
-| (4, 0)  | 33709.00 |       5.00 |    40.30 |    622.68 |         0.65 |         3.00 |       0.09 |           0.01 |         0.00 |            0.53 |          0.58 |
-| (4, 1)  |    92.00 |       5.00 |    16.69 |    717.95 |         0.61 |         3.00 |       0.11 |           0.02 |         0.00 |            0.47 |          0.40 |
-| (8, 0)  | 33709.00 |       5.00 |    49.60 |    623.44 |         0.67 |         3.00 |       0.09 |           0.02 |         0.00 |            0.45 |          0.56 |
-| (8, 1)  |    92.00 |       5.00 |     6.96 |    755.77 |         0.72 |         3.00 |       0.10 |           0.03 |         0.01 |            0.55 |          0.48 |
-| (12, 0) | 33709.00 |       5.00 |    57.01 |    607.78 |         0.68 |         3.00 |       0.09 |           0.02 |         0.00 |            0.46 |          0.58 |
-| (12, 1) |    92.00 |       5.00 |   163.79 |    702.62 |         1.32 |         2.00 |       0.07 |           0.04 |         0.00 |            0.68 |          0.54 |
-| (26, 0) | 33709.00 |       6.00 |    74.89 |    659.46 |         0.73 |         3.00 |       0.08 |           0.03 |         0.00 |            0.49 |          0.61 |
-| (26, 1) |    92.00 |       5.00 |     0.00 |    586.38 |         0.62 |         3.00 |       0.06 |           0.03 |         0.01 |            0.46 |          0.33 |
-
-  -> before any laundering starts, launderers' weeks should look like everyone else's: the simulator gives
-     every profile the same normal life. Differences in early weeks come from the application side only.
-
-activity that stops (weeks 0-77): accounts whose last active week is before week 77, and zero-activity weeks
-|   is_launderer |   accounts |   stopped_before_week_77 |   zero_activity_weeks |   account_weeks |
-|---------------:|-----------:|-------------------------:|----------------------:|----------------:|
-|              0 |      33709 |                        0 |                    15 |         2629302 |
-|              1 |         92 |                       23 |                  1123 |            7176 |
-
-  -> 23 of 92 launderers stop early, against 0 normal account(s). Only the bank's rules close accounts, only after a
-     confirmed (true) alert, so weeks after a closure are a label giveaway a live model never sees (the harness
-     counts closed accounts as caught). A zero-row week is not a clean closure test: normal accounts have 15 too.
-     labels() returns open_by_day (decision 10 Oct 2026: 0 once the bank has closed the account; a bank knows its
-     closures). The screen below and Phase 3/4 drop account-weeks with open_by_day = 0.
 
 label maturity on training accounts (1s): launderers labelled under each label, by week
 |   week |   mule_by_day |   started_by_day |   is_launderer |
@@ -148,6 +125,80 @@ label maturity on training accounts (1s): launderers labelled under each label, 
 |     52 |            82 |               82 |             92 |
 |     78 |            92 |               92 |             92 |
 
+
+per open account-week, launderers (1) vs normal (0): medians (_med) and means (_avg), weeks 0, 1, 4, 8, 12, 26.
+Launderers mix accounts before and after their start, so this table describes; the test below answers.
+|         |        n |   rows_med |   in_med |   out_med |   payers_avg |   payees_med |   cash_avg |   internal_avg |   abroad_avg |   new_payer_avg |   out_24h_avg |
+|:--------|---------:|-----------:|---------:|----------:|-------------:|-------------:|-----------:|---------------:|-------------:|----------------:|--------------:|
+| (0, 0)  | 33709.00 |       6.00 |    34.04 |    665.96 |         0.63 |         3.00 |       0.08 |           0.01 |         0.00 |            1.00 |          0.57 |
+| (0, 1)  |    92.00 |       5.00 |    67.87 |    694.62 |         0.64 |         3.00 |       0.08 |           0.00 |         0.01 |            1.00 |          0.64 |
+| (1, 0)  | 33709.00 |       6.00 |    34.20 |    662.90 |         0.63 |         3.00 |       0.08 |           0.01 |         0.00 |            0.78 |          0.59 |
+| (1, 1)  |    92.00 |       5.00 |     0.00 |    672.26 |         0.54 |         3.00 |       0.08 |           0.01 |         0.00 |            0.82 |          0.60 |
+| (4, 0)  | 33709.00 |       5.00 |    40.30 |    622.68 |         0.65 |         3.00 |       0.09 |           0.01 |         0.00 |            0.53 |          0.58 |
+| (4, 1)  |    92.00 |       5.00 |    16.69 |    717.95 |         0.61 |         3.00 |       0.11 |           0.02 |         0.00 |            0.47 |          0.40 |
+| (8, 0)  | 33709.00 |       5.00 |    49.60 |    623.44 |         0.67 |         3.00 |       0.09 |           0.02 |         0.00 |            0.45 |          0.56 |
+| (8, 1)  |    92.00 |       5.00 |     6.96 |    755.77 |         0.72 |         3.00 |       0.10 |           0.03 |         0.01 |            0.55 |          0.48 |
+| (12, 0) | 33709.00 |       5.00 |    57.01 |    607.78 |         0.68 |         3.00 |       0.09 |           0.02 |         0.00 |            0.46 |          0.58 |
+| (12, 1) |    89.00 |       5.00 |   164.33 |    725.80 |         1.35 |         2.00 |       0.07 |           0.04 |         0.00 |            0.68 |          0.55 |
+| (26, 0) | 33709.00 |       6.00 |    74.89 |    659.46 |         0.73 |         3.00 |       0.08 |           0.03 |         0.00 |            0.49 |          0.61 |
+| (26, 1) |    75.00 |       6.00 |    76.37 |    737.93 |         0.76 |         3.00 |       0.06 |           0.03 |         0.01 |            0.46 |          0.33 |
+
+
+before laundering starts: weeks 0-7, launderers before their start week vs normal accounts, one mean per account (fake 72, real mules 20, normal 33,709)
+| feature             | fake                | real mule           |
+|:--------------------|:--------------------|:--------------------|
+| n_rows              | 0.521 (0.453-0.591) | 0.498 (0.373-0.621) |
+| money_in            | 0.618 (0.552-0.687) | 0.459 (0.332-0.581) |
+| money_out           | 0.607 (0.540-0.677) | 0.475 (0.345-0.601) |
+| max_in              | 0.616 (0.549-0.685) | 0.457 (0.324-0.579) |
+| n_payers            | 0.475 (0.405-0.545) | 0.566 (0.445-0.672) |
+| n_payees            | 0.505 (0.433-0.574) | 0.426 (0.302-0.546) |
+| new_payer_share     | 0.482 (0.418-0.546) | 0.606 (0.494-0.706) |
+| passthrough_wk      | 0.469 (0.401-0.535) | 0.558 (0.431-0.674) |
+| out_1h_share        | 0.531 (0.484-0.580) | 0.484 (0.412-0.560) |
+| out_24h_share       | 0.485 (0.414-0.554) | 0.554 (0.434-0.664) |
+| med_delay_min       | 0.518 (0.447-0.588) | 0.473 (0.335-0.609) |
+| cash_share          | 0.549 (0.485-0.611) | 0.641 (0.523-0.745) |
+| internal_share      | 0.505 (0.442-0.564) | 0.505 (0.400-0.610) |
+| abroad_share        | 0.506 (0.485-0.534) | 0.478 (nan-nan)     |
+| hr_share            | 0.502 (0.495-0.516) | 0.495 (nan-nan)     |
+| night_share         | 0.496 (0.427-0.565) | 0.579 (0.444-0.700) |
+| money_in_cum        | 0.616 (0.547-0.685) | 0.440 (0.308-0.567) |
+| n_rows_cum          | 0.497 (0.429-0.566) | 0.482 (0.358-0.600) |
+| self_vs_past_in     | 0.491 (0.425-0.557) | 0.556 (0.437-0.670) |
+| self_vs_past_payers | 0.493 (0.430-0.555) | 0.507 (0.399-0.614) |
+| peer_ratio_in       | 0.605 (0.538-0.672) | 0.484 (0.345-0.617) |
+| income_fit_in       | 0.609 (0.544-0.677) | 0.476 (0.334-0.611) |
+
+  -> features with |AUC - 0.5| >= 0.05 and an interval excluding 0.5 before the start: fake 6 of 22 ['money_in', 'money_out', 'max_in', 'money_in_cum', 'peer_ratio_in', 'income_fit_in'], real mules 1 of 22 ['cash_share'].
+the same AUCs inside each BAF income band (normal banking scales with BAF income only, src/sim/normal.py):
+| group     | feature       |   auc |   auc within income band |
+|:----------|:--------------|------:|-------------------------:|
+| fake      | money_in      | 0.618 |                    0.509 |
+| fake      | money_out     | 0.607 |                    0.526 |
+| fake      | max_in        | 0.616 |                    0.512 |
+| fake      | money_in_cum  | 0.616 |                    0.507 |
+| fake      | peer_ratio_in | 0.605 |                    0.525 |
+| fake      | income_fit_in | 0.609 |                    0.520 |
+| real mule | cash_share    | 0.641 |                  nan     |
+
+share in the top BAF income band (0.9): fake 39%, real mules 20%, normal 20%
+  -> inside an income band, 6 of 7 gaps fall below 0.05: before laundering starts,
+     activity differs through the application's income, which the application already shows. Weeks before an
+     account's start can only be won on application data.
+     Not explained by income (or too few launderers per band to check): ['cash_share']. With 44 looks, about 2 pass by chance at 95%.
+
+activity that stops (weeks 0-77): accounts whose last active week is before week 77, and zero-activity weeks
+|   is_launderer |   accounts |   stopped_before_week_77 |   zero_activity_weeks |   account_weeks |
+|---------------:|-----------:|-------------------------:|----------------------:|----------------:|
+|              0 |      33709 |                        0 |                    15 |         2629302 |
+|              1 |         92 |                       23 |                  1123 |            7176 |
+
+  -> 23 of 92 launderers stop early, against 0 normal account(s). Only the bank's rules close accounts, only after a
+     confirmed (true) alert, so weeks after a closure are a label giveaway a live model never sees (the harness
+     counts closed accounts as caught). A zero-row week is not a clean closure test: normal accounts have 15 too.
+     labels() returns open_by_day (decision 10 Oct 2026: 0 once the bank has closed the account; a bank knows its
+     closures). The screen below and Phase 3/4 drop account-weeks with open_by_day = 0.
 
 ==============================================================================
 4. WHEN LAUNDERING STARTS ON THE WEEKLY CLOCK (training launderers)
@@ -284,6 +335,8 @@ the homophily test: r clearly below 2xy = launderers link to each other more tha
 | homophily test (x = share of accounts)                  |          0.002722 |                     0.005429 |                   0.004678 |    0.8617 | -5.191 |                1.045e-07 |                                1.913 |                                35 |
 | allowing for links per account (x = share of link ends) |          0.002475 |                     0.004937 |                   0.004678 |    0.9476 | -1.877 |                0.03029   |                                1.581 |                                35 |
 
+label-shuffle test (1,000 shuffles): mixed links 1,208 observed vs 1,402 on average (range 1,290-1,537), p = 0.0010; launderer-launderer links 35 vs 1.9 (range 0-8), p = 0.0010. p = 1/1001 = no shuffle reached the observed value.
+launderer-launderer links: 2 of 35 begin before both ends have started laundering, 2 before at least one end has.
 |   src_l |       edges |   accounts |   launderer_share_of_payees |
 |--------:|------------:|-----------:|----------------------------:|
 |       0 | 257618.0000 | 33697.0000 |                      0.0023 |
@@ -293,8 +346,11 @@ lift: base launderer rate in months 0-4: 0.2722%. A launderer's internal payees 
   -> homophily test: r = 0.468% vs 2xy = 0.543% (r / 2xy 0.86, z -5.2); allowing for links per account r / expected 0.95, z -1.9.
      r / 2xy looks modest only because launderers are 0.3% of accounts: nearly all their links are mixed links
      either way. The same fact, easier to read: 35 launderer-launderer links vs 2 expected by chance (18x; 22x allowing for links per account), and the 20x lift above.
-     So the chains and the big network leave a trace in the public transactions, and graph features (Phase 6)
-     have something to find. Only links with both ends in months 0-4 are counted, so no test-month account enters.
+     The shuffle test confirms it without assuming independent links (p = 0.0010). So the chains and the big
+     network leave a trace in the public transactions, and graph features (Phase 6) have something to find.
+     But the links are made by the laundering itself (2 of 35 exist before both ends start): graph
+     features can help find the rest of a network once one member is active or closed, not give a head start
+     before the first burst. Only links with both ends in months 0-4 are counted, so no test-month account enters.
 
 ==============================================================================
 7. BENFORD'S LAW ON ALL AMOUNTS (realism check for comment 1; not a feature)
@@ -349,9 +405,8 @@ Speed features separate started launderers: best |AUC - 0.5| vs started_by_day 0
 They are NaN in weeks with no money in (set in only 53% of screened account-weeks), and the AUC ranks NaN lowest. Correction 18 Oct 2026: the first version of
 this notebook ranked NaN highest by mistake, which made the speed shares look swamped by everyday outflows and led to
 a proposal to redefine them; the store keeps this definition (decision 15 Oct 2026).
-abroad_share, hr_share and cash_share are rare events at week level (launderers send ~1.6% of transfers abroad);
-keep them cumulative rather than weekly if kept at all.
+abroad_share, hr_share and cash_share are rare events at week level; the store keeps them cumulative (Phase 3).
 Application columns: keep all 29 after Phase 2 cleaning; LightGBM ignores useless ones and L1 logistic
 regression drops them. Candidate pairs above |0.8| correlation: keep one for the logistic model.
 
-done in 5s
+done in 7s
