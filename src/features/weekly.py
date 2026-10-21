@@ -11,13 +11,15 @@ gate's AUCs can be reproduced from the store:
   volume          rows, payments in / out, money in / out, largest payment in / out, card items (this week);
                   rows, money in, money out (cumulative)
   counterparties  distinct payers (not cash) and payees (not cash, not card), first-time payer share (this week);
-                  distinct payers and payees to date (cumulative)
+                  distinct payers and payees to date (cumulative). "New" means two things here, both kept from
+                  the EDA: new_payer_share_wk counts a payer as new at the first contact in either direction,
+                  n_payers_cum counts a counterparty at the first time it pays in.
   pass-through    share of this week's money in that leaves this week: min(out, in) / in
   speed           out_1h / out_24h_share_wk: money paid out (any kind) within 1 h / 24 h of the latest payment in
                   (any kind), over this week's money in (can exceed 1); med_in_out_minutes_wk: median minutes from
                   the latest payment in to each payment out. All three are the EDA's definitions. A transfers-only,
                   capped redefinition was tried and dropped (15 Oct 2026): it cannot see laundering through cash
-                  (1 h AUC 0.792 vs 0.958 for cash patterns); see outputs/modelling/features/report.md
+                  (1 h AUC 0.772 vs 0.951 for cash patterns); see outputs/modelling/features/report.md
   self vs past    (this week - median of earlier weeks) / MAD of earlier weeks, for money in, payers and rows;
                   NaN until 4 earlier weeks exist or when the MAD is 0
   peers           this week's money in / median money in of accounts with the same income and age band at the
@@ -29,11 +31,11 @@ gate's AUCs can be reproduced from the store:
 Dropped at the gate: night share (same hour weights for everyone), weekly cash / abroad / high-risk shares.
 """
 from __future__ import annotations
+import hashlib
 import os
 import shutil
 
 import amldata
-from amldata.loaders import _connect
 from . import manifest
 
 KEYS = ["account_id", "weeks_since_open"]
@@ -52,6 +54,11 @@ PEER_MONTHS = (0, 1, 2, 3, 4)                         # peer medians come from t
 HIGH_RISK = ("Mexico", "Turkey", "Morocco", "UAE")   # configs/sim.yaml countries.high_risk (SAML-D)
 SELF_MIN_WEEKS = 4
 PEERS = "peer_medians.parquet"
+# weekly totals that are 0 in a week with no rows (the median delay stays NULL: there is no delay to measure)
+ZERO_FILL = ["n_rows_wk", "n_in_wk", "n_out_wk", "money_in_wk", "money_out_wk", "max_in_wk", "max_out_wk",
+             "card_items_wk", "n_payers_wk", "n_payees_wk", "n_new_payers_wk", "first_seen_payers",
+             "first_seen_payees", "cash_in_wk", "internal_out_wk", "abroad_out_wk", "high_risk_out_wk",
+             "out_1h", "out_24h"]
 
 
 def parse_weeks(text: str) -> tuple[int, int]:
@@ -123,17 +130,7 @@ def base_sql(w_hi: int, month: int) -> str:
         FROM t GROUP BY 1, 2),
     grid AS (SELECT account_id, open_month, income, customer_age, unnest(range(0, {w_hi + 1})) AS w FROM acc)
     SELECT g.account_id, g.open_month, g.income, g.customer_age, g.w,
-           coalesce(n_rows_wk, 0) AS n_rows_wk, coalesce(n_in_wk, 0) AS n_in_wk, coalesce(n_out_wk, 0) AS n_out_wk,
-           coalesce(money_in_wk, 0) AS money_in_wk, coalesce(money_out_wk, 0) AS money_out_wk,
-           coalesce(max_in_wk, 0) AS max_in_wk, coalesce(max_out_wk, 0) AS max_out_wk,
-           coalesce(card_items_wk, 0) AS card_items_wk,
-           coalesce(n_payers_wk, 0) AS n_payers_wk, coalesce(n_payees_wk, 0) AS n_payees_wk,
-           coalesce(n_new_payers_wk, 0) AS n_new_payers_wk,
-           coalesce(first_seen_payers, 0) AS first_seen_payers, coalesce(first_seen_payees, 0) AS first_seen_payees,
-           coalesce(cash_in_wk, 0) AS cash_in_wk,
-           coalesce(internal_out_wk, 0) AS internal_out_wk, coalesce(abroad_out_wk, 0) AS abroad_out_wk,
-           coalesce(high_risk_out_wk, 0) AS high_risk_out_wk,
-           coalesce(out_1h, 0) AS out_1h, coalesce(out_24h, 0) AS out_24h, med_in_out_minutes_wk
+           {", ".join(f"coalesce({c}, 0) AS {c}" for c in ZERO_FILL)}, med_in_out_minutes_wk
     FROM grid g LEFT JOIN wk USING (account_id, w) LEFT JOIN speed USING (account_id, w)"""
 
 
@@ -184,6 +181,14 @@ def final_sql(parts: str, peers: str, w_lo: int, w_hi: int) -> str:
     ORDER BY account_id, weeks_since_open"""
 
 
+def code_sha256() -> str:
+    """Fingerprint of the feature SQL, stored in the manifest: a store built by different feature code is refused.
+    Built with fixed placeholder inputs, so it changes with the SQL (and the constants inside it), not with comments
+    in this file or with the weeks asked for."""
+    sql = base_sql(0, 0) + peer_sql("PARTS") + final_sql("PARTS", "PEERS", 0, 0)
+    return hashlib.sha256(sql.encode()).hexdigest()
+
+
 def build(out: str = amldata.DEFAULT_OUT, weeks: tuple[int, int] = (0, 78), force: bool = False):
     """Write <out>/features/weekly.parquet (+ peer medians and manifest). Returns (path, rows).
 
@@ -195,7 +200,7 @@ def build(out: str = amldata.DEFAULT_OUT, weeks: tuple[int, int] = (0, 78), forc
     if os.path.exists(path) and not force:
         try:
             manifest.check(out, FEATURES, weeks)
-            n = _connect().execute(f"SELECT count(*) FROM read_parquet('{path}')").fetchone()[0]
+            n = amldata.public(out).execute(f"SELECT count(*) FROM read_parquet('{path}')").fetchone()[0]
             return path, n
         except (ValueError, FileNotFoundError):
             pass
@@ -219,13 +224,23 @@ def build(out: str = amldata.DEFAULT_OUT, weeks: tuple[int, int] = (0, 78), forc
     con.close()
     shutil.rmtree(work, ignore_errors=True)
     manifest.write(out, FEATURES, weeks, {"rows": int(n), "peer_months": list(PEER_MONTHS),
-                                         "peer_medians_sha256": manifest._sha256(peers)})
+                                         "peer_medians_sha256": manifest._sha256(peers), "code_sha256": code_sha256()})
     return path, n
 
 
-def load(out: str = amldata.DEFAULT_OUT, weeks: tuple[int, int] | None = None):
-    """DataFrame of the store, after checking its manifest against the data run and FEATURES."""
+def load(out: str = amldata.DEFAULT_OUT, weeks: tuple[int, int] | None = None,
+         months: tuple[int, ...] | None = None, columns: list[str] | None = None):
+    """DataFrame of the store, after checking its manifest against the data run, the feature code and FEATURES.
+
+    weeks: weeks since opening to keep (inclusive); months: opening months of the accounts to keep; columns: features
+    to return besides the two keys. Rows come sorted by account and week."""
     manifest.check(out, FEATURES, weeks)
-    con = _connect()
-    where = f"WHERE weeks_since_open BETWEEN {weeks[0]} AND {weeks[1]}" if weeks else ""
-    return con.execute(f"SELECT * FROM read_parquet('{os.path.join(out, 'features', 'weekly.parquet')}') {where}").df()
+    con = amldata.public(out)                       # `accounts` gives each account's opening month
+    cols = ", ".join(KEYS + list(columns)) if columns else "*"
+    where = []
+    if weeks:
+        where.append(f"weeks_since_open BETWEEN {weeks[0]} AND {weeks[1]}")
+    if months:
+        where.append(f"account_id IN (SELECT account_id FROM accounts WHERE open_month IN ({', '.join(map(str, months))}))")
+    return con.execute(f"""SELECT {cols} FROM read_parquet('{os.path.join(out, 'features', 'weekly.parquet')}')
+                           {'WHERE ' + ' AND '.join(where) if where else ''} ORDER BY account_id, weeks_since_open""").df()

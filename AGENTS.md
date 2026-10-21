@@ -26,7 +26,8 @@ Modelling (plan: "Modelling: phased plan" tab of the decision-record doc; Phases
 `PYTHONPATH=src python -m features weekly --out data/v1_full --weeks 0-78` builds `<out>/features/weekly.parquet` (28 features
 from the Phase 1 gate list, see `src/features/weekly.py`; money summed as exact pence; 19.3M account-weeks, ~4 min, ~4.2 GB) +
 `peer_medians.parquet` (frozen from months 0–4) + `features_manifest.json` (feature list, cut-off rule, code commit, hash of the
-data's `run_manifest.json` and of the peer medians; `features.weekly.load()` refuses a stale store).
+data's `run_manifest.json` and of the peer medians, and a fingerprint of the feature SQL; `features.weekly.load()` and
+`features.manifest.check()` refuse a stale store, including one built by different feature code).
 `python -m features store-check [--out D]` runs `notebooks/03_feature_store.ipynb` (Phase 3 gate: store equals the EDA's query
 value by value, first-week AUCs with account-level bootstrap intervals, whole-store checks) -> `outputs/modelling/features[/<run>]`.
 `tests/test_feature_store.py` checks the store on real data (independent pandas re-implementation, no-peek cut test,

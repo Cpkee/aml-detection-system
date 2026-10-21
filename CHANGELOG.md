@@ -6,6 +6,19 @@ Assumptions and Use" doc.
 
 
 
+## 22 Oct 2026 — Feature store: code check in the manifest, simpler code (no result changes)
+
+No data change; both stores rebuilt and byte-identical to before (`weekly.parquet` and `peer_medians.parquet`, v1_full and v1).
+- **Code check:** the manifest now stores `code_sha256`, a fingerprint of the feature SQL, and `manifest.check()`
+  refuses a store built by different feature code. Before, `check()` compared data, feature list, weeks and peer
+  medians but not code, although its docstring said so, so an edited `weekly.py` silently reused the old store.
+  Stores built before this change are refused once; rebuild with `python -m features weekly --out <folder> --force`.
+- `load()` takes `months=` and `columns=` (rows now sorted by account and week); no private `amldata` import.
+- The zero-fill of empty weeks is generated from one list (`ZERO_FILL`) instead of 20 hand-written lines.
+- Docstring: the speed numbers match the report (1 h AUC 0.772 vs 0.951 for cash patterns); the two meanings of
+  "new payer" are written down.
+- Tests: a store built by other feature code is refused; `HIGH_RISK` equals `configs/sim.yaml`; `load()` filters.
+
 ## 21 Oct 2026 — EDA: simpler code (no result changes)
 
 No data change. `notebooks/01_eda_train.ipynb` cleanups, re-run on v1_full and v1 (50k); every number in the reports
