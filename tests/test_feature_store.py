@@ -2,13 +2,14 @@
 
   1. Independent re-implementation: every one of the 28 features is recomputed in plain pandas (merge_asof, groupby,
      cumsum) from the definitions in src/features/weekly.py, on 3 seeded samples of real accounts (each 300 random +
-     60 launderers, weeks 0-78), and
+     60 launderers, weeks 0-77), and
      must equal the DuckDB store (relative tolerance 1e-9, NaN where the store has NULL).
   2. No peeking: test-month accounts' transactions are cut at a random week each; every feature up to that week, and
      every feature of every other account, must be bit-identical to the uncut build.
   3. Reproducible: two builds of the sample are byte-identical parquet files.
   4. Whole-store invariants on <SIM_OUT>/features/weekly.parquet (skipped until it is built): complete keys, shares in
-     [0, 1], running totals never fall, money and row totals equal the transactions file, frozen peer medians equal a
+     [0, 1], running totals never fall, money and row totals equal the transactions file up to the last week's cut-off,
+     frozen peer medians equal a
      recomputation from training months.
 
 Run: PYTHONPATH=src SIM_OUT=data/v1_full pytest -q tests/test_feature_store.py
@@ -24,7 +25,7 @@ import amldata
 from features import manifest, weekly
 
 OUT = os.environ.get("SIM_OUT", "data/v1")
-W_MAX = 78
+W_MAX = weekly.LAST_WEEK
 N_RANDOM, N_LAUNDERERS = 300, 60
 SEEDS = (20261015, 7, 2024)                     # three independent samples
 STORE = os.path.join(OUT, "features", "weekly.parquet")
@@ -249,10 +250,12 @@ def test_whole_store_invariants():
                                              n_payees_cum - lag(n_payees_cum) OVER a AS d5
                                       FROM s WINDOW a AS (PARTITION BY account_id ORDER BY weeks_since_open))
                 WHERE d1 < 0 OR d2 < -1e-6 OR d3 < -1e-6 OR d4 < 0 OR d5 < 0""")[0] == 0
-    # nothing lost or counted twice: per account, the last week's totals equal the transactions file (whole window)
-    if w_lo == 0 and w_hi >= 78:
+    # nothing lost or counted twice: per account, the last week's totals equal its transactions up to that week's cut-off
+    if w_lo == 0:
         diff = q(f"""WITH tot AS (SELECT account_id, count(*) n, sum(amount) FILTER (WHERE direction = 'in') i,
-                                         sum(amount) FILTER (WHERE direction = 'out') o FROM transactions GROUP BY 1)
+                                         sum(amount) FILTER (WHERE direction = 'out') o
+                                  FROM transactions x JOIN accounts a USING (account_id)
+                                  WHERE x.day <= a.open_day + 7 * {w_hi} + 6 GROUP BY 1)
                      SELECT count(*), max(abs(s.n_rows_cum - coalesce(tot.n, 0))),
                             max(abs(s.money_in_cum - coalesce(tot.i, 0))), max(abs(s.money_out_cum - coalesce(tot.o, 0)))
                      FROM s LEFT JOIN tot USING (account_id) WHERE s.weeks_since_open = {w_hi}""")

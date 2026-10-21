@@ -1,7 +1,7 @@
 feature,eda_name,account_weeks,null_pattern_equal,max_rel_diff
 n_rows_wk,n_rows,912627,True,0.0
-money_in_wk,money_in,912627,True,3.486524196016747e-16
-money_out_wk,money_out,912627,True,5.059569392289579e-16
+money_in_wk,money_in,912627,True,3.6735980134299305e-16
+money_out_wk,money_out,912627,True,4.699032986109973e-16
 max_in_wk,max_in,912627,True,0.0
 n_payers_wk,n_payers,912627,True,0.0
 n_payees_wk,n_payees,912627,True,0.0

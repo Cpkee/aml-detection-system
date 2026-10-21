@@ -6,6 +6,16 @@ Assumptions and Use" doc.
 
 
 
+## 22 Oct 2026 — Feature store: weeks 0–77 (week 78 dropped)
+
+No change to the simulated data. Every account's data ends 547 days after opening, so week 78 (days 546–552) held only
+2 of its 7 days: 2.2 rows on average against 5.5 at week 77, an artificial drop in activity at the end of the 0–78
+appendix horizon. The store now holds weeks 0–77 (`weekly.LAST_WEEK`); `build()` refuses later weeks and
+`manifest.check()` refuses a store that still holds week 78. Rebuilt on v1_full (19,032,000 account-weeks) and v1
+(3,900,000): exactly the old store and peer medians without week 78, row for row. Notebook 03's gate re-run on both
+(passes); its end-of-window check and `test_whole_store_invariants` now compare week 77's running totals with the
+transactions up to that week's cut-off. Appendix horizon in CLAUDE.md: weeks 0–77 (team decision 22 Oct 2026).
+
 ## 22 Oct 2026 — Feature store: code check in the manifest, simpler code (no result changes)
 
 No data change; both stores rebuilt and byte-identical to before (`weekly.parquet` and `peer_medians.parquet`, v1_full and v1).

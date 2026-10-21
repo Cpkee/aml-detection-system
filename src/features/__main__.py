@@ -4,7 +4,7 @@ import argparse
 import os
 from pathlib import Path
 
-from .weekly import build, parse_weeks
+from .weekly import LAST_WEEK, build, parse_weeks
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DATA = "data/v1_full"
@@ -37,7 +37,7 @@ def main(argv=None):
 
     w = sub.add_parser("weekly", help="build the weekly feature store <out>/features/weekly.parquet")
     w.add_argument("--out", default="data/v1_full", help="data folder (default data/v1_full; data/v1 for 50k)")
-    w.add_argument("--weeks", default="0-78", help="weeks since opening, e.g. 0-26 (default 0-78)")
+    w.add_argument("--weeks", default=f"0-{LAST_WEEK}", help=f"weeks since opening, e.g. 0-26 (default 0-{LAST_WEEK})")
     w.add_argument("--force", action="store_true", help="rebuild even if the store exists")
 
     e = sub.add_parser("eda", help="Phase 1 EDA: execute notebooks/01_eda_train.ipynb -> <report>/report.md, figures, CSVs")
