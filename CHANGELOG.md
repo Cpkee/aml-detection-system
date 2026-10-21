@@ -6,6 +6,22 @@ Assumptions and Use" doc.
 
 
 
+## 19 Oct 2026 — EDA tidy: closure filter, keep/drop rule with intervals, age allowed
+
+No data change. `notebooks/01_eda_train.ipynb`, re-run on v1_full and v1 (50k); `notebooks/03_feature_store.ipynb`
+re-run on both (gate (A) still within 1e-5).
+- **Age decision (19 Oct 2026):** `customer_age` is allowed as a model input; Variant II tests fairness.
+- **Closure filter:** the feature screen (§5) kept account-weeks with any rows (`n_rows > 0`); it now uses
+  `labels()["open_by_day"] == 1`, as CLAUDE.md requires (normal accounts have 82 zero-row weeks in months 0–4). Notebook 03
+  uses the same filter so its gate still reproduces the screen. v1_full started launderers at week 12: 167 -> 157 (10
+  closed during that week).
+- **§3 text:** the stale "decision needed: open at week w" note is replaced (`open_by_day` exists since 10 Oct); the
+  closure numbers are printed from the data.
+- **§5 / §8:** one AUC helper with a 95% interval (resampling the launderers) for §2 and §5. A candidate is kept when,
+  at some screened week, |AUC − 0.5| ≥ 0.05 for `mule_by_day` or `started_by_day` and its interval excludes 0.5; the old
+  rule had no interval. v1_full: drop cash / abroad / high-risk shares (as the team decided on 15 Oct); `night_share` and
+  `internal_share` pass in 1 of 8 looks (weak). No change to the feature store.
+
 ## 18 Oct 2026 — EDA fixes: missing values rank lowest in the AUC; real mules separate on age
 
 No data change. Two corrections to `notebooks/01_eda_train.ipynb`, re-run on v1_full and v1 (50k):
