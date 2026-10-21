@@ -6,6 +6,22 @@ Assumptions and Use" doc.
 
 
 
+## 22 Oct 2026 — Phase 4 baselines re-run, now reproducible
+
+No data change. The two baselines re-run on v1_full after the feature-store changes (weeks 0–26 unchanged).
+- `notebooks/05_lgbm_baseline.ipynb` imported `models.lgbm_baseline`, but the module was committed as
+  `src/models/lightGBM.py`, so the notebook could not run from the repo; renamed to `lgbm_baseline.py` (its own
+  docstring and command line already used that name).
+- **Not reproducible before:** three runs with the same seed gave combined PR-AUC 0.216 / 0.248 / 0.258. Rows came
+  from an unsorted DuckDB join, and LightGBM's threads add in no fixed order. Now both notebooks read the store with
+  `weekly.load(..., months=...)` (sorted rows) and LightGBM uses `deterministic=True, force_row_wise=True`: two runs
+  of each notebook give identical metrics.
+- v1_full, account-level PR-AUC (mean of 3 folds), LightGBM / logistic: activity 0.730 / 0.038, application
+  0.011 / 0.025, combined 0.256 / 0.112. Logistic numbers moved by at most 0.002 (row order only).
+- Finding for tuning: combined LightGBM overfits. Last fold: account-level PR-AUC 1.00 on training vs 0.40 on
+  validation (activity only: 0.83 vs 0.77), with 87% of its gain from application columns. Fake accounts are labelled
+  mules in every week, so the trees learn to recognise individual training fakes by their application values.
+
 ## 22 Oct 2026 — Feature store: weeks 0–77 (week 78 dropped)
 
 No change to the simulated data. Every account's data ends 547 days after opening, so week 78 (days 546–552) held only
