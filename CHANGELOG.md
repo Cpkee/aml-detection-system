@@ -6,6 +6,21 @@ Assumptions and Use" doc.
 
 
 
+## 22 Oct 2026 — Phase 4 tuning, step 1: equal account weight and the application as one score
+
+No data change. New `notebooks/06_lgbm_tuning.ipynb` (helpers `src/models/tuning.py`, tests
+`tests/test_models_tuning.py`) -> `outputs/modelling/models/v1_full/lgbm_tuning/`. Same rows, folds, metrics and
+LightGBM defaults as the baseline; deterministic. Two fixes for the combined model's memorising:
+- **Equal weight per account** (each account's weeks share one unit of weight, classes balanced): barely helps;
+  combined account-level PR-AUC 0.256 -> 0.279, training-minus-validation gap 0.74 -> 0.72.
+- **The application as one score**: a logistic regression on the 56 `accounts_linear` columns, one row per account,
+  label "mule by the end of week 26" (team choice 22 Oct 2026), scored 5-fold out of fold for training accounts.
+  Activity + app score: 0.695, gap 0.18. Both ideas together: 0.699.
+- Activity alone still has the best account-level PR-AUC (0.730). But week by week, activity + app score is higher in
+  27 of 27 weeks, and in weeks 0–8 it puts 15% of the mules into each week's top 1% against 4%: the application buys
+  earliness, which the account-level measure (an account's best week) does not reward. It catches fewer real-customer
+  mules in the account-level top 1% (witting 6/14 and unwitting 13/18, vs 9/14 and 16/18 for activity alone).
+
 ## 22 Oct 2026 — Phase 4 baselines re-run, now reproducible
 
 No data change. The two baselines re-run on v1_full after the feature-store changes (weeks 0–26 unchanged).

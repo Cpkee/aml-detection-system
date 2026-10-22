@@ -41,7 +41,12 @@ Phase 4 baselines (untuned, 3 temporal folds, months 0–4, weeks 0–26): `note
 reproducible run to run (sorted rows via `weekly.load(months=)`, LightGBM `deterministic=True`, since 22 Oct 2026).
 v1_full account-level PR-AUC, LightGBM / logistic: activity 0.730 / 0.038, application 0.011 / 0.025, combined
 0.256 / 0.112. Combined LightGBM overfits: train 1.00 vs validation 0.40 on the last fold, 87% of its gain from
-application columns (fake accounts are mules in every week, so it learns to recognise them); fix in tuning.
+application columns (fake accounts are mules in every week, so it learns to recognise them).
+Tuning step 1 (`notebooks/06_lgbm_tuning.ipynb`, helpers `src/models/tuning.py`, 22 Oct 2026): equal weight per account
+barely helps (combined 0.256 -> 0.279); the application as one out-of-fold logistic score (label: mule by week 26)
+fixes the memorising (gap 0.74 -> 0.18; 0.695). Activity alone still leads on account level (0.730), but activity +
+app score wins in 27 of 27 weeks and puts 15% of mules in each week's top 1% in weeks 0-8 vs 4%: earliness, which
+the account-level measure does not reward. It catches fewer real mules in the account top 1% (19/32 vs 25/32).
 Sensitivity runs (rules frozen, 244k, one `test` value each): `python -m sim.sensitivity --list | --run [--only NAME]
 | --summarise` -> `data/sensitivity/<name>/` (large files deleted) and `outputs/sensitivity/summary.csv`.
 Single steps: `accounts`, `normal --batches 3-3`, `laundering`, `rules`, `finalize`. Use `--out` for another
