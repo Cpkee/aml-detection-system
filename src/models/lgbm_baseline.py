@@ -33,7 +33,7 @@ import numpy as np
 import pandas as pd
 
 import amldata
-from features import manifest
+from features import weekly
 from features.weekly import FEATURES as WEEKLY
 
 REPORT_ROOT = "outputs/modelling/models"
@@ -52,13 +52,7 @@ def load_table(out: str, months: tuple[int, ...], weeks: tuple[int, int]) -> tup
     app = app[app["open_month"].isin(months)].reset_index(drop=True)
     app_cols = [c for c in app.columns if c not in ("account_id", "open_month")]
 
-    manifest.check(out, WEEKLY, weeks)            # refuses a stale or missing store
-    con = amldata.loaders._connect()
-    con.register("keep", app[["account_id"]])
-    wk = con.execute(f"""
-        SELECT w.* FROM read_parquet('{os.path.join(out, 'features', 'weekly.parquet')}') w
-        JOIN keep USING (account_id)
-        WHERE w.weeks_since_open BETWEEN {weeks[0]} AND {weeks[1]}""").df()
+    wk = weekly.load(out, weeks, months=months)   # checks the manifest; rows sorted, so every run trains alike
     for c in WEEKLY:
         wk[c] = wk[c].astype("float32")
 
@@ -255,7 +249,8 @@ def main(argv=None):
         train, valid = df[df.open_month.isin(train_m)], df[df.open_month == valid_m]
         for name in a.views:
             cols = [c for c in views[name] if c not in a.drop]
-            model = lgb.LGBMClassifier(class_weight="balanced", random_state=a.seed, n_jobs=-1, verbose=-1)
+            model = lgb.LGBMClassifier(class_weight="balanced", random_state=a.seed, n_jobs=-1, verbose=-1,
+                                       deterministic=True, force_row_wise=True)   # same result every run
             model.fit(train[cols], train["mule_by_day"])
             score = model.predict_proba(valid[cols])[:, 1]
             m = evaluate(valid, score, prof)
@@ -276,7 +271,7 @@ def main(argv=None):
     imp.to_csv(os.path.join(report, "importance.csv"), index=False)
     figs = figures(report, oof, folds, wk, imp)
     settings = {"data": a.out, "weeks": list(weeks), "folds": [f"{t} -> {v}" for t, v in FOLDS],
-                "dropped_features": a.drop, "model": "LGBMClassifier(class_weight='balanced'), defaults otherwise",
+                "dropped_features": a.drop, "model": "LGBMClassifier(class_weight='balanced', deterministic=True), defaults otherwise",
                 "seed": a.seed, "lightgbm": lgb.__version__}
     write_report(report, settings, folds, wk, imp, figs)
     print(f"-> {report}  ({time.time() - t0:.0f}s)")

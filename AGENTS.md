@@ -36,6 +36,12 @@ byte-identical rebuild, whole-store invariants); run it with `SIM_OUT` = a folde
 `python -m features preprocess [--out data/v1_full --report DIR]` executes `notebooks/02_preprocess.ipynb` (Phase 2: all its
 code is in the notebook) -> `<out>/features/accounts_{linear,tree}.parquet` + `preprocess_manifest.json`, `<report>/params.json`
 + `report.md` (default `outputs/modelling/preprocess[/<run>]`); `python -m models train` is a Phase 4 stub.
+Phase 4 baselines (untuned, 3 temporal folds, months 0–4, weeks 0–26): `notebooks/05_lgbm_baseline.ipynb` (helpers in
+`src/models/lgbm_baseline.py`) and `notebooks/04_logreg_baseline.ipynb` -> `outputs/modelling/models/<run>/`; both
+reproducible run to run (sorted rows via `weekly.load(months=)`, LightGBM `deterministic=True`, since 22 Oct 2026).
+v1_full account-level PR-AUC, LightGBM / logistic: activity 0.730 / 0.038, application 0.011 / 0.025, combined
+0.256 / 0.112. Combined LightGBM overfits: train 1.00 vs validation 0.40 on the last fold, 87% of its gain from
+application columns (fake accounts are mules in every week, so it learns to recognise them); fix in tuning.
 Sensitivity runs (rules frozen, 244k, one `test` value each): `python -m sim.sensitivity --list | --run [--only NAME]
 | --summarise` -> `data/sensitivity/<name>/` (large files deleted) and `outputs/sensitivity/summary.csv`.
 Single steps: `accounts`, `normal --batches 3-3`, `laundering`, `rules`, `finalize`. Use `--out` for another
