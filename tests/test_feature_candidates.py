@@ -28,29 +28,38 @@ def _store(n_acc=5, n_weeks=12, seed=0) -> pd.DataFrame:
     return df
 
 
-def test_no_peeking():
+@pytest.mark.parametrize("group", GROUPS)
+def test_no_peeking(group):
     df = _store()
-    base, names = candidates.add(df, GROUPS)
-    cols = [c for g in GROUPS for c in names[g]]
+    base, names = candidates.add(df, [group])
     for w in (0, 3, 7):
         changed = df.copy()
         later = changed.weeks_since_open > w
         changed.loc[later, FEATURES] = changed.loc[later, FEATURES] * 7 + 3
-        after, _ = candidates.add(changed, GROUPS)
+        after, _ = candidates.add(changed, [group])
         upto = df.weeks_since_open <= w
-        pd.testing.assert_frame_equal(base.loc[upto, cols], after.loc[upto, cols])
+        pd.testing.assert_frame_equal(base.loc[upto, names[group]], after.loc[upto, names[group]])
 
 
-def test_accounts_do_not_mix():
+@pytest.mark.parametrize("group", GROUPS)
+def test_accounts_do_not_mix(group):
     df = _store()
-    base, names = candidates.add(df, GROUPS)
-    cols = [c for g in GROUPS for c in names[g]]
+    base, names = candidates.add(df, [group])
     changed = df.copy()
     other = changed.account_id != "A2"
     changed.loc[other, FEATURES] = changed.loc[other, FEATURES] + 11
-    after, _ = candidates.add(changed, GROUPS)
+    after, _ = candidates.add(changed, [group])
     mine = df.account_id == "A2"
-    pd.testing.assert_frame_equal(base.loc[mine, cols], after.loc[mine, cols])
+    pd.testing.assert_frame_equal(base.loc[mine, names[group]], after.loc[mine, names[group]])
+
+
+def test_core_is_part_of_roll4():
+    df = _store()
+    full, _ = candidates.add(df, ["roll4"])
+    core, names = candidates.add(df, ["roll4_core"])
+    pd.testing.assert_frame_equal(core[names["roll4_core"]], full[names["roll4_core"]])
+    with pytest.raises(ValueError):                    # same column names: one or the other, never both
+        candidates.add(df, ["roll4", "roll4_core"])
 
 
 def test_windows_by_hand():
@@ -70,8 +79,13 @@ def test_windows_by_hand():
 def test_refuses_gaps_and_unsorted_rows():
     df = _store()
     with pytest.raises(ValueError):
-        candidates.add(df[df.weeks_since_open != 4], GROUPS)
+        candidates.add(df[df.weeks_since_open != 4], ["roll4"])
     with pytest.raises(ValueError):
-        candidates.add(df.sample(frac=1, random_state=0), GROUPS)
+        candidates.add(df.sample(frac=1, random_state=0), ["roll4"])
     with pytest.raises(ValueError):
         candidates.add(df, ["no_such_group"])
+
+
+def test_adopted_is_the_roll4_group():
+    _, names = candidates.add(_store(), [candidates.ADOPTED_GROUP])
+    assert set(candidates.ADOPTED) <= set(names[candidates.ADOPTED_GROUP])

@@ -40,7 +40,10 @@ Feature lab: candidate features live in `src/features/candidates.py` (built from
 `tests/test_feature_candidates.py`); `python -m models.feature_lab --out data/v1 --groups G... --name N` refits the tuned
 LightGBM (activity + application score, as notebook 06; `--views activity` for store features only) with each group added
 (baseline folds, months 0–4 only) and judges it on the tuning measure, weekly earliness (decision 26 Oct 2026) ->
-`outputs/modelling/feature_lab/<data>/<name>/` and an append-only `ledger.csv`. The `feature-engineer` agent (`.claude/agents/`) runs propose -> implement -> verify -> evaluate
+`outputs/modelling/feature_lab/<data>/<name>/` and an append-only `ledger.csv`. **Adopted (26 Oct 2026, Kee Chee Pheng):**
+the 8 four-week-window features (`candidates.ADOPTED`, group `roll4`), added at load time with
+`lgbm_baseline.load_table(..., adopted=True)` (not stored; weeks must start at 0). Tuning step 2 and later models use them;
+the lab's baseline includes them. Notebooks 05/06 stay the records of the store-only runs. The `feature-engineer` agent (`.claude/agents/`) runs propose -> implement -> verify -> evaluate
 trials; it never changes the store, which stays a team decision.
 Phase 4 baselines (untuned, 3 temporal folds, months 0–4, weeks 0–26): `notebooks/05_lgbm_baseline.ipynb` (helpers in
 `src/models/lgbm_baseline.py`) and `notebooks/04_logreg_baseline.ipynb` -> `outputs/modelling/models/<run>/`; both

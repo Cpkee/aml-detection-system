@@ -6,6 +6,21 @@ Assumptions and Use" doc.
 
 
 
+## 26 Oct 2026 — Four-week-window features adopted into the model inputs
+
+No data change, no feature-store change. The 8 features of the feature lab's `roll4` group (`n_rows_4wk`, `n_in_4wk`,
+`money_in_4wk`, `money_out_4wk`, `n_payers_4wk`, `out_1h_share_4wk`, `out_24h_share_4wk`, `passthrough_4wk`: this week
+and the three before) are adopted (decision 26 Oct 2026, Kee Chee Pheng, lead). Option A: they are computed at load
+time, `models.lgbm_baseline.load_table(..., adopted=True)` (`features.candidates.ADOPTED`), not written to the store,
+since they are sums of store columns; no store rebuild, manifest unchanged. `load_table` without the flag is
+unchanged, so notebooks 05 and 06 stay the records of the store-only runs. The feature lab's baseline now includes
+them (ledger column `baseline`), so later trials must beat the model as it now stands; on v1_full that baseline
+reproduces the earlier `+roll4` result exactly (weekly recall 0.403 pooled).
+- Smaller set tried first (trial `roll4-core-vs-full`, v1_full): the three 4-week ratios plus `n_in_4wk` reach weekly
+  recall 0.393 (−0.03 / +0.02 / −0.03 per fold against all eight) but PR-AUC 0.826 against 0.871 (lower in every
+  fold) and 23 against 27 of 32 real-customer mules in the top 1%; all eight kept.
+- Still to do: confirm on Variants II and IV once their feature stores exist; tuning step 2 uses `adopted=True`.
+
 ## 26 Oct 2026 — Feature lab scores the tuning measure on the tuned model
 
 No data change, no feature-store change. `python -m models.feature_lab` now follows the tuning decision of 26 Oct

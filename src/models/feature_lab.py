@@ -8,7 +8,9 @@ Candidates come from src/features/candidates.py. For each trial:
             accounts) at weeks 8, 12 and 26, with a 95% bootstrap interval over launderers; 0.5 = no signal
   model     LightGBM as in notebooks/06_lgbm_tuning.ipynb (same rows, folds, seed and settings), refitted with each
             group added and with all groups together. Views: 'app' = activity + application score (the model the
-            team tunes, decision 26 Oct 2026; default), 'activity' = the 28 store features + weeks_since_open only
+            team tunes, decision 26 Oct 2026; default), 'activity' = store features + weeks_since_open only.
+            The baseline includes the adopted candidates (features.candidates.ADOPTED, since 26 Oct 2026: the
+            roll4 group), so a new group must beat the model as it now stands
   measures  weekly_recall, the tuning measure (decision 26 Oct 2026): the share of each week's mules in that week's
             top 1% of open accounts, averaged over weeks 0-26 (recall_top_1pct of lgbm_baseline.by_week). The
             summary shows it pooled over the 3 validation months, as notebook 06 reports it, and per fold.
@@ -181,7 +183,7 @@ def main(argv=None):
     data = os.path.basename(os.path.normpath(a.out))
     report = os.path.join(ROOT, data, a.name)
     os.makedirs(report, exist_ok=True)
-    df, _ = base.load_table(a.out, MONTHS, WEEKS)
+    df, _ = base.load_table(a.out, MONTHS, WEEKS, adopted=True)
     df = df.sort_values(candidates.KEY, kind="stable").reset_index(drop=True)
     df, names = candidates.add(df, a.groups)
     prof, start = base.profiles(a.out, MONTHS), start_weeks(a.out)
@@ -193,7 +195,7 @@ def main(argv=None):
     adds = {f"+{g}": names[g] for g in a.groups} | ({"+all": new} if len(a.groups) > 1 else {})
     res, summary = [], []
     for view in a.views:
-        base_cols = WEEKLY + ["weeks_since_open"] + (["app_score"] if view == "app" else [])
+        base_cols = WEEKLY + candidates.ADOPTED + ["weeks_since_open"] + (["app_score"] if view == "app" else [])
         b = None
         for v, extra in {"baseline": [], **adds}.items():
             r, oof = fit_folds(df, base_cols + extra, prof, start, scores if view == "app" else None, a.seed)
@@ -216,7 +218,7 @@ def main(argv=None):
     summary.to_csv(os.path.join(report, "summary.csv"), index=False)
     write_report(report, a, data, summary, scr)
     stamp = {"date": datetime.date.today().isoformat(), "commit": git_commit(), "data": data, "trial": a.name,
-             "hypothesis": a.hypothesis, "seed": a.seed}
+             "hypothesis": a.hypothesis, "seed": a.seed, "baseline": f"store + {candidates.ADOPTED_GROUP}"}
     led = summary[summary.variant != "baseline"].assign(**stamp)
     led["features"] = led.variant.map(lambda v: " ".join(adds[v]))
     append_ledger(led[list(stamp) + [c for c in led.columns if c not in stamp]])
