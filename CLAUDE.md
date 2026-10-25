@@ -37,9 +37,10 @@ byte-identical rebuild, whole-store invariants); run it with `SIM_OUT` = a folde
 code is in the notebook) -> `<out>/features/accounts_{linear,tree}.parquet` + `preprocess_manifest.json`, `<report>/params.json`
 + `report.md` (default `outputs/modelling/preprocess[/<run>]`); `python -m models train` is a Phase 4 stub.
 Feature lab: candidate features live in `src/features/candidates.py` (built from the store, same and earlier weeks only;
-`tests/test_feature_candidates.py`); `python -m models.feature_lab --out data/v1 --groups G... --name N` refits the activity
-LightGBM with each group added (baseline folds, months 0–4 only) -> `outputs/modelling/feature_lab/<data>/<name>/` and an
-append-only `ledger.csv`. The `feature-engineer` agent (`.claude/agents/`) runs propose -> implement -> verify -> evaluate
+`tests/test_feature_candidates.py`); `python -m models.feature_lab --out data/v1 --groups G... --name N` refits the tuned
+LightGBM (activity + application score, as notebook 06; `--views activity` for store features only) with each group added
+(baseline folds, months 0–4 only) and judges it on the tuning measure, weekly earliness (decision 26 Oct 2026) ->
+`outputs/modelling/feature_lab/<data>/<name>/` and an append-only `ledger.csv`. The `feature-engineer` agent (`.claude/agents/`) runs propose -> implement -> verify -> evaluate
 trials; it never changes the store, which stays a team decision.
 Phase 4 baselines (untuned, 3 temporal folds, months 0–4, weeks 0–26): `notebooks/05_lgbm_baseline.ipynb` (helpers in
 `src/models/lgbm_baseline.py`) and `notebooks/04_logreg_baseline.ipynb` -> `outputs/modelling/models/<run>/`; both
