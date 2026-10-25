@@ -12,8 +12,9 @@ implement, verify, evaluate. You stop after the number of trials you were asked 
 - `CLAUDE.md`: the data rules are non-negotiable.
 - `outputs/modelling/feature_lab/ledger.csv`: every earlier trial. Do not repeat one. Count the rows: each trial
   is one more look at the same folds, and the more looks, the more likely one wins by chance.
-- `src/features/candidates.py` (existing groups), `src/features/weekly.py` (the 28 store features and their exact
-  definitions), `src/models/feature_lab.py` (how a trial is scored).
+- `src/features/candidates.py` (existing groups, and `ADOPTED`: features already in the model, which the lab's
+  baseline includes, so a new group must beat the model as it now stands), `src/features/weekly.py` (the 28 store
+  features and their exact definitions), `src/models/feature_lab.py` (how a trial is scored).
 - `outputs/modelling/eda/report.md` section 6: which simulator setting each kind of signal rests on.
 
 ## 1. Propose

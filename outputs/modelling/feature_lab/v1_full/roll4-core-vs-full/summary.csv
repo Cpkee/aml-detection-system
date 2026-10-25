@@ -1,0 +1,3 @@
+view,variant,n_features,weekly_recall_pooled,weekly_recall,d_weekly_recall,d_weekly_recall_folds,weekly_recall_verdict,acc_pr_auc,d_acc_pr_auc,d_acc_pr_auc_folds,acc_pr_auc_verdict,caught_2wk,d_caught_2wk,d_caught_2wk_folds,caught_2wk_verdict
+app,baseline,30,0.34488716044347456,0.3507610373508829,0.0,+0.000 / +0.000 / +0.000,,0.6945899642690749,0.0,+0.000 / +0.000 / +0.000,,0.8836011904761905,0.0,+0.000 / +0.000 / +0.000,
+app,+roll4_core,34,0.3934124200809545,0.3975056626951223,0.0467446253442394,+0.047 / +0.062 / +0.031,better,0.8257564220216809,0.13116645775260613,+0.202 / +0.169 / +0.023,better,0.8846230158730158,0.001021825396825382,+0.047 / -0.057 / +0.013,no clear change

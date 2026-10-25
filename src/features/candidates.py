@@ -8,9 +8,11 @@ team and then added to weekly.py.
   lag1         last week's value of the main weekly features
   roll2        totals over this week and the one before (a ~2-week laundering burst often crosses a week boundary)
   roll4        the same over this week and the three before
+  roll4_core   roll4's three ratios and payments in only (is the smaller set as good?)
   running_max  the largest weekly value so far (a burst stays visible after it ends)
 
-Evaluated by `python -m models.feature_lab` (see that module); every trial is logged in its ledger.
+Evaluated by `python -m models.feature_lab` (see that module); every trial is logged in its ledger. Groups the team
+adopts are listed in ADOPTED at the bottom of this file.
 """
 from __future__ import annotations
 
@@ -60,13 +62,26 @@ def roll4(df, g):
     return _window(df, 4)
 
 
+def roll4_core(df, g):
+    """The 4-week ratios plus payments in: roll4 without the totals that move with them (rows, money, payers)."""
+    w = _window(df, 4)
+    return {c: w[c] for c in ("n_in_4wk", "out_1h_share_4wk", "out_24h_share_4wk", "passthrough_4wk")}
+
+
 def running_max(df, g):
     # a week with no money in has no share; it counts as 0 so the running max carries on through it
     return {f"{c}_max_so_far": df[c].fillna(0).groupby(df["account_id"].to_numpy(), sort=False).cummax()
             for c in MAX_COLS}
 
 
-GROUPS = {"lag1": lag1, "roll2": roll2, "roll4": roll4, "running_max": running_max}
+GROUPS = {"lag1": lag1, "roll2": roll2, "roll4": roll4, "roll4_core": roll4_core, "running_max": running_max}
+
+# Adopted into the model inputs (decision 26 Oct 2026, Kee Chee Pheng, lead; feature lab trials
+# item1-history-tuned-measure and roll4-core-vs-full). Computed at load time by models.lgbm_baseline.load_table(...,
+# adopted=True), not stored: they are sums of store columns. Moving them into weekly.py is optional tidying.
+ADOPTED_GROUP = "roll4"
+ADOPTED = ["n_rows_4wk", "n_in_4wk", "money_in_4wk", "money_out_4wk", "n_payers_4wk",
+           "out_1h_share_4wk", "out_24h_share_4wk", "passthrough_4wk"]
 
 
 def add(df: pd.DataFrame, groups: list[str]) -> tuple[pd.DataFrame, dict[str, list[str]]]:

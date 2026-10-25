@@ -33,7 +33,7 @@ import numpy as np
 import pandas as pd
 
 import amldata
-from features import weekly
+from features import candidates, weekly
 from features.weekly import FEATURES as WEEKLY
 
 REPORT_ROOT = "outputs/modelling/models"
@@ -43,8 +43,14 @@ COLORS = {"application": "#eb6834", "activity": "#2a78d6", "combined": "#1baf7a"
 
 
 # ---------------------------------------------------------------- data
-def load_table(out: str, months: tuple[int, ...], weeks: tuple[int, int]) -> tuple[pd.DataFrame, list[str]]:
-    """Account-week rows for accounts opened in `months`: application + weekly features + label."""
+def load_table(out: str, months: tuple[int, ...], weeks: tuple[int, int],
+               adopted: bool = False) -> tuple[pd.DataFrame, list[str]]:
+    """Account-week rows for accounts opened in `months`: application + weekly features + label.
+
+    adopted=True also adds the adopted candidate features (features.candidates.ADOPTED, computed from the store's
+    same and earlier weeks); they need every week from 0, so `weeks` must start at 0."""
+    if adopted and weeks[0] != 0:
+        raise ValueError("adopted features are windows over earlier weeks: load weeks from 0")
     tree_path = os.path.join(out, "features", "accounts_tree.parquet")
     if not os.path.exists(tree_path):
         raise FileNotFoundError(f"{tree_path} not found - run `python -m features preprocess --out {out}` first")
@@ -55,6 +61,9 @@ def load_table(out: str, months: tuple[int, ...], weeks: tuple[int, int]) -> tup
     wk = weekly.load(out, weeks, months=months)   # checks the manifest; rows sorted, so every run trains alike
     for c in WEEKLY:
         wk[c] = wk[c].astype("float32")
+    if adopted:
+        wk, names = candidates.add(wk, [candidates.ADOPTED_GROUP])
+        wk = wk.drop(columns=[c for c in names[candidates.ADOPTED_GROUP] if c not in candidates.ADOPTED])
 
     lab = []
     for w in range(weeks[0], weeks[1] + 1):       # label at the end of each account's own week w

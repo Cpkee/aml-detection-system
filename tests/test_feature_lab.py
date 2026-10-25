@@ -1,6 +1,10 @@
-"""The feature lab's measures (src/models/feature_lab.py) on a small hand-made validation table, no data needed."""
+"""The feature lab's measures (src/models/feature_lab.py) on a small hand-made validation table, no data needed;
+and the adopted features in lgbm_baseline.load_table on data/v1 (skipped without its feature store)."""
+import os
+
 import numpy as np
 import pandas as pd
+import pytest
 
 from models import feature_lab as lab
 from models.lgbm_baseline import by_week
@@ -40,3 +44,20 @@ def test_verdict():
     assert lab.verdict(pd.Series([0.05, -0.01, 0.04]), 0.02) == "no clear change"
     assert lab.verdict(pd.Series([0.01, 0.01, 0.01]), 0.02) == "no clear change"
     assert lab.verdict(pd.Series([-0.05, -0.01, -0.04]), 0.02) == "worse"
+
+
+DATA = "data/v1"
+needs_store = pytest.mark.skipif(not os.path.exists(os.path.join(DATA, "features", "weekly.parquet")),
+                                 reason="data/v1 feature store not built")
+
+
+@needs_store
+def test_load_table_adds_adopted_features():
+    from features import candidates
+    from models.lgbm_baseline import load_table
+    plain, _ = load_table(DATA, (0,), (0, 26))
+    with_adopted, _ = load_table(DATA, (0,), (0, 26), adopted=True)
+    assert set(candidates.ADOPTED) <= set(with_adopted.columns) and not set(candidates.ADOPTED) & set(plain.columns)
+    pd.testing.assert_frame_equal(with_adopted[plain.columns], plain)          # nothing else changes
+    with pytest.raises(ValueError):
+        load_table(DATA, (0,), (1, 26), adopted=True)
