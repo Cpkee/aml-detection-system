@@ -39,8 +39,9 @@ code is in the notebook) -> `<out>/features/accounts_{linear,tree}.parquet` + `p
 Phase 4 baselines (untuned, 3 temporal folds, months 0–4, weeks 0–26): `notebooks/05_lgbm_baseline.ipynb` (helpers in
 `src/models/lgbm_baseline.py`) and `notebooks/04_logreg_baseline.ipynb` -> `outputs/modelling/models/<run>/`; both
 reproducible run to run (sorted rows via `weekly.load(months=)`, LightGBM `deterministic=True`, since 22 Oct 2026).
-v1_full account-level PR-AUC, LightGBM / logistic: activity 0.730 / 0.038, application 0.011 / 0.025, combined
-0.256 / 0.112. Combined LightGBM overfits: train 1.00 vs validation 0.40 on the last fold, 87% of its gain from
+v1_full account-level PR-AUC, LightGBM / logistic: activity 0.730 / 0.122, application 0.011 / 0.025, combined
+0.256 / 0.274 (logistic since 25 Oct 2026: share features clipped to [0, 1] in notebook 04; unclipped speed shares
+reach 222 and gave 0.038 / 0.112). Combined LightGBM overfits: train 1.00 vs validation 0.40 on the last fold, 87% of its gain from
 application columns (fake accounts are mules in every week, so it learns to recognise them).
 Tuning step 1 (`notebooks/06_lgbm_tuning.ipynb`, helpers `src/models/tuning.py`, 22 Oct 2026): equal weight per account
 barely helps (combined 0.256 -> 0.279); the application as one out-of-fold logistic score (label: mule by week 26)

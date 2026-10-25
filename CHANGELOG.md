@@ -6,6 +6,18 @@ Assumptions and Use" doc.
 
 
 
+## 25 Oct 2026 — Logistic baseline: share features clipped to [0, 1]
+
+No data change, no feature-store change. `notebooks/04_logreg_baseline.ipynb` now clips the eight share features to
+[0, 1] before standardising them (section 2). The two speed shares divide money paid out this week by this week's
+money in, so they pass 1 when money from the week before leaves this week (up to 222 on v1_full, 99th percentile
+0.52); unclipped, those rows set the scaler. The store keeps the agreed definition (decision 15 Oct 2026); LightGBM
+is unaffected (clipping keeps the order trees split on).
+- v1_full, logistic account-level PR-AUC (mean of 3 folds): activity 0.038 -> 0.122, combined 0.112 -> 0.274,
+  application 0.025 (unchanged, no shares). Combined logistic now edges past untuned combined LightGBM (0.256);
+  activity LightGBM (0.730) still leads by about 6x, not 19x.
+- Same check on data/v1 (50k), activity view: 0.051 -> 0.136.
+
 ## 22 Oct 2026 — Phase 4 tuning, step 1: equal account weight and the application as one score
 
 No data change. New `notebooks/06_lgbm_tuning.ipynb` (helpers `src/models/tuning.py`, tests
