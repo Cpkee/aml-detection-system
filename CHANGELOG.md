@@ -6,6 +6,23 @@ Assumptions and Use" doc.
 
 
 
+## 26 Oct 2026 — Feature lab: candidate features, trial runner, feature-engineer agent
+
+No data change, no feature-store change. New `src/features/candidates.py`: candidate weekly features built from the
+store, using only the same and earlier weeks of each account (groups `lag1`, `roll2`, `roll4`, `running_max`;
+`tests/test_feature_candidates.py` checks no look-ahead and no mixing between accounts). New `python -m
+models.feature_lab`: refits the activity LightGBM of `models.lgbm_baseline` (same rows, folds, seed, months 0–4 only)
+with each group added; measures account-level PR-AUC and `caught_2wk` (launderers in that week's top 1% in their
+start week or the next); verdict 'better' only if all 3 folds improve by at least 0.04 PR-AUC (team noise rule) /
+0.05 `caught_2wk` (assumption). Reports under `outputs/modelling/feature_lab/<data>/<trial>/`, every trial appended
+to `outputs/modelling/feature_lab/ledger.csv`. New agent `.claude/agents/feature-engineer.md` runs propose ->
+implement -> verify -> evaluate trials; it never changes the store (promotion is a team decision).
+- First trial `item1-history`, v1_full (baseline reproduces the published activity PR-AUC 0.730): 2-week windows
+  0.822 (+0.13 / +0.08 / +0.07 per fold), 4-week windows 0.865 (+0.21 / +0.13 / +0.07), both 'better' on PR-AUC;
+  `caught_2wk` unchanged (baseline 0.943); running max worse on both measures (0.659). The windows reduce normal
+  accounts' one-week spikes (precision), not time to catch. Witting mules in the top 1% fell in one fold (6 -> 4 of 7
+  with 2-week windows), so no group is proposed for the store yet.
+
 ## 25 Oct 2026 — Logistic baseline: share features clipped to [0, 1]
 
 No data change, no feature-store change. `notebooks/04_logreg_baseline.ipynb` now clips the eight share features to
