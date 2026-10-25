@@ -48,6 +48,9 @@ barely helps (combined 0.256 -> 0.279); the application as one out-of-fold logis
 fixes the memorising (gap 0.74 -> 0.18; 0.695). Activity alone still leads on account level (0.730), but activity +
 app score wins in 27 of 27 weeks and puts 15% of mules in each week's top 1% in weeks 0-8 vs 4%: earliness, which
 the account-level measure does not reward. It catches fewer real mules in the account top 1% (19/32 vs 25/32).
+**Tuning measure (decided 26 Oct 2026, lead):** weekly earliness = share of each week's mules in the top 1% of open
+accounts, mean over weeks 0–26 (`recall_top_1pct` in `lgbm_baseline.by_week`); account-level PR-AUC reported beside it.
+Report the real-mule cost; the Phase 5 harness (caught within the rules' budget, days earlier) stays the final test.
 Sensitivity runs (rules frozen, 244k, one `test` value each): `python -m sim.sensitivity --list | --run [--only NAME]
 | --summarise` -> `data/sensitivity/<name>/` (large files deleted) and `outputs/sensitivity/summary.csv`.
 Single steps: `accounts`, `normal --batches 3-3`, `laundering`, `rules`, `finalize`. Use `--out` for another
