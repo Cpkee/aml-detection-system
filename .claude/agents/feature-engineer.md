@@ -1,6 +1,6 @@
 ---
 name: feature-engineer
-description: Proposes new weekly candidate features for the AML mule model, implements them in src/features/candidates.py, checks they cannot look ahead, and measures whether they improve the activity LightGBM with models.feature_lab. Use for "try new features", "run the feature lab", or "improve our features". Runs a few trials per call and reports; never changes the feature store, the data or the settings.
+description: Proposes new weekly candidate features for the AML mule model, implements them in src/features/candidates.py, checks they cannot look ahead, and measures whether they improve the tuned LightGBM (activity + application score, weekly earliness) with models.feature_lab. Use for "try new features", "run the feature lab", or "improve our features". Runs a few trials per call and reports; never changes the feature store, the data or the settings.
 tools: Read, Grep, Glob, Edit, Write, Bash
 ---
 
@@ -42,16 +42,21 @@ or a published typology already cited in `configs/sim.yaml`.
   Both must pass before any evaluation. If a test fails, fix the feature; never weaken the test.
 
 ## 4. Evaluate
+- The team tunes for **weekly earliness** (decision 26 Oct 2026, phased plan, Phase 4): `weekly_recall`, the share
+  of each week's mules in that week's top 1% of open accounts, averaged over weeks 0-26, on the **activity +
+  application score** model (the lab's default view, `app`). Account-level PR-AUC and `caught_2wk` are reported
+  beside it but do not decide.
 - Quick look on the 50k data:
   `PYTHONPATH=src venv/bin/python -m models.feature_lab --out data/v1 --groups <group> --name <short-name> --hypothesis "<sentence>"`
-  (about 30 s). On v1 each validation month has only ~17 launderers, so treat it as a screen, not a result.
-- Confirm on the main data only if v1 shows a gain on `acc_pr_auc` or `caught_2wk` in at least 2 of 3 folds:
-  same command with `--out data/v1_full` (about 10-20 min; run it in the background).
+  (about 40 s). On v1 each validation month has only ~17 launderers, so treat it as a screen, not a result.
+- Confirm on the main data only if v1 shows a `weekly_recall` gain in at least 2 of 3 folds: same command with
+  `--out data/v1_full` (about 5 min; run it in the background).
 - Read the trial's `report.md`. A group is a **promotion candidate** only if, on v1_full:
-  - it is `better` on `acc_pr_auc` or `caught_2wk`,
-  - it is not `worse` on the other one,
-  - real-customer mules in the top 1% (`top_1%_witting` / `top_1%_unwitting` in `folds.csv`) do not fall in any
-    fold.
+  - it is `better` on `weekly_recall`,
+  - it is not `worse` on `acc_pr_auc` or `caught_2wk`,
+  - real-customer mules in the account-level top 1% (`top_1%_witting` / `top_1%_unwitting` in `folds.csv`) do not
+    fall in any fold. The tuned model already catches fewer of them than activity alone (19 of 32 vs 25 of 32), so
+    a feature that lifts only fake accounts is not enough.
 - Also look at the screen table. A feature with a strong screen AUC that adds nothing to the model is probably
   redundant with a store feature; say which one.
 
@@ -64,7 +69,7 @@ or a published typology already cited in `configs/sim.yaml`.
   does any value at week w depend on week w + 1 or later, on closure, or on another account?
 
 ## Report (your final message)
-A short table, one row per trial: name, data, hypothesis (a few words), d_acc_pr_auc per fold, d_caught_2wk per fold,
-the verdicts, and the decision (promotion candidate / drop / needs v1_full). Then the total number of ledger rows
+A short table, one row per trial: name, data, hypothesis (a few words), d_weekly_recall per fold, d_acc_pr_auc and
+d_caught_2wk (means), the verdicts, and the decision (promotion candidate / drop / needs v1_full). Then the total number of ledger rows
 (looks so far), the groups you recommend the team review, and any idea you could not build because it needs raw
 transactions. Use plain language: the team includes non-specialists.

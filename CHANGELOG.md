@@ -6,6 +6,21 @@ Assumptions and Use" doc.
 
 
 
+## 26 Oct 2026 — Feature lab scores the tuning measure on the tuned model
+
+No data change, no feature-store change. `python -m models.feature_lab` now follows the tuning decision of 26 Oct
+2026: its default view is activity + application score, built exactly as `notebooks/06_lgbm_tuning.ipynb`, and the
+verdict that decides is `weekly_recall` (share of each week's mules in that week's top 1% of open accounts, mean over
+weeks 0–26; 'better' = all 3 folds up and mean gain >= 0.02, an assumption). Account-level PR-AUC and `caught_2wk`
+are reported beside it; `early_recall` (weeks 0–8) is gone. `--views activity` keeps the store-only model. The ledger
+keeps earlier rows when columns change. New `tests/test_feature_lab.py` checks the measures by hand and against
+`lgbm_baseline.by_week`. The feature-engineer agent's promotion rule now uses `weekly_recall`.
+- Trial `item1-history-tuned-measure`, v1_full: baseline reproduces notebook 06 (weekly recall 0.345 pooled,
+  PR-AUC 0.695). 4-week windows: weekly recall 0.403 (+0.073 / +0.041 / +0.059 per fold, 'better'), PR-AUC 0.871
+  ('better'), `caught_2wk` no clear change, real-customer mules in the account-level top 1% 19 -> 27 of 32 (up or
+  equal in every fold): the only group that meets every condition of the promotion rule. Running max raises weekly
+  recall (0.413) but is worse on PR-AUC and `caught_2wk`; last-week values and 2-week windows: no clear change.
+
 ## 26 Oct 2026 — Feature lab: candidate features, trial runner, feature-engineer agent
 
 No data change, no feature-store change. New `src/features/candidates.py`: candidate weekly features built from the
