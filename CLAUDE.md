@@ -42,7 +42,12 @@ LightGBM (activity + application score, as notebook 06; `--views activity` for s
 (baseline folds, months 0–4 only) and judges it on the tuning measure, weekly earliness (decision 26 Oct 2026) ->
 `outputs/modelling/feature_lab/<data>/<name>/` and an append-only `ledger.csv`. **Adopted (26 Oct 2026, Kee Chee Pheng):**
 the 8 four-week-window features (`candidates.ADOPTED`, group `roll4`), added at load time with
-`lgbm_baseline.load_table(..., adopted=True)` (not stored; weeks must start at 0). Tuning step 2 and later models use them;
+`lgbm_baseline.load_table(..., adopted=True)` (not stored; weeks must start at 0).
+**Feature list frozen (28 Oct 2026, Kee Chee Pheng):** for tuning step 2, calibration (month 5) and the test months the
+LightGBM inputs are the 28 store features + the 8 `roll4` features + `weeks_since_open` + the application score
+(`app_score`): 38, the lab's baseline. Changed only by team decision. Feature-lab trials and `/feature-round` run only on
+explicit request and are report-appendix work; re-checking `roll4` on Variant II / IV is a robustness check, not a
+reopening of the list. Tuning step 2 and later models use them;
 the lab's baseline includes them (`--baseline store` to re-check them). Notebooks 05/06 stay the records of the store-only
 runs. The lab also splits each gain by phase (`pre_start_recall`, `start_recall`, `later_recall`) and reports
 `first_caught_2wk` with permanent flags: weekly recall rewards re-flagging mules already found (26 Oct 2026 finding). The `feature-engineer` agent (`.claude/agents/`) runs propose -> implement -> verify -> evaluate
@@ -171,8 +176,8 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
 ## Next tasks
 **Status 27 Oct 2026** (team plan: doc tab "Team plan: final 3 weeks"): Phases 0–3 done; Phase 4 baselines, tuning step 1
 and feature adoption (`roll4`) done. Feature engineering is closing: `self4` not adopted (28 Oct; the agent worktree's lab code,
-phase split, `--baseline store` and trial outputs were merged 27 Oct), so the model inputs stay store + `roll4`; next,
-freeze the feature list for tuning step 2. Gate 28 Oct: tuning
+phase split, `--baseline store` and trial outputs were merged 27 Oct), so the model inputs stay store + `roll4`; feature list
+frozen 28 Oct (see the Modelling commands above). Gate 28 Oct: tuning
 grid done (Li Ann, with `adopted=True`), harness dry run on month 5 (Emmy Li), stress-test datasets and Variant II / IV
 stores built (teammate 4; then re-check `roll4` there). 4 Nov: models calibrated on month 5 and frozen. 5 Nov: test
 months 6–7 scored once. 11 Nov report final, 12 Nov submit (date to confirm). Caution: the lab and the tuning measure use

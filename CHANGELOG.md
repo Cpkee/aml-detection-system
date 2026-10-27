@@ -6,6 +6,16 @@ Assumptions and Use" doc.
 
 
 
+## 28 Oct 2026 — Feature list frozen
+
+No data, feature-store or code change. Decision (28 Oct 2026, Kee Chee Pheng, lead): the model inputs are frozen
+for tuning step 2, calibration on month 5 and scoring of test months 6–7: the 28 store features, the 8 `roll4`
+features (`features.candidates.ADOPTED`), `weeks_since_open` and the application score (`app_score`), 38 in all for
+the LightGBM activity + application model (the feature lab's baseline). Groups tried and not taken: `lag1`, `roll2`,
+`roll4_core`, `running_max`, `new_cp4`, `self4`, `speed_cum`, `max_out_hist`, `internal_out`. From now on feature-lab
+trials and `/feature-round` run only on explicit request, as report-appendix work. Re-checking `roll4` on Variants II
+and IV is a robustness check and does not reopen the list.
+
 ## 28 Oct 2026 — `self4` not adopted
 
 No data, feature-store or code change. Decision (28 Oct 2026, Kee Chee Pheng, lead): the `self4` group (last 4 weeks
