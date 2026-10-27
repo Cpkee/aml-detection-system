@@ -6,6 +6,16 @@ Assumptions and Use" doc.
 
 
 
+## 28 Oct 2026 — `self4` not adopted
+
+No data, feature-store or code change. Decision (28 Oct 2026, Kee Chee Pheng, lead): the `self4` group (last 4 weeks
+vs the account's own earlier 4-week average: money in, money out, payments in) is **not** added to the model inputs,
+which stay store + `roll4` (`features.candidates.ADOPTED` unchanged). On v1_full against the adopted model its weekly
+recall gain (+0.030 / +0.037 / +0.022) is mostly re-flagging mules already found (later recall +0.053 / +0.077 /
++0.061; start-week recall +0.008 / +0.029 / +0.013), first catch within 2 weeks is unchanged (0.957) and it loses 1
+unwitting mule from the top 1% in fold 1. A flag is permanent, so re-flagging earns nothing. The group stays in
+`candidates.py` as a tried candidate.
+
 ## 28 Oct 2026 — Feature round r01: real-customer mules
 
 No data change, no feature-store change, no change to the adopted features. First `/feature-round`, focus

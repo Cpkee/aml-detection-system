@@ -49,7 +49,9 @@ runs. The lab also splits each gain by phase (`pre_start_recall`, `start_recall`
 trials; it never changes the store, which stays a team decision.
 Agent trials 26 Oct 2026 (v1_full, vs the adopted model; groups `new_cp4`, `self4`, `speed_cum` in `candidates.py`,
 merged from the agent worktree 27 Oct 2026): `self4` (last 4 weeks vs the account's own earlier average)
-weekly recall +0.03, better in all folds, mostly later weeks, loses 1 unwitting mule in fold 1: **team decision open**;
+weekly recall +0.03, better in all folds, mostly later weeks, loses 1 unwitting mule in fold 1: **not adopted (decision
+28 Oct 2026, Kee Chee Pheng)**: the gain is re-flagging (later recall +0.05 to +0.08; start recall +0.008 to +0.029;
+first catch within 2 weeks unchanged), worth nothing with a permanent flag; stays a candidate group, not in `ADOPTED`;
 `speed_cum` +0.13 but almost all repeat flags: dropped; `new_cp4` (v1 only) no clear change: dropped. Finding: weekly
 recall rewards re-flagging mules already found, worth nothing with a permanent flag. Split by phase, `roll4` still lifts the
 start-week flag rate (0.703 -> 0.781, all folds), but first catch within 2 weeks with permanent flags stays 0.958 / 0.957.
@@ -168,8 +170,9 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
 
 ## Next tasks
 **Status 27 Oct 2026** (team plan: doc tab "Team plan: final 3 weeks"): Phases 0–3 done; Phase 4 baselines, tuning step 1
-and feature adoption (`roll4`) done. Feature engineering is closing: decide `self4` (the agent worktree's lab code, phase split,
-`--baseline store` and trial outputs were merged 27 Oct), then freeze the feature list for tuning step 2. Gate 28 Oct: tuning
+and feature adoption (`roll4`) done. Feature engineering is closing: `self4` not adopted (28 Oct; the agent worktree's lab code,
+phase split, `--baseline store` and trial outputs were merged 27 Oct), so the model inputs stay store + `roll4`; next,
+freeze the feature list for tuning step 2. Gate 28 Oct: tuning
 grid done (Li Ann, with `adopted=True`), harness dry run on month 5 (Emmy Li), stress-test datasets and Variant II / IV
 stores built (teammate 4; then re-check `roll4` there). 4 Nov: models calibrated on month 5 and frozen. 5 Nov: test
 months 6–7 scored once. 11 Nov report final, 12 Nov submit (date to confirm). Caution: the lab and the tuning measure use
