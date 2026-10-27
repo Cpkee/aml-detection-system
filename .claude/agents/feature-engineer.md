@@ -73,7 +73,8 @@ or a published typology already cited in `configs/sim.yaml`.
   - it is `better` on `weekly_recall`,
   - it is not `worse` on `acc_pr_auc` or `caught_2wk`,
   - real-customer mules in the account-level top 1% (`top_1%_witting` / `top_1%_unwitting` in `folds.csv`) do not
-    fall in any fold. The tuned model already catches fewer of them than activity alone (19 of 32 vs 25 of 32), so
+    fall in any fold. The current model (store + `roll4`, app view) puts 27 of 32 in the top 1%
+    on v1_full (10/14 witting, 17/18 unwitting; before `roll4` it was 19 of 32 vs 25 for activity alone), so
     a feature that lifts only fake accounts is not enough;
   - `start_recall` (mule weeks flagged in the start week and the next) and `first_caught_2wk` (first flag within 2
     weeks of the start) do not fall. `weekly_recall` also rewards flagging the same mule again in later weeks, which is
