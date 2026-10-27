@@ -76,6 +76,36 @@ def test_windows_by_hand():
     np.testing.assert_allclose(out["out_1h_share_wk_max_so_far"], np.maximum.accumulate(np.nan_to_num(s)), rtol=1e-6)
 
 
+def test_new_cp4_by_hand():
+    df = _store(n_acc=1, n_weeks=8)
+    df["n_payers_cum"] = [1, 1, 3, 3, 4, 9, 9, 10]          # cumulative distinct payers, weeks 0-7
+    out, _ = candidates.add(df, ["new_cp4"])
+    # weeks 0-3: everything so far; week 4: 4 - 1 (week 0); week 5: 9 - 1; week 6: 9 - 3; week 7: 10 - 3
+    np.testing.assert_allclose(out["new_payers_4wk"], [1, 1, 3, 3, 3, 8, 6, 7])
+
+
+def test_self4_by_hand():
+    df = _store(n_acc=1, n_weeks=9)
+    df["money_in_wk"] = [0, 0, 0, 0, 0, 0, 0, 0, 0.0]
+    df.loc[[0, 4], "money_in_wk"] = 1000.0                   # salary in weeks 0 and 4
+    df.loc[7, "money_in_wk"] = 3000.0                        # a burst in week 7
+    out, _ = candidates.add(df, ["self4"])
+    got = out["self4_money_in"].to_numpy()
+    assert np.isnan(got[:7]).all()                           # fewer than 4 earlier weeks before the window
+    # week 7: window weeks 4-7 = 4000; usual = 4 x 1000 / 4 weeks (0-3) = 1000 -> 4.0
+    # week 8: window weeks 5-8 = 3000; usual = 4 x 2000 / 5 weeks (0-4) = 1600 -> 1.875
+    np.testing.assert_allclose(got[7:], [4.0, 1.875], rtol=1e-6)
+
+
+def test_speed_cum_by_hand():
+    df = _store(n_acc=1, n_weeks=4)
+    df["money_in_wk"] = [0.0, 1000.0, 0.0, 3000.0]
+    df["out_1h_share_wk"] = [np.nan, 0.1, np.nan, 0.9]       # no money in -> no share
+    out, _ = candidates.add(df, ["speed_cum"])
+    # week 0: no money in yet; week 1: 100 / 1000; week 2: unchanged; week 3: (100 + 2700) / 4000
+    np.testing.assert_allclose(out["out_1h_share_cum"], [np.nan, 0.1, 0.1, 0.7], rtol=1e-6)
+
+
 def test_refuses_gaps_and_unsorted_rows():
     df = _store()
     with pytest.raises(ValueError):

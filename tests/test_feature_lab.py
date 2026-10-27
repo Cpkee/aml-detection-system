@@ -61,3 +61,22 @@ def test_load_table_adds_adopted_features():
     pd.testing.assert_frame_equal(with_adopted[plain.columns], plain)          # nothing else changes
     with pytest.raises(ValueError):
         load_table(DATA, (0,), (1, 26), adopted=True)
+
+
+def test_phase_recall_by_hand():
+    d = _valid()
+    v = lab.weekly_top1(d, d["score"].to_numpy())
+    # flags: week 0 M0 + top normal; week 1 M0 + M1. Mule rows: M0 w0, w1; M1 w1; M2 w0, w1 (never flagged)
+    r = lab.phase_recall(v, pd.Series({"M0": 1, "M1": 1, "M2": 0}))
+    assert r["pre_start_recall"] == 1.0                      # M0 at week 0, before its start
+    assert np.isclose(r["start_recall"], 2 / 4)              # M0 w1, M1 w1 flagged; M2 w0, w1 not
+    assert np.isnan(r["later_recall"])
+
+
+def test_permanent_flags_by_hand():
+    d = _valid()
+    v = d.assign(flag=False)
+    first = lab.first_flag_weeks(v)
+    # week 0: M0 and N0 (best normal); week 1 draws from the rest: M1 and N1 (M0 is not flagged twice)
+    assert first.to_dict() == {"M0": 0, "N0": 0, "M1": 1, "N1": 1}
+    assert np.isclose(lab.first_caught_2wk(v, pd.Series({"M0": 0, "M1": 1, "M2": 0})), 2 / 3)
