@@ -61,7 +61,12 @@ up to 5 insights in `outputs/modelling/eda_agent/insights.csv` (append-only; onl
 `tests/test_eda_agent.py`) with `notebooks/07_eda_agent_<round>.ipynb` as evidence -> the user picks -> the
 `feature-engineer` runs at most 3 trials -> a v1_full promotion candidate is judged **once** on `data/sensitivity/seed__43`
 (same settings as v1_full, seed 43, rules frozen at 1.516; never used by a trial before), its store and cleaned table built
-on first use.
+on first use. **Round r01 (28 Oct 2026, focus real-customer mules):** for real customers no signal before the start (21 of
+376 checks in the 2 weeks before, ~19 expected by chance); 4 start-week insights: r01-1 matched forwarding (strongest, AUC
+0.88 real, needs raw transactions: team proposal), r01-3 repeat payee (artefact: normal accounts never repeat a payee),
+r01-2 `max_out_hist` and r01-4 `internal_out` trialled: no gain on v1_full (r01-4 PR-AUC worse in all folds), so seed 43
+unused. The current model already flags 0.78 of mule weeks in the start week and the next, first catch within 2 weeks
+0.957, 27 of 32 real-customer mules in the top 1%. 19 looks on v1_full so far.
 Phase 4 baselines (untuned, 3 temporal folds, months 0–4, weeks 0–26): `notebooks/05_lgbm_baseline.ipynb` (helpers in
 `src/models/lgbm_baseline.py`) and `notebooks/04_logreg_baseline.ipynb` -> `outputs/modelling/models/<run>/`; both
 reproducible run to run (sorted rows via `weekly.load(months=)`, LightGBM `deterministic=True`, since 22 Oct 2026).

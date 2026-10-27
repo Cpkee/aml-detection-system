@@ -6,6 +6,30 @@ Assumptions and Use" doc.
 
 
 
+## 28 Oct 2026 — Feature round r01: real-customer mules
+
+No data change, no feature-store change, no change to the adopted features. First `/feature-round`, focus
+real-customer mules (66 witting + 69 unwitting in months 0–4 of v1_full). Report-appendix work.
+- EDA (`notebooks/07_eda_agent_r01.ipynb`, `outputs/modelling/eda_agent/r01/`, 669 AUCs listed in `checks.csv`):
+  for real customers no signal before laundering starts (21 of 376 checks in the 2 weeks before differ, ~19 expected by
+  chance); the Phase 1 hint (more rows before the start) disappears when compared at the same week since opening
+  (AUC 0.50). 4 start-week insights in `insights.csv`:
+  - r01-1 matched forwarding (pays out 80–100% of a payment just received within 24 h): AUC real 0.88, 58% of real
+    mules' start weeks vs 1.3% of normal weeks; needs raw transactions, so a team proposal; size partly an artefact
+    (normal accounts never forward a received amount).
+  - r01-2 largest payment out beats the account's earlier maximum: real 0.81 (store version 0.79).
+  - r01-3 same payee 2+ times a week: artefact (the simulator never repeats a normal payee within a week); recorded
+    so nobody trials it.
+  - r01-4 weekly share of money out to accounts inside the bank: real 0.75 vs fake 0.63.
+- Trials (new groups `max_out_hist`, `internal_out` in `features.candidates`, with hand-computed tests), vs store +
+  `roll4`, per fold on v1_full: `max_out_hist` weekly recall −0.006 / +0.003 / +0.012, no clear change (status
+  `tried`); `internal_out` −0.017 / +0.005 / −0.004, PR-AUC worse in all folds (status `dropped`). Start-week recall
+  and first catch within 2 weeks unchanged within fold noise; real-customer mules in the top 1% unchanged (27 of 32).
+  No promotion candidate, so seed 43 is still unused.
+- Looks: 34 ledger rows, 19 on v1_full.
+- `feature-engineer` prompt: the real-mule figure updated to the current model (27 of 32; 19 of 32 was before
+  `roll4`).
+
 ## 27 Oct 2026 — EDA -> feature loop (report appendix)
 
 No data change, no feature-store change, no change to the adopted features or the frozen feature list. New:

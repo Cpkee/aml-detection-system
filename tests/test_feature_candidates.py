@@ -106,6 +106,29 @@ def test_speed_cum_by_hand():
     np.testing.assert_allclose(out["out_1h_share_cum"], [np.nan, 0.1, 0.1, 0.7], rtol=1e-6)
 
 
+def test_max_out_hist_by_hand():
+    df = _store(n_acc=1, n_weeks=6)
+    df["max_out_wk"] = [0.0, 50.0, 20.0, 0.0, 100.0, 60.0]
+    out, _ = candidates.add(df, ["max_out_hist"])
+    # largest earlier: -, 0, 50, 50, 50, 100 -> NaN until an earlier week has money out; 0 in a week with none
+    np.testing.assert_allclose(out["max_out_vs_hist"], [np.nan, np.nan, 0.4, 0.0, 2.0, 0.6], rtol=1e-6)
+
+
+def test_internal_out_by_hand():
+    df = _store(n_acc=1, n_weeks=6)
+    money_out = np.array([0.0, 100.0, 50.0, 0.0, 200.0, 0.0])
+    internal = np.array([0.0, 30.0, 0.0, 0.0, 100.0, 0.0])          # money out to A* accounts, per week
+    df["money_out_wk"], df["money_out_cum"] = money_out, money_out.cumsum()
+    df["internal_out_share_cum"] = np.where(money_out.cumsum() > 0, internal.cumsum() / np.where(
+        money_out.cumsum() > 0, money_out.cumsum(), 1), np.nan)    # as the store: NaN until money goes out
+    out, _ = candidates.add(df, ["internal_out"])
+    # weekly: no money out in weeks 0, 3, 5 -> NaN; week 1: 30/100; week 2: 0/50; week 4: 100/200
+    np.testing.assert_allclose(out["internal_out_share_wk"], [np.nan, 0.3, 0.0, np.nan, 0.5, np.nan], rtol=1e-6)
+    assert (out["internal_out_share_wk"].dropna() >= 0).all()
+    # 4 weeks: week 0 none; 1: 30/100; 2: 30/150; 3: 30/150; 4 (weeks 1-4): 130/350; 5 (weeks 2-5): 100/250
+    np.testing.assert_allclose(out["internal_out_share_4wk"], [np.nan, 0.3, 0.2, 0.2, 130 / 350, 0.4], rtol=1e-6)
+
+
 def test_refuses_gaps_and_unsorted_rows():
     df = _store()
     with pytest.raises(ValueError):
