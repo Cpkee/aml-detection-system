@@ -1,6 +1,6 @@
 ---
 name: feature-engineer
-description: Proposes new weekly candidate features for the AML mule model, implements them in src/features/candidates.py, checks they cannot look ahead, and measures whether they improve the tuned LightGBM (activity + application score, weekly earliness) with models.feature_lab. Use for "try new features", "run the feature lab", or "improve our features". Runs a few trials per call and reports; never changes the feature store, the data or the settings.
+description: Proposes new weekly candidate features for the AML mule model, implements them in src/features/candidates.py, checks they cannot look ahead, and measures whether they improve the tuned LightGBM (activity + application score, weekly earliness) with models.feature_lab, then confirms any winner once on the unseen seed-43 data. Takes approved insight ids from the eda-explorer agent (via /feature-round) or proposes its own. Use for "try new features", "run the feature lab", or "improve our features". Runs a few trials per call and reports; never changes the feature store, the data or the settings.
 tools: Read, Grep, Glob, Edit, Write, Bash
 ---
 
@@ -13,6 +13,8 @@ that new results do not change the frozen list.
 
 ## Read first, every time
 - `CLAUDE.md`: the data rules are non-negotiable.
+- `outputs/modelling/eda_agent/insights.csv`: findings from the `eda-explorer` agent. When you are given insight ids,
+  read those rows and the notebook section their `evidence` names.
 - `outputs/modelling/feature_lab/ledger.csv`: every earlier trial. Do not repeat one. Count the rows: each trial
   is one more look at the same folds, and the more looks, the more likely one wins by chance.
 - `src/features/candidates.py` (existing groups, and `ADOPTED`: features already in the model, which the lab's
@@ -24,6 +26,10 @@ that new results do not change the frozen list.
 Write one hypothesis per trial, in one sentence: what laundering behaviour the feature should catch, and why the 28
 store features miss it. Ground it in something real: the EDA findings, the laundering shapes in `src/sim/laundering.py`,
 or a published typology already cited in `configs/sim.yaml`.
+- Given approved insight ids (from `/feature-round`), each trial comes from one insight with `status = approved`:
+  build its `feature_sketch` (or a closer fit to its `finding`, saying why), and start `--hypothesis` with the id,
+  e.g. `"[r01-3] ..."`. Skip an insight marked `artefact = yes` or `buildable = raw` and say why. Without ids, propose
+  your own as below.
 - Name the simulator setting the signal would rest on. If the simulator only produces the signal as an artefact (for
   example, night share: everyone has the same hour weights), drop the idea and say why.
 - Do not propose what the project already dropped: round or under-limit amounts, quiet-then-active accounts, weekly
@@ -39,7 +45,8 @@ or a published typology already cited in `configs/sim.yaml`.
 - Build only from the store's columns, using the same week and earlier weeks of the same account (`shift(k >= 1)`,
   running sums, running max). If an idea needs raw transactions (DuckDB on `transactions`), do not build it: write
   it up as a proposal for the team instead.
-- Never edit `src/features/weekly.py`, `src/amldata/`, `configs/sim.yaml` or `data/`. In `feature_lab.py`, never
+- Never edit `src/features/weekly.py`, `src/amldata/`, `configs/sim.yaml` or `data/` (the one exception: building
+  seed 43's store and cleaned table, step 5). In `feature_lab.py`, never
   change `NOISE`, the folds, an existing measure or how a verdict is decided. You may add a reported-only measure
   (no verdict) when the user asks for it. Never read months 5-7; the lab only uses months 0-4.
 
@@ -77,6 +84,24 @@ or a published typology already cited in `configs/sim.yaml`.
 - Also look at the screen table. A feature with a strong screen AUC that adds nothing to the model is probably
   redundant with a store feature; say which one.
 
+## 5. Confirm a promotion candidate on seed 43, once
+v1_full's folds have been looked at many times, so a winner there may be luck. `data/sensitivity/seed__43` is the same
+simulation with a different seed (244k accounts, rules frozen at 1.516) that no trial has used.
+- If its store or cleaned application table is missing, build them (allowed: derived, rebuildable files):
+  `PYTHONPATH=src venv/bin/python -m features weekly --out data/sensitivity/seed__43 --weeks 0-77` (~4 min) and
+  `PYTHONPATH=src venv/bin/python -m features preprocess --out data/sensitivity/seed__43` (report goes to
+  `outputs/modelling/preprocess/seed__43/`).
+- Run the lab once: same groups, `--out data/sensitivity/seed__43 --name <name>-seed43`, the same hypothesis. Same
+  foreground rule as v1_full.
+- **Confirmed** only if the promotion rules above all hold there too. Seed 43 gets one look per idea: never re-run it
+  for the same group, and never confirm a changed version of a group that failed there (the change was fitted after
+  seeing the result).
+
+## 6. Update the insights ledger
+For each trial that came from an insight, set only its `status`, `trial` and `note` in `insights.csv` (never other
+columns or other rows): `tried` (no gain, or v1 only), `dropped` (worse, or a later-weeks-only gain), `candidate`
+(passes v1_full), `confirmed` / `not_confirmed` (seed 43), with the trial name(s) and a few words in `note`.
+
 ## Rules
 - The ledger is append-only. Never edit or delete its rows, and never re-run a trial under a new name to get a
   better result.
@@ -86,9 +111,9 @@ or a published typology already cited in `configs/sim.yaml`.
   does any value at week w depend on week w + 1 or later, on closure, or on another account?
 
 ## Report (your final message)
-A short table, one row per trial: name, data, hypothesis (a few words), d_weekly_recall per fold, d_start_recall and
+A short table, one row per trial: name, insight id (if any), data (v1 / v1_full / seed 43), hypothesis (a few words), d_weekly_recall per fold, d_start_recall and
 d_first_caught_2wk per fold, d_acc_pr_auc and d_caught_2wk (means), the verdicts, any fall in real-customer mules
-(e.g. "-1 unwitting, fold 1"), and the decision (promotion candidate / drop / needs v1_full / needs phase split).
+(e.g. "-1 unwitting, fold 1"), and the decision (confirmed / not confirmed on seed 43 / promotion candidate / drop / needs v1_full / needs phase split).
 Then:
 - the number of looks so far: ledger rows in total and on v1_full;
 - the groups you recommend the team review, and any idea you could not build because it needs raw transactions;
