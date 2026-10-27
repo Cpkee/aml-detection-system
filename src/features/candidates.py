@@ -10,6 +10,11 @@ team and then added to weekly.py.
   roll4        the same over this week and the three before
   roll4_core   roll4's three ratios and payments in only (is the smaller set as good?)
   running_max  the largest weekly value so far (a burst stays visible after it ends)
+  new_cp4      payers and payees first seen in this week and the three before (from the cumulative counts)
+  self4        this week and the three before vs the account's own average 4 weeks before them (money in / out,
+               payments in): self-vs-past on a monthly scale, defined when weekly money in is mostly 0
+  speed_cum    share of all money in so far paid out within 1 h / 24 h of a payment in (a burst stays visible after
+               it ends, while a normal account's one-off fast week is diluted, unlike running_max)
 
 Evaluated by `python -m models.feature_lab` (see that module); every trial is logged in its ledger. Groups the team
 adopts are listed in ADOPTED at the bottom of this file.
@@ -74,7 +79,41 @@ def running_max(df, g):
             for c in MAX_COLS}
 
 
-GROUPS = {"lag1": lag1, "roll2": roll2, "roll4": roll4, "roll4_core": roll4_core, "running_max": running_max}
+def new_cp4(df, g):
+    """Distinct payers (payees) whose first payment in (out) falls in weeks w-3..w: the growth of the store's
+    cumulative counts over 4 weeks. Unlike n_payers_4wk, a payer who pays every week counts once, and only if new."""
+    return {f"new_{c}_4wk": df[f"n_{c}_cum"] - g[f"n_{c}_cum"].shift(4).fillna(0) for c in ("payers", "payees")}
+
+
+SELF4_COLS = ["money_in_wk", "money_out_wk", "n_in_wk"]
+
+
+def self4(df, g):
+    """Sum over weeks w-3..w / (4 x mean weekly value over weeks 0..w-4). NaN until 4 earlier weeks exist (as the
+    store's self_vs_past, SELF_MIN_WEEKS) or when the earlier weeks hold nothing. A salary paid monthly leaves most
+    weeks at 0, so the store's median/MAD version is often NaN; a 4-week window holds about one pay day."""
+    acc = df["account_id"].to_numpy()
+    n_past = (df["weeks_since_open"] - 3).where(df["weeks_since_open"] >= 7)       # weeks 0..w-4, at least 4
+    out = {}
+    for c in SELF4_COLS:
+        cum = df[c].groupby(acc, sort=False).cumsum()
+        past = cum.groupby(acc, sort=False).shift(4)                                 # total of weeks 0..w-4
+        usual = 4 * past / n_past
+        out[f"self4_{c.removesuffix('_wk')}"] = (cum - past) / usual.where(usual > 0)
+    return out
+
+
+def speed_cum(df, g):
+    """Money paid out within 1 h / 24 h of the latest payment in, summed over weeks 0..w, over money in summed over
+    weeks 0..w (the weekly shares weighted by the week's money in, as roll4 does over 4 weeks). NaN until money in."""
+    acc = df["account_id"].to_numpy()
+    money_in = df["money_in_wk"].groupby(acc, sort=False).cumsum()
+    return {f"{c}_share_cum": (df[f"{c}_share_wk"].fillna(0) * df["money_in_wk"]).groupby(acc, sort=False).cumsum()
+            / money_in.where(money_in > 0) for c in ("out_1h", "out_24h")}
+
+
+GROUPS = {"lag1": lag1, "roll2": roll2, "roll4": roll4, "roll4_core": roll4_core, "running_max": running_max,
+          "new_cp4": new_cp4, "self4": self4, "speed_cum": speed_cum}
 
 # Adopted into the model inputs (decision 26 Oct 2026, Kee Chee Pheng, lead; feature lab trials
 # item1-history-tuned-measure and roll4-core-vs-full). Computed at load time by models.lgbm_baseline.load_table(...,

@@ -6,6 +6,27 @@ Assumptions and Use" doc.
 
 
 
+## 27 Oct 2026 — Feature lab splits gains by phase; agent trials merged
+
+No data change, no feature-store change, no change to the adopted features. Merged from the `feature-engineer` agent's
+worktree (trials of 26 Oct 2026):
+- `python -m models.feature_lab` also reports, with no verdict, where a gain comes from: `pre_start_recall` (fake
+  accounts before they launder), `start_recall` (start week and the next), `later_recall` (2+ weeks after), and
+  `first_caught_2wk` (as `caught_2wk`, but a flag is permanent: a mule flagged once leaves the pool).
+  `--baseline store` re-checks the adopted features against the store-only model. `NOISE`, folds, the existing
+  measures and verdicts are unchanged; the ledger gains columns, earlier rows are kept as they were.
+- Finding: `weekly_recall` also rewards flagging the same mule again in later weeks, worth nothing with a permanent flag.
+  `roll4` (re-check, v1_full): `start_recall` 0.703 -> 0.781 in all folds, so its gain is partly earlier catching;
+  `first_caught_2wk` 0.958 -> 0.957.
+- New candidate groups in `features.candidates` (with hand-computed tests): `new_cp4`, `self4`, `speed_cum`. On
+  v1_full against the adopted model: `self4` weekly recall +0.030 (+0.030 / +0.037 / +0.022), `start_recall` +0.008 /
+  +0.029 / +0.013, `first_caught_2wk` unchanged, loses 1 unwitting mule in fold 1: team decision open. `speed_cum`
+  +0.131, almost all in `later_recall` (+0.34 / +0.33 / +0.20): dropped. `new_cp4` (v1 only) no clear change: dropped.
+- 17 looks on v1_full against the same folds so far (ledger).
+- `.claude/agents/feature-engineer.md`: promotion also needs `start_recall` and `first_caught_2wk` not to fall;
+  clearer lab-editing rule, foreground v1_full runs, worktree data paths, report lists changed files and the
+  top-1%-vs-rules'-budget caveat.
+
 ## 26 Oct 2026 — Four-week-window features adopted into the model inputs
 
 No data change, no feature-store change. The 8 features of the feature lab's `roll4` group (`n_rows_4wk`, `n_in_4wk`,

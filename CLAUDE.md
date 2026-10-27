@@ -43,8 +43,17 @@ LightGBM (activity + application score, as notebook 06; `--views activity` for s
 `outputs/modelling/feature_lab/<data>/<name>/` and an append-only `ledger.csv`. **Adopted (26 Oct 2026, Kee Chee Pheng):**
 the 8 four-week-window features (`candidates.ADOPTED`, group `roll4`), added at load time with
 `lgbm_baseline.load_table(..., adopted=True)` (not stored; weeks must start at 0). Tuning step 2 and later models use them;
-the lab's baseline includes them. Notebooks 05/06 stay the records of the store-only runs. The `feature-engineer` agent (`.claude/agents/`) runs propose -> implement -> verify -> evaluate
+the lab's baseline includes them (`--baseline store` to re-check them). Notebooks 05/06 stay the records of the store-only
+runs. The lab also splits each gain by phase (`pre_start_recall`, `start_recall`, `later_recall`) and reports
+`first_caught_2wk` with permanent flags: weekly recall rewards re-flagging mules already found (26 Oct 2026 finding). The `feature-engineer` agent (`.claude/agents/`) runs propose -> implement -> verify -> evaluate
 trials; it never changes the store, which stays a team decision.
+Agent trials 26 Oct 2026 (v1_full, vs the adopted model; groups `new_cp4`, `self4`, `speed_cum` in `candidates.py`,
+merged from the agent worktree 27 Oct 2026): `self4` (last 4 weeks vs the account's own earlier average)
+weekly recall +0.03, better in all folds, mostly later weeks, loses 1 unwitting mule in fold 1: **team decision open**;
+`speed_cum` +0.13 but almost all repeat flags: dropped; `new_cp4` (v1 only) no clear change: dropped. Finding: weekly
+recall rewards re-flagging mules already found, worth nothing with a permanent flag. Split by phase, `roll4` still lifts the
+start-week flag rate (0.703 -> 0.781, all folds), but first catch within 2 weeks with permanent flags stays 0.958 / 0.957.
+17 looks on v1_full against the same folds so far (multiple-looks risk).
 Phase 4 baselines (untuned, 3 temporal folds, months 0–4, weeks 0–26): `notebooks/05_lgbm_baseline.ipynb` (helpers in
 `src/models/lgbm_baseline.py`) and `notebooks/04_logreg_baseline.ipynb` -> `outputs/modelling/models/<run>/`; both
 reproducible run to run (sorted rows via `weekly.load(months=)`, LightGBM `deterministic=True`, since 22 Oct 2026).
@@ -145,6 +154,14 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
 - Branch per change, PR into `main`. Never commit `data/`. Run checks + pytest before committing.
 
 ## Next tasks
+**Status 27 Oct 2026** (team plan: doc tab "Team plan: final 3 weeks"): Phases 0–3 done; Phase 4 baselines, tuning step 1
+and feature adoption (`roll4`) done. Feature engineering is closing: decide `self4` (the agent worktree's lab code, phase split,
+`--baseline store` and trial outputs were merged 27 Oct), then freeze the feature list for tuning step 2. Gate 28 Oct: tuning
+grid done (Li Ann, with `adopted=True`), harness dry run on month 5 (Emmy Li), stress-test datasets and Variant II / IV
+stores built (teammate 4; then re-check `roll4` there). 4 Nov: models calibrated on month 5 and frozen. 5 Nov: test
+months 6–7 scored once. 11 Nov report final, 12 Nov submit (date to confirm). Caution: the lab and the tuning measure use
+each week's top 1% (~300–500 accounts a week); the rules flag ~7–9 cohort accounts a week in weeks 0–12 (111 of 50,061),
+about 60x fewer, so only the Phase 5 harness at the rules' budget shows whether the features help.
 1. ~~`--set key=value` override~~ done 7 Oct 2026 (with run manifest).
 2. ~~Full-size run~~ done 7 Oct 2026, regenerated 8 Oct after the R6 fix: rules at 93.4% (see above).
 3. Modelling. **Decisions 9 Oct 2026** (phased plan in the doc tab "Modelling: phased plan"): one pooled account-week

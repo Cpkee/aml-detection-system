@@ -48,6 +48,7 @@ NOISE = {"weekly_recall": 0.02,   # assumption: 2 points of recall, no measured 
          "acc_pr_auc": 0.04,      # team plan working rule: PR-AUC differences under ~0.04 are fold noise
          "caught_2wk": 0.05}      # assumption: ~1 binomial s.e. with ~90 starts per fold on v1_full; test 0.03 / 0.08
 MAIN = "weekly_recall"
+INFO = ["pre_start_recall", "start_recall", "later_recall", "first_caught_2wk"]   # where a gain comes from; no verdict
 
 
 def auc_ci(x, y, n_boot: int = 1000, seed: int = 0) -> tuple[float, float, float]:
@@ -119,6 +120,37 @@ def caught_2wk(v: pd.DataFrame, start: pd.Series) -> float:
     return float(near.groupby("account_id")["flag"].any().reindex(st.index, fill_value=False).mean())
 
 
+def phase_recall(v: pd.DataFrame, start: pd.Series) -> dict[str, float]:
+    """Share of mule weeks flagged, split by weeks since the account's laundering start: before it (fake accounts,
+    mules from opening), the start week and the next, and 2+ weeks after. weekly_recall mixes all three; a gain only
+    in 'later' re-flags mules a permanent flag would already have caught."""
+    m = v[v.mule_by_day == 1]
+    since = m["weeks_since_open"] - m["account_id"].map(start)
+    return {"pre_start_recall": float(m.loc[since < 0, "flag"].mean()),
+            "start_recall": float(m.loc[since.between(0, 1), "flag"].mean()),
+            "later_recall": float(m.loc[since >= 2, "flag"].mean())}
+
+
+def first_flag_weeks(v: pd.DataFrame) -> pd.Series:
+    """Week of each account's first flag when a flag is permanent (decision 9 Oct 2026): every week the top 1% of
+    that week's open accounts is flagged from the accounts not flagged before (same k as weekly_top1)."""
+    first = {}
+    for w, g in v.groupby("weeks_since_open"):
+        k = max(1, int(round(0.01 * len(g))))
+        pool = g[~g["account_id"].isin(first.keys())]
+        for a in pool.sort_values("score", ascending=False, kind="stable")["account_id"].head(k):
+            first[a] = w
+    return pd.Series(first, dtype=float)
+
+
+def first_caught_2wk(v: pd.DataFrame, start: pd.Series) -> float:
+    """caught_2wk with permanent flags: share of launderers starting in weeks 0-25 whose first flag comes no later
+    than the week after their start (a flag before the start counts: it is earlier still)."""
+    st = start[(start <= 25) & start.index.isin(v["account_id"])]
+    first = first_flag_weeks(v).reindex(st.index)
+    return float((first <= st + 1).mean())
+
+
 def fit_folds(df, cols, prof, start, scores, seed) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Per-fold measures and the out-of-fold scores of one variant."""
     import lightgbm as lgb
@@ -133,7 +165,8 @@ def fit_folds(df, cols, prof, start, scores, seed) -> tuple[pd.DataFrame, pd.Dat
         m = base.evaluate(valid, score, prof)
         v = weekly_top1(valid, score)
         rows.append({"fold": f, "weekly_recall": weekly_recall(v), "acc_pr_auc": m["acc_pr_auc"],
-                     "caught_2wk": caught_2wk(v, start), "top_1%_witting": m["top_1%_witting"],
+                     "caught_2wk": caught_2wk(v, start), **phase_recall(v, start),
+                     "first_caught_2wk": first_caught_2wk(v, start), "top_1%_witting": m["top_1%_witting"],
                      "top_1%_unwitting": m["top_1%_unwitting"]})
         oof.append(valid[base.KEY + ["mule_by_day"]].assign(score=score))
     return pd.DataFrame(rows), pd.concat(oof, ignore_index=True)
@@ -162,8 +195,13 @@ def git_commit() -> str:
 
 
 def append_ledger(rows: pd.DataFrame):
-    """Add rows to the ledger. Earlier rows are kept as they are; a column they lack is left empty."""
+    """Add rows to the ledger. Earlier rows are kept byte for byte when the columns fit; only a new column forces a
+    rewrite, which leaves that column empty for earlier rows."""
     if os.path.exists(LEDGER):
+        old = pd.read_csv(LEDGER, nrows=0).columns
+        if set(rows.columns) <= set(old):
+            rows.reindex(columns=old).to_csv(LEDGER, mode="a", header=False, index=False)
+            return
         rows = pd.concat([pd.read_csv(LEDGER), rows], ignore_index=True)
     rows.to_csv(LEDGER, index=False)
 
@@ -176,14 +214,18 @@ def main(argv=None):
     ap.add_argument("--views", nargs="+", default=["app"], choices=["app", "activity"],
                     help="app = activity + application score (default, the tuned model); activity = store features only")
     ap.add_argument("--hypothesis", default="", help="one line: what laundering behaviour the group should catch")
+    ap.add_argument("--baseline", default="adopted", choices=["adopted", "store"],
+                    help="adopted = store + features.candidates.ADOPTED (default); store = store features only, to "
+                         "re-check an adopted group")
     ap.add_argument("--seed", type=int, default=42)
     a = ap.parse_args(argv)
+    adopted = candidates.ADOPTED if a.baseline == "adopted" else []
 
     t0 = time.time()
     data = os.path.basename(os.path.normpath(a.out))
     report = os.path.join(ROOT, data, a.name)
     os.makedirs(report, exist_ok=True)
-    df, _ = base.load_table(a.out, MONTHS, WEEKS, adopted=True)
+    df, _ = base.load_table(a.out, MONTHS, WEEKS, adopted=bool(adopted))
     df = df.sort_values(candidates.KEY, kind="stable").reset_index(drop=True)
     df, names = candidates.add(df, a.groups)
     prof, start = base.profiles(a.out, MONTHS), start_weeks(a.out)
@@ -195,7 +237,7 @@ def main(argv=None):
     adds = {f"+{g}": names[g] for g in a.groups} | ({"+all": new} if len(a.groups) > 1 else {})
     res, summary = [], []
     for view in a.views:
-        base_cols = WEEKLY + candidates.ADOPTED + ["weeks_since_open"] + (["app_score"] if view == "app" else [])
+        base_cols = WEEKLY + adopted + ["weeks_since_open"] + (["app_score"] if view == "app" else [])
         b = None
         for v, extra in {"baseline": [], **adds}.items():
             r, oof = fit_folds(df, base_cols + extra, prof, start, scores if view == "app" else None, a.seed)
@@ -204,10 +246,11 @@ def main(argv=None):
             row = {"view": view, "variant": v, "n_features": len(base_cols + extra),
                    "weekly_recall_pooled": pooled_weekly_recall(oof)}
             b = r.set_index("fold") if b is None else b
-            for m in NOISE:
+            for m in list(NOISE) + INFO:
                 d = r.set_index("fold")[m] - b[m]
-                row |= {m: r[m].mean(), f"d_{m}": d.mean(), f"d_{m}_folds": " / ".join(f"{x:+.3f}" for x in d),
-                        f"{m}_verdict": verdict(d, NOISE[m]) if v != "baseline" else ""}
+                row |= {m: r[m].mean(), f"d_{m}": d.mean(), f"d_{m}_folds": " / ".join(f"{x:+.3f}" for x in d)}
+                if m in NOISE:
+                    row[f"{m}_verdict"] = verdict(d, NOISE[m]) if v != "baseline" else ""
             summary.append(row)
             print(f"{view:8s} {v:14s} weekly recall {row['weekly_recall_pooled']:.3f} (pooled)  "
                   f"PR-AUC {row['acc_pr_auc']:.3f}  caught 2wk {row['caught_2wk']:.3f}  ({time.time() - t0:.0f}s)")
@@ -218,7 +261,8 @@ def main(argv=None):
     summary.to_csv(os.path.join(report, "summary.csv"), index=False)
     write_report(report, a, data, summary, scr)
     stamp = {"date": datetime.date.today().isoformat(), "commit": git_commit(), "data": data, "trial": a.name,
-             "hypothesis": a.hypothesis, "seed": a.seed, "baseline": f"store + {candidates.ADOPTED_GROUP}"}
+             "hypothesis": a.hypothesis, "seed": a.seed,
+             "baseline": f"store + {candidates.ADOPTED_GROUP}" if adopted else "store"}
     led = summary[summary.variant != "baseline"].assign(**stamp)
     led["features"] = led.variant.map(lambda v: " ".join(adds[v]))
     append_ledger(led[list(stamp) + [c for c in led.columns if c not in stamp]])
@@ -240,6 +284,12 @@ def write_report(report, a, data, summary, scr):
                    [m, f"d_{m}", f"d_{m}_folds", f"{m}_verdict"]
             lines += [f"### {m}{' (decides)' if m == MAIN else ''}", "",
                       s[cols].to_markdown(index=False, floatfmt=".3f"), ""]
+        cols = ["variant"] + [c for m in INFO for c in (m, f"d_{m}_folds")]
+        lines += ["### Where the gain comes from (no verdict)", "", s[cols].to_markdown(index=False, floatfmt=".3f"),
+                  "", "Share of mule weeks in the weekly top 1%, by weeks since the account's laundering start: "
+                  "pre_start (fake accounts before they launder), start (start week and the next), later (2+ weeks "
+                  "after). first_caught_2wk: as caught_2wk, but a flag is permanent (decision 9 Oct 2026), so a mule "
+                  "flagged earlier counts as caught and later re-flags count for nothing.", ""]
     lines += [
         "- weekly_recall: share of each week's mules in that week's top 1% of open accounts, mean over weeks 0-26 "
         "(the tuning measure, decision 26 Oct 2026). `weekly_recall_pooled` pools the 3 validation months per week, "
