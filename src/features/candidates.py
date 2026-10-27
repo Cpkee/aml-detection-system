@@ -15,6 +15,10 @@ team and then added to weekly.py.
                payments in): self-vs-past on a monthly scale, defined when weekly money in is mostly 0
   speed_cum    share of all money in so far paid out within 1 h / 24 h of a payment in (a burst stays visible after
                it ends, while a normal account's one-off fast week is diluted, unlike running_max)
+  max_out_hist this week's largest payment out over the largest in any earlier week (insight r01-2: a burst pays
+               out more than the account ever did, even with a long normal history)
+  internal_out share of this week's (and the last 4 weeks') money out paid to accounts inside the bank, recovered from
+               the store's cumulative share (insight r01-4: a long history dilutes the cumulative share)
 
 Evaluated by `python -m models.feature_lab` (see that module); every trial is logged in its ledger. Groups the team
 adopts are listed in ADOPTED at the bottom of this file.
@@ -112,8 +116,30 @@ def speed_cum(df, g):
             / money_in.where(money_in > 0) for c in ("out_1h", "out_24h")}
 
 
+def max_out_hist(df, g):
+    """max_out_wk / the largest max_out_wk in weeks 0..w-1. NaN until an earlier week has money out; 0 in a week with
+    none. Store version: max_out_wk includes the weekly card row (insight r01-2's raw version leaves it out)."""
+    before = g["max_out_wk"].cummax().groupby(df["account_id"].to_numpy(), sort=False).shift(1)
+    return {"max_out_vs_hist": df["max_out_wk"] / before.where(before > 0)}
+
+
+def internal_out(df, g):
+    """Money out to accounts inside the bank (A*) over weeks w-k+1..w, k = 1 and 4, over money out in those weeks.
+    The internal money so far is internal_out_share_cum x money_out_cum (the share is NaN, i.e. 0 money, until money
+    goes out); its growth over k weeks is rounded to pence, as the amounts are, so float error cannot leave a tiny
+    non-zero share. NaN when no money goes out in the window."""
+    so_far = df["internal_out_share_cum"].fillna(0) * df["money_out_cum"]
+    out = {}
+    for k in (1, 4):
+        internal = (so_far - so_far.groupby(df["account_id"].to_numpy(), sort=False).shift(k).fillna(0)).round(2)
+        money = df["money_out_wk"] + sum(g["money_out_wk"].shift(j).fillna(0) for j in range(1, k))
+        out["internal_out_share_wk" if k == 1 else f"internal_out_share_{k}wk"] = internal / money.where(money > 0)
+    return out
+
+
 GROUPS = {"lag1": lag1, "roll2": roll2, "roll4": roll4, "roll4_core": roll4_core, "running_max": running_max,
-          "new_cp4": new_cp4, "self4": self4, "speed_cum": speed_cum}
+          "new_cp4": new_cp4, "self4": self4, "speed_cum": speed_cum, "max_out_hist": max_out_hist,
+          "internal_out": internal_out}
 
 # Adopted into the model inputs (decision 26 Oct 2026, Kee Chee Pheng, lead; feature lab trials
 # item1-history-tuned-measure and roll4-core-vs-full). Computed at load time by models.lgbm_baseline.load_table(...,
