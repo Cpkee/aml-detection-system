@@ -6,6 +6,20 @@ Assumptions and Use" doc.
 
 
 
+## 27 Oct 2026 — EDA -> feature loop (report appendix)
+
+No data change, no feature-store change, no change to the adopted features or the frozen feature list. New:
+- `eda-explorer` agent (`.claude/agents/eda-explorer.md`): one round explores months 0–4 of v1_full through `amldata`
+  (store, raw transactions in DuckDB, labels with launderer type), data first and only then the simulator code, and
+  writes up to 5 insights with evidence (AUC with 95% bootstrap interval for all / fake / real-customer mules, within
+  income and age bands, against the closest store feature, before vs after the start), the simulator setting and its
+  `strength`, and an artefact verdict. Evidence notebook `notebooks/07_eda_agent_<round>.ipynb`.
+- `outputs/modelling/eda_agent/insights.csv`: append-only ledger (empty); `tests/test_eda_agent.py` checks it.
+- `/feature-round` skill: EDA agent -> the user picks insights -> `feature-engineer` (at most 3 trials) -> report.
+- `feature-engineer` agent: takes approved insight ids, updates their status, and judges a v1_full promotion
+  candidate once on `data/sensitivity/seed__43` (same settings as v1_full, seed 43, rules frozen at 1.516, unused by any
+  trial so far; store and cleaned table built on first use) against the multiple-looks risk.
+
 ## 27 Oct 2026 — Feature lab splits gains by phase; agent trials merged
 
 No data change, no feature-store change, no change to the adopted features. Merged from the `feature-engineer` agent's

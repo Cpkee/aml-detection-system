@@ -54,6 +54,14 @@ weekly recall +0.03, better in all folds, mostly later weeks, loses 1 unwitting 
 recall rewards re-flagging mules already found, worth nothing with a permanent flag. Split by phase, `roll4` still lifts the
 start-week flag rate (0.703 -> 0.781, all folds), but first catch within 2 weeks with permanent flags stays 0.958 / 0.957.
 17 looks on v1_full against the same folds so far (multiple-looks risk).
+**EDA -> feature loop (decided 27 Oct 2026, report appendix only; never changes the frozen feature list):** `/feature-round`
+(`.claude/skills/feature-round/`) runs the `eda-explorer` agent (months 0–4 of v1_full via `amldata`: store, raw
+transactions, labels with type; explores the data first, then audits each finding against `src/sim/` / `sim.yaml`) ->
+up to 5 insights in `outputs/modelling/eda_agent/insights.csv` (append-only; only `status` / `trial` / `note` change;
+`tests/test_eda_agent.py`) with `notebooks/07_eda_agent_<round>.ipynb` as evidence -> the user picks -> the
+`feature-engineer` runs at most 3 trials -> a v1_full promotion candidate is judged **once** on `data/sensitivity/seed__43`
+(same settings as v1_full, seed 43, rules frozen at 1.516; never used by a trial before), its store and cleaned table built
+on first use.
 Phase 4 baselines (untuned, 3 temporal folds, months 0–4, weeks 0–26): `notebooks/05_lgbm_baseline.ipynb` (helpers in
 `src/models/lgbm_baseline.py`) and `notebooks/04_logreg_baseline.ipynb` -> `outputs/modelling/models/<run>/`; both
 reproducible run to run (sorted rows via `weekly.load(months=)`, LightGBM `deterministic=True`, since 22 Oct 2026).
