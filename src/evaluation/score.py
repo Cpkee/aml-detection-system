@@ -18,8 +18,10 @@ Measures, over weeks 0-W (W = 26 main, 77 appendix):
               for launderers both catch, how many days earlier the model flags than the rules' first alert. A model
               flag is dated at the end of its week, the day the weekly score exists
   catch_mean  per week the share of that week's mules already flagged, averaged over weeks 0-W (the lab's catch_rules)
-  any time    secondary (8 Oct 2026): the model spends the rules' total number of alerts when it likes, one score
-              threshold over the whole horizon: an upper bound on the head start
+  any time    secondary policy (8 Oct 2026): one score threshold over the horizon, applied to each account's highest
+              score, flagging as many accounts as the rules' total number of alerts. Not an upper bound: the model is
+              trained on weeks 0-26 only, so past week 26 its running-total features leave the training range and
+              late scores are not comparable across weeks
   by type     caught per hidden type (fake / witting / unwitting); per week: accounts still open, mules, starts
 
 Test months 6-7 need --final-test and are scored once: the run leaves a lock in
@@ -254,8 +256,13 @@ def write_report(report, settings, res, test):
     lines = [f"# Harness, {title}: cohort opened in month(s) {', '.join(map(str, settings['cohort_months']))}", "",
              f"Settings: `{json.dumps(settings)}`", "",
              "Model vs rules on the same accounts. Each week since opening the model may flag as many accounts as the "
-             "rules raised alerts on this cohort that week; a flag is permanent. `model_anytime`: the same total "
-             "number of flags, spent whenever the model likes (an upper bound on the head start).", ""]
+             "rules raised alerts on this cohort that week; a flag is permanent. `model_anytime`: a secondary policy, "
+             "one score threshold over the horizon (on each account's highest score) flagging the same total number "
+             "of accounts.", "",
+             "- The weekly budget counts the rules' alerts: an account alerted twice counts twice, so the model can "
+             "flag slightly more distinct accounts than the rules (e.g. 124 vs 119 over weeks 0-26 in the month-5 dry run).",
+             "- The model is trained on weeks 0-26 only (models.train WEEKS); weeks 27-77 are outside its training "
+             "range, so its running-total features drift there and late scores are not comparable across weeks.", ""]
     for h, r in res.items():
         s = r["summary"].set_index("policy")[show].T
         s = s.apply(lambda col: col.map(lambda v: f"{v:.3f}" if isinstance(v, float) and not float(v).is_integer()

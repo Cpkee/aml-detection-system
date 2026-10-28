@@ -49,7 +49,7 @@ import numpy as np
 import pandas as pd
 
 import amldata
-from features import candidates
+from features import candidates, manifest
 from features.weekly import FEATURES as WEEKLY
 from evaluation import budget as rules_budget
 from models import lgbm_baseline as base
@@ -115,6 +115,7 @@ def app_scores(out: str, seed: int, split: bool = False, other_months=None) -> d
     Column app_score; split=True adds app_score_fake and app_score_real (tuning.app_score_split). other_months:
     opening months to score as well with the model fitted on the training months (no label of theirs is read;
     models.graph_nb scores neighbours in any month)."""
+    manifest.check_preprocess(out)
     lin = pd.read_parquet(os.path.join(out, "features", "accounts_linear.parquet"))
     keep = set(MONTHS) | set(other_months or ())
     lin = lin[lin["open_month"].isin(keep)].set_index("account_id")
