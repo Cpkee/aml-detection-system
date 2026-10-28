@@ -97,6 +97,11 @@ manifest, store untouched) and `graph_nb` (neighbours' scores from a two-stage m
 `<out>/features/graph_nb/`); `--scratch DIR` for development runs that skip the ledger. Report-appendix work under the
 freeze: v1_full results (catch_rules: rules 0.141, frozen model 0.457; `roll4` holds at the rules' budget, `app_split` and the
 graph groups no clear gain) agree with the frozen 38 inputs; measured refit noise 0.012 (catch_rules), 0.006 (weekly recall).
+Phase 5 (28 Oct 2026): `python -m models train [--out D --params FILE]` fits the frozen model on months 0-4 ->
+`data/<run>/models/frozen/`; `python -m evaluation.score [--months 5]` runs the fixed-cohort harness at the rules' weekly
+budget -> `outputs/modelling/results/<run>/month5_dryrun/`; test months only with `--final-test`, once (lock file).
+Dry run, month 5 of v1_full, weeks 0-26: model 62 of 78 mules caught vs rules 16 (precision 0.50 vs 0.13), no flag before
+laundering starts (the budget is ~5 flags a week).
 Sensitivity runs (rules frozen, 244k, one `test` value each): `python -m sim.sensitivity --list | --run [--only NAME]
 | --summarise` -> `data/sensitivity/<name>/` (large files deleted) and `outputs/sensitivity/summary.csv`.
 Single steps: `accounts`, `normal --batches 3-3`, `laundering`, `rules`, `finalize`. Use `--out` for another
@@ -189,7 +194,7 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
 and feature adoption (`roll4`) done. Feature engineering is closing: `self4` not adopted (28 Oct; the agent worktree's lab code,
 phase split, `--baseline store` and trial outputs were merged 27 Oct), so the model inputs stay store + `roll4`; feature list
 frozen 28 Oct (see the Modelling commands above). Gate 28 Oct: tuning
-grid done (Li Ann, with `adopted=True`), harness dry run on month 5 (Emmy Li), stress-test datasets and Variant II / IV
+grid done (Li Ann, with `adopted=True`), ~~harness dry run on month 5 (Emmy Li)~~ done 28 Oct (`evaluation.score`), stress-test datasets and Variant II / IV
 stores built (teammate 4; then re-check `roll4` there). 4 Nov: models calibrated on month 5 and frozen. 5 Nov: test
 months 6–7 scored once. 11 Nov report final, 12 Nov submit (date to confirm). Caution: the lab and the tuning measure use
 each week's top 1% (~300–500 accounts a week); the rules flag ~7–9 cohort accounts a week in weeks 0–12 (111 of 50,061),

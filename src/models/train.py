@@ -1,0 +1,150 @@
+"""Phase 5, step 1: train the frozen model on all training months and save it for the harness.
+
+    PYTHONPATH=src python -m models train --out data/v1_full                       # default LightGBM settings
+    PYTHONPATH=src python -m models train --out data/v1_full --params tuned.json   # tuning step 2's settings
+
+The model is the one the team froze on 28 Oct 2026: LightGBM on 38 inputs, the 28 store features + the 8 adopted
+`roll4` features + weeks_since_open + the application score. It is fitted on every account opened in months 0-4,
+weeks 0-26 since opening, label mule_by_day, closed weeks dropped (lgbm_baseline.load_table, adopted=True); the
+application score is the logistic regression of notebook 06 (accounts_linear, label: mule by the end of week 26),
+out of fold for the training accounts, and fitted on all of them for scoring new accounts.
+
+Saved to <out>/models/<name>/ (data, git-ignored): lgbm.txt (LightGBM text model), app_logreg.json (columns,
+coefficients, intercept: readable, no pickle) and manifest.json (inputs, settings, data and store hashes, git commit).
+A copy of the manifest and the feature importances go to outputs/modelling/models/<data>/<name>/ (committed).
+Calibration on month 5 is a later step (4 Nov 2026); this file only trains.
+"""
+from __future__ import annotations
+import argparse
+import json
+import os
+import time
+
+import numpy as np
+import pandas as pd
+
+import amldata
+from features import candidates, manifest, weekly
+from features.weekly import FEATURES as WEEKLY
+from models import lgbm_baseline as base
+from models.tuning import _logreg, app_score
+
+MONTHS = (0, 1, 2, 3, 4)
+WEEKS = (0, 26)
+INPUTS = WEEKLY + candidates.ADOPTED + ["weeks_since_open", "app_score"]      # the 38 frozen inputs
+DEFAULT_PARAMS = {"class_weight": "balanced", "random_state": 42, "deterministic": True, "force_row_wise": True,
+                  "verbose": -1}
+REPORT_ROOT = "outputs/modelling/models"
+
+
+def model_dir(out: str, name: str) -> str:
+    return os.path.join(out, "models", name)
+
+
+def feature_table(out: str, months, weeks: tuple[int, int]) -> pd.DataFrame:
+    """Public inputs for every account-week of accounts opened in `months` (no label, no closure): the store, the
+    adopted features and each account's opening month. Rows sorted by account and week."""
+    wk = weekly.load(out, (0, weeks[1]), months=tuple(months))
+    for c in WEEKLY:
+        wk[c] = wk[c].astype("float32")
+    wk, names = candidates.add(wk, [candidates.ADOPTED_GROUP])
+    wk = wk.drop(columns=[c for c in names[candidates.ADOPTED_GROUP] if c not in candidates.ADOPTED])
+    wk = wk[wk["weeks_since_open"] >= weeks[0]].reset_index(drop=True)
+    acc = amldata.public(out).execute("SELECT account_id, open_month, open_day FROM accounts").df()
+    return wk.merge(acc, on="account_id", how="left", validate="m:1")
+
+
+def _linear(out: str) -> tuple[pd.DataFrame, list[str]]:
+    lin = pd.read_parquet(os.path.join(out, "features", "accounts_linear.parquet")).set_index("account_id")
+    return lin, [c for c in lin.columns if c != "open_month"]
+
+
+def app_scores_for(out: str, model: dict, ids) -> pd.Series:
+    """The saved application model's score (log-odds) for any accounts, from the public cleaned table."""
+    lin, _ = _linear(out)
+    x = lin.loc[list(ids), model["columns"]].to_numpy(dtype=float)
+    return pd.Series(x @ np.asarray(model["coef"]) + model["intercept"], index=list(ids))
+
+
+def train(out: str = amldata.DEFAULT_OUT, name: str = "frozen", params: dict | None = None, seed: int = 42,
+          report_root: str = REPORT_ROOT) -> dict:
+    import lightgbm as lgb
+    t0 = time.time()
+    lin, cols = _linear(out)
+    lin = lin[lin["open_month"].isin(MONTHS)]
+    y26 = amldata.labels(out, months=MONTHS, weeks_since_open=WEEKS[1]).set_index("account_id")["mule_by_day"]
+    oof, _ = app_score(lin[cols], y26.loc[lin.index], lin[cols].iloc[:1], seed=seed)
+    full = _logreg().fit(lin[cols].to_numpy(), y26.loc[lin.index].to_numpy().astype(int))
+    app_model = {"columns": cols, "coef": full.coef_[0].tolist(), "intercept": float(full.intercept_[0]),
+                 "label": "mule_by_day at week 26", "fitted_on_months": list(MONTHS)}
+
+    df, _ = base.load_table(out, MONTHS, WEEKS, adopted=True)
+    df["app_score"] = df["account_id"].map(pd.Series(oof, index=lin.index)).astype("float32")
+    settings = {**DEFAULT_PARAMS, "random_state": seed, **(params or {})}
+    model = lgb.LGBMClassifier(n_jobs=-1, **settings).fit(df[INPUTS], df["mule_by_day"])
+
+    folder = model_dir(out, name)
+    os.makedirs(folder, exist_ok=True)
+    model.booster_.save_model(os.path.join(folder, "lgbm.txt"))
+    with open(os.path.join(folder, "app_logreg.json"), "w") as f:
+        json.dump(app_model, f)
+    gain = model.booster_.feature_importance("gain")
+    imp = pd.DataFrame({"feature": INPUTS, "gain": gain, "share": gain / gain.sum()}).sort_values("gain", ascending=False)
+    store = manifest.check(out, WEEKLY)
+    m = {"name": name, "data_folder": out, "inputs": INPUTS, "n_inputs": len(INPUTS), "train_months": list(MONTHS),
+         "weeks": list(WEEKS), "label": "mule_by_day; account-weeks after closure dropped",
+         "rows": int(len(df)), "mule_rows": int(df["mule_by_day"].sum()), "accounts": int(df["account_id"].nunique()),
+         "lightgbm_params": settings, "params_source": "default" if not params else "file",
+         "app_score": "LogisticRegression(class_weight='balanced', max_iter=2000) on accounts_linear; out of fold "
+                      "(5 folds) for training rows, fitted on all training accounts for new ones",
+         "run_manifest_sha256": manifest._sha256(os.path.join(out, "run_manifest.json")),
+         "store_code_sha256": store.get("code_sha256"),
+         "preprocess_manifest_sha256": manifest._sha256(os.path.join(out, "features", "preprocess_manifest.json")),
+         "git_commit": manifest._git("rev-parse", "HEAD"),
+         "git_uncommitted_changes": bool(manifest._git("status", "--porcelain", "--untracked-files=no")),
+         "lightgbm": lgb.__version__, "seconds": round(time.time() - t0)}
+    with open(os.path.join(folder, "manifest.json"), "w") as f:
+        json.dump(m, f, indent=2)
+    report = os.path.join(report_root, os.path.basename(os.path.normpath(out)), name)
+    os.makedirs(report, exist_ok=True)
+    with open(os.path.join(report, "manifest.json"), "w") as f:
+        json.dump(m, f, indent=2)
+    imp.to_csv(os.path.join(report, "importance.csv"), index=False)
+    return m
+
+
+def load(out: str = amldata.DEFAULT_OUT, name: str = "frozen") -> tuple:
+    """(booster, app model dict, manifest), after checking the model was trained on this data run and store."""
+    import lightgbm as lgb
+    folder = model_dir(out, name)
+    if not os.path.exists(os.path.join(folder, "manifest.json")):
+        raise FileNotFoundError(f"{folder} has no model - run `python -m models train --out {out}`")
+    m = json.load(open(os.path.join(folder, "manifest.json")))
+    problems = []
+    if m["run_manifest_sha256"] != manifest._sha256(os.path.join(out, "run_manifest.json")):
+        problems.append("the data run changed")
+    if m["store_code_sha256"] != manifest.check(out, WEEKLY).get("code_sha256"):
+        problems.append("the feature store code changed")
+    if m["inputs"] != INPUTS:
+        problems.append("the frozen input list changed")
+    if problems:
+        raise ValueError(f"model {folder} is stale: {'; '.join(problems)}. Retrain.")
+    booster = lgb.Booster(model_file=os.path.join(folder, "lgbm.txt"))
+    return booster, json.load(open(os.path.join(folder, "app_logreg.json"))), m
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(prog="python -m models train", description=__doc__.split("\n")[0])
+    ap.add_argument("--out", default=amldata.DEFAULT_OUT)
+    ap.add_argument("--name", default="frozen", help="model folder name under <out>/models/")
+    ap.add_argument("--params", default=None, help="JSON file of LightGBM settings (tuning step 2), merged over defaults")
+    ap.add_argument("--seed", type=int, default=42)
+    a = ap.parse_args(argv)
+    params = json.load(open(a.params)) if a.params else None
+    m = train(a.out, a.name, params, a.seed)
+    print(f"trained {m['name']} on {m['rows']:,} account-weeks ({m['mule_rows']:,} mule weeks), "
+          f"{m['n_inputs']} inputs, {m['seconds']}s -> {model_dir(a.out, a.name)}")
+
+
+if __name__ == "__main__":
+    main()
