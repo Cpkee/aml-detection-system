@@ -102,6 +102,13 @@ Phase 5 (28 Oct 2026): `python -m models train [--out D --params FILE]` fits the
 budget -> `outputs/modelling/results/<run>/month5_dryrun/`; test months only with `--final-test`, once (lock file).
 Dry run, month 5 of v1_full, weeks 0-26: model 62 of 78 mules caught vs rules 16 (precision 0.50 vs 0.13), no flag before
 laundering starts (the budget is ~5 flags a week).
+Policy + drift checks (`notebooks/11_policy_drift.ipynb`, `src/evaluation/policy.py`, `src/models/drift.py`, 29 Oct 2026,
+draft PR, this Mac's v1_full copy, months 0-4 only, 11 new looks): carrying unused weekly budget forward (flag only
+scores >= the 0.9995 quantile, never ahead of the rules' cumulative alerts) "holds up" on held-back fold 3 with 3 seeds
+(68 / 66 / 67 vs 63 / 64 / 64 caught, 1-2 days sooner, ~60% of the reviews): a possible secondary policy, team decision.
+The app score's velocity_* columns tilt months 6+7 (month 7: 47% of accounts, 34% of the top 1%; 44% without them), but
+dropping them costs slightly more than noise on 3 single-month measures, so the pre-registered answer is keep (team
+decision). -> `outputs/modelling/models/v1_full/policy_drift/`.
 Sensitivity runs (rules frozen, 244k, one `test` value each): `python -m sim.sensitivity --list | --run [--only NAME]
 | --summarise` -> `data/sensitivity/<name>/` (large files deleted) and `outputs/sensitivity/summary.csv`.
 Single steps: `accounts`, `normal --batches 3-3`, `laundering`, `rules`, `finalize`. Use `--out` for another

@@ -1,0 +1,7 @@
+seed,cap,quantile,caught_folds12_choice,caught_folds12_topk,caught_f1,caught_f2,caught_f3,topk_caught_f1,topk_caught_f2,topk_caught_f3,median_days_f3,topk_median_days_f3,verdict
+42,nocap,0.9995,119,116,58,61,68,57,59,63,6.0,7.0,better
+42,cap,0.9995,119,116,58,61,68,57,59,63,6.0,7.0,better
+1,nocap,0.9995,118,115,57,61,66,57,58,64,6.0,8.0,holds up
+1,cap,0.9995,117,115,57,60,65,57,58,64,6.0,8.0,holds up
+2,nocap,0.9995,120,118,58,62,67,59,59,64,6.0,7.0,holds up
+2,cap,0.9995,120,118,58,62,65,59,59,64,6.0,7.0,holds up
