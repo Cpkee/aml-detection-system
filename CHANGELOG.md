@@ -6,6 +6,44 @@ Assumptions and Use" doc.
 
 
 
+## 28 Oct 2026 — Rules-budget measure, measured noise, split application score, graph features (proposal)
+
+No change to the simulated data, the feature store, its 28 features or the adopted features. New derived files in
+`data/<run>/features/` (git-ignored): `graph_weekly.parquet`, `graph_edges.parquet`, `graph_manifest.json`,
+`graph_nb/`. The 50k store `data/v1/features/weekly.parquet` was rebuilt (it predated the week-78 drop). All of this
+is a **proposal for the team** (Emmy Li); defaults are unchanged (`--decide weekly_recall`). Report-appendix work
+under the feature freeze of 28 Oct 2026: none of it changes the 38 frozen inputs, and the results agree with them.
+- **Rules' budget** (`src/evaluation/budget.py`): the rules raise ~6 alerts a week per validation month (0.017-0.020%
+  of accounts per week, months 0-7), against ~300 flags for the lab's top 1%. New measure `catch_rules`: permanent
+  flags at the rules' alert count in each week since opening; per week the share of mule accounts (closed ones
+  included) flagged so far, averaged over weeks 0-26. The rules' own value on the same scale: **0.141**. Also
+  `catch_0.1pct` (0.1% of open accounts per week). `--decide` picks the deciding measure.
+- **Noise measured** (`--placebo N`, trial `noise-placebo5`, 5 groups of shuffled columns): 2 x RMS placebo gain =
+  catch_rules 0.012, catch_0.1pct 0.005 (set in `NOISE`); weekly_recall 0.006, acc_pr_auc 0.008, caught_2wk 0.023
+  (reported only; the agreed 0.02 / 0.04 / 0.05 are left for the team). Bootstrap over each month's mule accounts:
+  catch_rules sd 0.026 per fold.
+- **roll4 at the rules' budget** (trial `roll4-recheck-rules-budget`, baseline store only): catch_rules 0.381 ->
+  0.457 (+0.128 / +0.072 / +0.027), `better`; start_recall up in all folds. The adoption holds.
+- **Two application scores** (`tuning.app_score_split`, group `app_split`): catch_rules -0.008 / -0.022 / +0.006 (no
+  clear change), catch_0.1pct `worse`, PR-AUC 0.870 -> 0.811, real-customer mules caught not higher. Drop.
+- **Graph features** (`python -m features graph`, `src/features/graph.py`: internal money in / out, internal payers,
+  forward-within-24h of internal money, neighbours so far, neighbours showing the closure footprint;
+  `src/models/graph_nb.py`: neighbours' out-of-fold scores from a two-stage model, no labels of neighbours):
+  `graph_struct` catch_rules -0.011 / -0.004 / -0.001 (`worse` by the all-folds rule, every fall below the noise
+  level), `graph_nb` -0.008 / +0.006 / +0.038 (no clear change), both together +0.001 / +0.004 / +0.029 (no clear
+  change). start_recall rises in every fold for every graph group (+0.02 to +0.04), PR-AUC 0.870 -> 0.895
+  (`graph_nb`); real-customer mules caught at the rules' budget with `graph_nb`: +1 in fold 1, -1 in fold 2, +1 in
+  fold 3. Not a promotion candidate at the rules' budget.
+- `--scratch DIR` for development runs (no ledger row). The ledger gained 10 columns; earlier lines are byte for
+  byte as before plus empty fields (`append_ledger` no longer re-writes old values). 29 ledger rows on v1_full now
+  (5 of them placebos).
+- **roll4 confirmed on fresh data (seed 43, one look):** `data/sensitivity/seed__43` rebuilt from its committed
+  manifest (same BAF hash and setting values; data card identical to the committed one, 10/10 checks), then preprocess
+  (`outputs/modelling/preprocess/seed__43/`), store and trial `roll4-confirm-seed43`: catch_rules 0.382 -> 0.452
+  (+0.076 / +0.079 / +0.055, `better`; rules 0.162), weekly recall +0.047 / +0.048 / +0.045, PR-AUC 0.691 -> 0.859.
+  Seed 44 not run (disk).
+- `outputs/modelling/feature_lab/PLAN.md`: the planned trials, their results and the seed-43 check.
+
 ## 28 Oct 2026 — Feature list frozen
 
 No data, feature-store or code change. Decision (28 Oct 2026, Kee Chee Pheng, lead): the model inputs are frozen

@@ -40,6 +40,11 @@ def main(argv=None):
     w.add_argument("--weeks", default=f"0-{LAST_WEEK}", help=f"weeks since opening, e.g. 0-26 (default 0-{LAST_WEEK})")
     w.add_argument("--force", action="store_true", help="rebuild even if the store exists")
 
+    g = sub.add_parser("graph", help="payment-graph features <out>/features/graph_weekly.parquet (proposal 28 Oct 2026; "
+                                     "needs the weekly store)")
+    g.add_argument("--out", default="data/v1_full", help="data folder (default data/v1_full)")
+    g.add_argument("--force", action="store_true", help="rebuild even if the graph store is current")
+
     e = sub.add_parser("eda", help="Phase 1 EDA: execute notebooks/01_eda_train.ipynb -> <report>/report.md, figures, CSVs")
     e.add_argument("--out", default="data/v1_full", help="data folder (default data/v1_full)")
     e.add_argument("--report", default=None,
@@ -58,6 +63,10 @@ def main(argv=None):
     a = ap.parse_args(argv)
     if a.cmd == "weekly":
         path, n = build(a.out, parse_weeks(a.weeks), force=a.force)
+        print(f"wrote {path}: {n:,} account-weeks")
+    elif a.cmd == "graph":
+        from .graph import build as build_graph
+        path, n = build_graph(a.out, force=a.force)
         print(f"wrote {path}: {n:,} account-weeks")
     elif a.cmd == "eda":
         run_notebook("01_eda_train.ipynb", a.out, a.report)
