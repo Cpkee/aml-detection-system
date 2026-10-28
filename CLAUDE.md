@@ -86,6 +86,17 @@ barely helps (combined 0.256 -> 0.279); the application as one out-of-fold logis
 fixes the memorising (gap 0.74 -> 0.18; 0.695). Activity alone still leads on account level (0.730), but activity +
 app score wins in 27 of 27 weeks and puts 15% of mules in each week's top 1% in weeks 0-8 vs 4%: earliness, which
 the account-level measure does not reward. It catches fewer real mules in the account top 1% (19/32 vs 25/32).
+Feature lab (`python -m models.feature_lab`, `src/features/candidates.py`, ledger `outputs/modelling/feature_lab/ledger.csv`,
+26-27 Oct 2026): candidate groups judged on the tuned model; `roll4` (8 four-week-window features) adopted 26 Oct, computed
+at load time (`load_table(..., adopted=True)`). **Proposal 28 Oct 2026, pending the team** (plan:
+`outputs/modelling/feature_lab/PLAN.md`): `--decide catch_rules` = permanent flags at the rules' own weekly alert count
+(`src/evaluation/budget.py`; ~0.02% of accounts a week vs the top 1%'s ~60x), the rules' own value beside it;
+`--placebo N` measures refit noise; special groups `app_split` (two application scores, `tuning.app_score_split`),
+`graph_struct` (`python -m features graph` -> `<out>/features/graph_weekly.parquet` + `graph_edges.parquet`, own
+manifest, store untouched) and `graph_nb` (neighbours' scores from a two-stage model, `src/models/graph_nb.py`, cached in
+`<out>/features/graph_nb/`); `--scratch DIR` for development runs that skip the ledger. Report-appendix work under the
+freeze: v1_full results (catch_rules: rules 0.141, frozen model 0.457; `roll4` holds at the rules' budget, `app_split` and the
+graph groups no clear gain) agree with the frozen 38 inputs; measured refit noise 0.012 (catch_rules), 0.006 (weekly recall).
 Sensitivity runs (rules frozen, 244k, one `test` value each): `python -m sim.sensitivity --list | --run [--only NAME]
 | --summarise` -> `data/sensitivity/<name>/` (large files deleted) and `outputs/sensitivity/summary.csv`.
 Single steps: `accounts`, `normal --batches 3-3`, `laundering`, `rules`, `finalize`. Use `--out` for another
