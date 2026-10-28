@@ -12,7 +12,8 @@ This module gives the lab two things, both read from the hidden alerts table and
                                       rules' own catch curve, so the lab can show model and rules on one scale
 
 Nothing per account goes into a model: the budget is a count, and the rules' first alerts are only compared with the
-model's flags.
+model's flags. Months 0-5 by default (the lab uses 0-4, the harness's dry run 5); test months 6-7 only with
+allow_test=True, which the harness passes for the single final scoring.
 """
 from __future__ import annotations
 
@@ -20,19 +21,21 @@ import pandas as pd
 
 import amldata
 
-ALLOWED_MONTHS = (0, 1, 2, 3, 4)      # training months: month 5 stays for calibration, 6-7 for the test
+ALLOWED_MONTHS = amldata.TRAIN_MONTHS     # 0-4 train, 5 calibrate (the harness's dry run)
 
 
-def _months(months) -> str:
+def _months(months, allow_test: bool = False) -> str:
     months = tuple(int(m) for m in months)
-    if not set(months) <= set(ALLOWED_MONTHS):
-        raise ValueError(f"the lab's rules budget is for training months {ALLOWED_MONTHS} only, got {months}")
+    allowed = set(ALLOWED_MONTHS) | (set(amldata.TEST_MONTHS) if allow_test else set())
+    if not set(months) <= allowed:
+        raise ValueError(f"the rules budget covers months {sorted(allowed)} here, got {months}; test months need "
+                         "allow_test=True (the harness's single final scoring)")
     return ", ".join(map(str, months))
 
 
-def weekly_budget(out: str, months, weeks: tuple[int, int]) -> pd.DataFrame:
+def weekly_budget(out: str, months, weeks: tuple[int, int], allow_test: bool = False) -> pd.DataFrame:
     """open_month, week, alerts: rule alerts raised in each week since opening on the accounts of each month."""
-    m = _months(months)
+    m = _months(months, allow_test)
     df = amldata.evaluation(out).execute(f"""
         WITH a AS (SELECT account_id, open_month, open_day FROM accounts WHERE open_month IN ({m}))
         SELECT a.open_month, (x.alert_day - a.open_day) // 7 AS week, count(*) AS alerts
@@ -44,9 +47,9 @@ def weekly_budget(out: str, months, weeks: tuple[int, int]) -> pd.DataFrame:
     return (df.set_index(["open_month", "week"])["alerts"].reindex(grid, fill_value=0).astype(int).reset_index())
 
 
-def rules_first_alert(out: str, months, weeks: tuple[int, int]) -> pd.Series:
+def rules_first_alert(out: str, months, weeks: tuple[int, int], allow_test: bool = False) -> pd.Series:
     """First rule alert week since opening per account, for accounts alerted inside `weeks` (others absent)."""
-    m = _months(months)
+    m = _months(months, allow_test)
     df = amldata.evaluation(out).execute(f"""
         WITH a AS (SELECT account_id, open_day FROM accounts WHERE open_month IN ({m}))
         SELECT account_id, min((x.alert_day - a.open_day) // 7) AS week

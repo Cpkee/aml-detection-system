@@ -6,6 +6,28 @@ Assumptions and Use" doc.
 
 
 
+## 28 Oct 2026 — Phase 5 harness, dry run on month 5
+
+No data change, no feature-store change, frozen inputs unchanged. New:
+- `python -m models train` (`src/models/train.py`, was a stub): the frozen 38-input LightGBM fitted on all of months
+  0-4 (weeks 0-26, closed weeks dropped; application score out of fold as in notebook 06). Saved to
+  `data/<run>/models/<name>/` (LightGBM text model, logistic coefficients as JSON, manifest); manifest and importances
+  copied to `outputs/modelling/models/<run>/<name>/`. Default LightGBM settings until tuning step 2: `--params FILE`.
+- `python -m evaluation.score` (`src/evaluation/score.py`): the fixed-cohort comparison of 8 Oct 2026. Each week
+  since opening the model flags as many accounts as the rules alerted on the same cohort that week, permanently;
+  closed accounts stay in the cohort as caught by the rules. Reports caught / precision / false alarms (also against
+  the fixed final label), days from laundering start, catch_mean, head to head, the any-time policy (same total
+  flags, upper bound), by type, per week; horizons 26 (main) and 77 (appendix) in one run. Test months 6-7 need
+  `--final-test` and are scored once (lock file). `evaluation.budget` reads month 5, and 6-7 only with
+  `allow_test`.
+- Dry run, month 5 of v1_full (29,120 accounts, 97 launderers; default settings), weeks 0-26: rules' budget 124
+  flags. Model caught 62 of 78 mules (precision 0.50), rules 16 (0.13); fake 57/70 vs 13/70, witting 3/5 vs 3/5,
+  unwitting 2/3 vs 0/3; catch_mean 0.371 vs 0.095; when both catch a launderer, same median day (model first 6,
+  rules first 5). No flag before laundering starts: at ~5 flags a week, fake accounts (median rank ~1,300 of 29,120
+  at weeks 0-8) never reach the budget, so at the rules' budget the application buys no head start; the gain is
+  catching bursts the rules miss. Weeks 0-77: model 75 of 97, rules 29.
+  `outputs/modelling/results/v1_full/month5_dryrun/`. Tests: `tests/test_harness.py`.
+
 ## 28 Oct 2026 — Rules-budget measure, measured noise, split application score, graph features (proposal)
 
 No change to the simulated data, the feature store, its 28 features or the adopted features. New derived files in
