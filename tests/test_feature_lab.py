@@ -80,3 +80,13 @@ def test_permanent_flags_by_hand():
     # week 0: M0 and N0 (best normal); week 1 draws from the rest: M1 and N1 (M0 is not flagged twice)
     assert first.to_dict() == {"M0": 0, "N0": 0, "M1": 1, "N1": 1}
     assert np.isclose(lab.first_caught_2wk(v, pd.Series({"M0": 0, "M1": 1, "M2": 0})), 2 / 3)
+
+
+def test_frozen_inputs_are_the_lab_baseline():
+    """The frozen feature list (28 Oct 2026): 28 store features + 8 roll4 + weeks_since_open + app_score = 38."""
+    from features import candidates
+    from features.weekly import FEATURES
+    from models.frozen_importance import INPUTS
+    assert len(INPUTS) == len(set(INPUTS)) == 38
+    assert INPUTS == list(FEATURES) + candidates.ADOPTED + ["weeks_since_open", "app_score"]
+    assert candidates.ADOPTED_GROUP == "roll4"

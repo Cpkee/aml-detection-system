@@ -47,7 +47,9 @@ the 8 four-week-window features (`candidates.ADOPTED`, group `roll4`), added at 
 LightGBM inputs are the 28 store features + the 8 `roll4` features + `weeks_since_open` + the application score
 (`app_score`): 38, the lab's baseline. Changed only by team decision. Feature-lab trials and `/feature-round` run only on
 explicit request and are report-appendix work; re-checking `roll4` on Variant II / IV is a robustness check, not a
-reopening of the list. Tuning step 2 and later models use them;
+reopening of the list. `python -m models.frozen_importance` (~30 s) refits that baseline and writes each input's share
+of split gain to `outputs/modelling/models/v1_full/frozen_importance/importance.csv` (v1_full: `app_score` 51%, top 5
+80%, top 10 89%); `tests/test_feature_lab.py` pins the 38. Tuning step 2 and later models use them;
 the lab's baseline includes them (`--baseline store` to re-check them). Notebooks 05/06 stay the records of the store-only
 runs. The lab also splits each gain by phase (`pre_start_recall`, `start_recall`, `later_recall`) and reports
 `first_caught_2wk` with permanent flags: weekly recall rewards re-flagging mules already found (26 Oct 2026 finding). The `feature-engineer` agent (`.claude/agents/`) runs propose -> implement -> verify -> evaluate

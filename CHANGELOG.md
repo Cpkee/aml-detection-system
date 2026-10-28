@@ -6,6 +6,18 @@ Assumptions and Use" doc.
 
 
 
+## 28 Oct 2026 — Importance of the frozen inputs
+
+No data, feature-store or model-input change. `python -m models.frozen_importance` refits the frozen 38-input model
+exactly as the feature lab's baseline (same 3 folds on months 0–4, seed 42, LightGBM settings; it reproduces the lab's
+weekly recall, 0.407 / 0.366 / 0.453 on v1_full) and writes each input's share of split gain per fold and on average
+to `outputs/modelling/models/v1_full/frozen_importance/importance.csv`. On v1_full: application score 51.0%,
+`out_1h_share_4wk` 11.5%, `money_in_4wk` 6.7%, `n_payers_cum` 6.7%, `internal_out_share_cum` 4.1%; the top 5 carry
+80%, the top 10 89%; the 28 store features together 24%, the 8 four-week windows 23%. Gain share shows what the
+trees lean on, not what the model could do without (inputs that measure the same thing share the credit). Selects
+nothing, so it is not another look at the folds. `tests/test_feature_lab.py` now pins the 38 inputs. Used in the
+decision-record doc's "Feature engineering" tab (section "The final feature list: 38 inputs").
+
 ## 28 Oct 2026 — Feature list frozen
 
 No data, feature-store or code change. Decision (28 Oct 2026, Kee Chee Pheng, lead): the model inputs are frozen

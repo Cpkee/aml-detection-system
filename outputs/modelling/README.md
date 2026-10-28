@@ -10,6 +10,7 @@ Committed results of the modelling phases (plan: the "Modelling: phased plan" ta
 | `feature_lab/<data>/<trial>/` | `python -m models.feature_lab` | 4: candidate feature trials (`report.md`, `folds.csv`, `screen.csv`, `summary.csv`) and the append-only `ledger.csv` of every trial (the number of looks) |
 | `eda_agent/` | the `eda-explorer` agent, via `/feature-round` | appendix: `insights.csv` (append-only ledger of findings and their status) and `<round>/` figures and CSVs; the evidence notebooks are `notebooks/07_eda_agent_<round>.ipynb` |
 | `models/<run>/` | `python -m models train` | 4: models, calibrators, importances, model cards |
+| `models/<run>/frozen_importance/` | `python -m models.frozen_importance` | 4: share of split gain per input of the frozen 38-input model (the feature lab's baseline, 3 folds, months 0-4) |
 | `results/<run>/` | `python -m evaluation.score` | 5: weekly scoring against the rules on the test cohort |
 
 Feature stores themselves are data (`data/<run>/features/`, git-ignored); only their manifests are described here.
