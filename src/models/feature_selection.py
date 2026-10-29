@@ -1,8 +1,8 @@
-"""Feature selection helpers: which of the tuned model's inputs earn their place?
+﻿"""Feature selection helpers: which of the tuned model's inputs earn their place?
 
 The tuned model (notebooks/06_lgbm_tuning.ipynb, plus the adopted 4-week windows) reads 38 inputs: the 28 store
 features, the 8 adopted 4-week features, weeks_since_open and the application score. This module gives the pieces
-notebooks/07_feature_selection.ipynb uses to narrow them down, all on training months 0-4 only:
+notebooks/10_feature_selection.ipynb uses to narrow them down, all on training months 0-4 only:
 
   FAMILIES             the 38 inputs in 10 groups of the same kind (used for leave-one-group-out trials:
                        `python -m models.feature_lab --drop FAMILY ...`)
@@ -70,16 +70,22 @@ def permutation_drop(model, valid: pd.DataFrame, cols: list[str], groups: dict[s
                      repeats: int = 3, seed: int = 0) -> pd.DataFrame:
     """Fall in `measure(valid, score)` when each group's columns are shuffled, `repeats` times each.
 
-    measure takes the validation rows and a score array and returns one number (higher = better). A positive
-    drop means the model needed that group; about 0 means it did not (or a near-copy stood in for it)."""
+    measure takes the validation rows and a score array and returns one number (higher = better), or a dict of
+    named numbers to score several measures on the same shuffles; then each row also has a `measure` column. A
+    positive drop means the model needed that group; about 0 means it did not (or a near-copy stood in for it)."""
+    def as_dict(m):
+        return m if isinstance(m, dict) else {None: m}
+
     x = valid[cols]
-    base = measure(valid, model.predict_proba(x)[:, 1])
+    base = as_dict(measure(valid, model.predict_proba(x)[:, 1]))
     rng = np.random.default_rng(seed)
     rows = []
     for name, g in groups.items():
         for r in range(repeats):
-            s = model.predict_proba(permute_columns(x, g, rng))[:, 1]
-            rows.append({"group": name, "repeat": r, "base": base, "drop": base - measure(valid, s)})
+            got = as_dict(measure(valid, model.predict_proba(permute_columns(x, g, rng))[:, 1]))
+            for k, b in base.items():
+                rows.append({"group": name, "repeat": r, **({"measure": k} if k is not None else {}),
+                             "base": b, "drop": b - got[k]})
     return pd.DataFrame(rows)
 
 

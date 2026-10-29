@@ -6,31 +6,192 @@ Assumptions and Use" doc.
 
 
 
-## 27 Oct 2026 — Feature selection, steps 1–3 (notebook 07) and `feature_lab --drop`
+## 29 Oct 2026 — Share one model file between machines (option B)
 
-No data change, no feature-store change, no change to the model's inputs (narrowing them is a team decision).
-- New `notebooks/07_feature_selection.ipynb` (`python -m features select [--out D --report R]`, helpers
-  `src/models/feature_selection.py`) -> `outputs/modelling/feature_selection/` (v1_full) and `.../v1/` (50k). On the
-  tuned model's 38 inputs (store 28 + adopted 8 + `weeks_since_open` + app score), months 0–4, the baseline's 3 folds:
-  single-feature AUCs, near-duplicate groups (|Spearman| >= 0.8 for every pair, an assumption), permutation
-  importance on weekly recall (single inputs, near-duplicate groups and families, 3 shuffles per fold), gain and
-  mean |SHAP|. Provisional label per input: needed (shuffle costs >= 0.005 weekly recall in all 3 folds, an
-  assumption) / covered by a near-copy / mixed / weak.
-- `python -m models.feature_lab --drop NAME... [--together]` leaves families or single inputs out (the opposite of
-  `--groups`); `tests/test_feature_selection.py`.
-- v1_full: 13 needed, 1 mixed, 7 covered, 16 weak; 7 near-duplicate groups (largest: the 7 weekly money-in /
-  payer / self-vs-past / peer features). Most relied on: app score (0.132), `out_1h_share_4wk` (0.098),
-  `n_payers_cum` (0.060), `internal_out_share_cum` (0.043), `weeks_since_open` (0.042). The notebook's baseline
-  equals the feature lab's on the same machine (weekly recall 0.409 / 0.366 / 0.446 per fold; pooled 0.402 on this
-  Windows machine vs 0.403 in the team's earlier runs).
-- Refit trials, v1_full: dropping the 16 weak inputs (38 -> 22): weekly recall 0.402 -> 0.400 pooled (−0.001 / −0.012 /
-  −0.003 per fold), PR-AUC 0.867 -> 0.856, `caught_2wk` 0.880 -> 0.885, real-customer mules in the top 1% unchanged;
-  verdict 'worse' because all 3 folds fall, though each fall is under the 0.02 noise level. Also dropping 7 spare
-  near-copies (38 -> 15): 0.398 (+0.001 / −0.016 / −0.007), PR-AUC 0.847, `caught_2wk` 0.870, one witting and one
-  unwitting mule fewer in the top 1%; verdict 'no clear change' only because one fold rose by 0.001. The rule
-  ('worse' = all folds fall, any size) reads small consistent losses as 'worse': the team decides whether 16 fewer
-  inputs are worth about 0.2 points of weekly recall.
-- `tests/test_hidden_files.py` reads files as UTF-8 (it failed on Windows on a notebook with non-ASCII text).
+No data change, no result change. Li Ann's `frozen_tuned` (Windows, 16 threads) and a retrain on Emmy Li's Mac
+(8 threads) differ slightly (63 vs 65 of 78 month-5 mules), but **scoring a given model file is the same on both**:
+her `lgbm.txt` + `app_logreg.json`, scored on the Mac, reproduce her committed `month5_dryrun_frozen_tuned` file for
+file (summaries, weekly tables, every launderer's flag week). So the team can train once and share the model files.
+- `python -m features fingerprint` (`src/features/fingerprint.py`): content fingerprints (row count + exact sum of
+  each row's MD5) of the files a model reads, independent of parquet bytes and row order; cached in
+  `features/fingerprints.json`. v1_full on the Mac (DuckDB 1.5.6): accounts 51646089, accounts_linear 82994433,
+  accounts_tree 18593764, peer_medians 416730365, weekly 3065472.
+- `models.train`: new manifests record `data_identity` (seed, `--set`, config and BAF hashes) and
+  `input_fingerprints`; `load` accepts a model when the run manifest is the same file, or the fingerprints equal
+  the local data's, or (models trained before) a `verified.json` from `python -m models verify` still matches.
+- `python -m models verify --model M --reference RUN` (`src/models/verify.py`): rescores a committed harness run of
+  the model; only if every result file is identical does it write `verified.json` (local fingerprints + hashes of the
+  model files). `frozen_tuned` verified on the Mac against `month5_dryrun_frozen_tuned`.
+- `evaluation.score.run`: `check_data=False` / `results=` only for `verify`; the final test refuses both.
+- **The model of record is committed:** `outputs/modelling/models/v1_full/frozen_tuned/` now holds Li Ann's `lgbm.txt`
+  and `app_logreg.json` beside his manifest, plus `verified.json` (fingerprints of the data it reproduces, hashes of the
+  model files with line endings normalised) and `calibration.json`. `models.train.find_model_dir` prefers this
+  committed copy; `train` refuses to overwrite a shared model; `evaluation.score` and `models calibrate` default to
+  `frozen_tuned`; notebook 09 defaults to `RETRAIN = False`. `.gitattributes` keeps `lgbm.txt` byte-exact. Team
+  members no longer train the model: they need the data, its cleaned tables and the feature store, then score.
+- Calibration of `frozen_tuned` on month 5: isotonic chosen, out-of-fold Brier 0.0749 -> 0.0018, mean predicted
+  0.00235 = observed rate (`outputs/modelling/models/v1_full/frozen_tuned/calibration/report.md`).
+
+## 29 Oct 2026 — Calibration, onboarding value, age breakdown, seed-43 dry run (Phase 5)
+
+No data change, no feature-store change, frozen inputs and Li Ann's tuned settings unchanged. All runs below are on
+Emmy Li's Mac and carry the suffix `_macos`: the tuned model does not rebuild identically across machines (Li Ann,
+Windows: 63 of 78 mules caught on month 5; this Mac: 65; same data, same settings), so which machine produces the
+results of record is a team decision. Li Ann's committed `frozen_tuned` outputs are untouched.
+- `python -m models calibrate` (`src/models/calibrate.py`): isotonic and Platt mappings fitted on month 5 (open
+  account-weeks, weeks 0-26), checked out of fold over 5 groups of accounts, the lower Brier score chosen and saved to
+  `data/<run>/models/<model>/calibration.json`. `frozen_tuned_macos`: raw scores average 0.186 for a 0.235% mule rate
+  (class weights); isotonic 0.00235, Brier 0.0748 -> 0.0018, reliability close in every bin. Order-preserving, so the
+  harness's results do not change.
+- `python -m models train --inputs activity`: the frozen inputs without `app_score`, for the value of onboarding
+  information (professor's comment 2). `python -m evaluation.compare`: two harness runs on the same cohort side by
+  side. Month 5 at the rules' budget, weeks 0-26: frozen 65 of 78 caught vs activity only 61 (fake 60 vs 55,
+  witting 3 vs 4, unwitting 2 vs 2); catch_mean 0.385 vs 0.358; the frozen model ahead in 16 of 27 weeks, behind in
+  7. Seed 43 month 5: 56 vs 56 of 65, catch_mean 0.471 vs 0.462. At the rules' budget the application adds a few
+  fake accounts, mostly from week 12 on, and no early flags.
+- Harness: recall and false-positive rate by age band (under 30 / 30-49 / 50+, `by_age_w<h>.csv`) for Variant II;
+  every model, calibration and harness run records its machine (OS, processor, cores).
+- Seed 43 (chance yardstick): trained on its months 0-4 with the tuned settings, month 5 at the rules' budget, weeks
+  0-26: model 56 of 65 mules (precision 0.35) vs rules 19 (0.13); v1_full month 5: 65 of 78 (0.52) vs 16 (0.13).
+
+## 28 Oct 2026 — Phase 5 harness, dry run on month 5
+
+No data change, no feature-store change, frozen inputs unchanged. New:
+- `python -m models train` (`src/models/train.py`, was a stub): the frozen 38-input LightGBM fitted on all of months
+  0-4 (weeks 0-26, closed weeks dropped; application score out of fold as in notebook 06). Saved to
+  `data/<run>/models/<name>/` (LightGBM text model, logistic coefficients as JSON, manifest); manifest and importances
+  copied to `outputs/modelling/models/<run>/<name>/`. Default LightGBM settings until tuning step 2: `--params FILE`.
+- `python -m evaluation.score` (`src/evaluation/score.py`): the fixed-cohort comparison of 8 Oct 2026. Each week
+  since opening the model flags as many accounts as the rules alerted on the same cohort that week, permanently;
+  closed accounts stay in the cohort as caught by the rules. Reports caught / precision / false alarms (also against
+  the fixed final label), days from laundering start, catch_mean, head to head, the any-time policy (same total
+  flags, upper bound), by type, per week; horizons 26 (main) and 77 (appendix) in one run. Test months 6-7 need
+  `--final-test` and are scored once (lock file). `evaluation.budget` reads month 5, and 6-7 only with
+  `allow_test`.
+- Dry run, month 5 of v1_full (29,120 accounts, 97 launderers; default settings), weeks 0-26: rules' budget 124
+  flags. Model caught 62 of 78 mules (precision 0.50), rules 16 (0.13); fake 57/70 vs 13/70, witting 3/5 vs 3/5,
+  unwitting 2/3 vs 0/3; catch_mean 0.371 vs 0.095; when both catch a launderer, same median day (model first 6,
+  rules first 5). No flag before laundering starts: at ~5 flags a week, fake accounts (median rank ~1,300 of 29,120
+  at weeks 0-8) never reach the budget, so at the rules' budget the application buys no head start; the gain is
+  catching bursts the rules miss. Weeks 0-77: model 75 of 97, rules 29.
+  `outputs/modelling/results/v1_full/month5_dryrun/`. Tests: `tests/test_harness.py`.
+
+## 28 Oct 2026 — Rules-budget measure, measured noise, split application score, graph features (proposal)
+
+No change to the simulated data, the feature store, its 28 features or the adopted features. New derived files in
+`data/<run>/features/` (git-ignored): `graph_weekly.parquet`, `graph_edges.parquet`, `graph_manifest.json`,
+`graph_nb/`. The 50k store `data/v1/features/weekly.parquet` was rebuilt (it predated the week-78 drop). All of this
+is a **proposal for the team** (Emmy Li); defaults are unchanged (`--decide weekly_recall`). Report-appendix work
+under the feature freeze of 28 Oct 2026: none of it changes the 38 frozen inputs, and the results agree with them.
+- **Rules' budget** (`src/evaluation/budget.py`): the rules raise ~6 alerts a week per validation month (0.017-0.020%
+  of accounts per week, months 0-7), against ~300 flags for the lab's top 1%. New measure `catch_rules`: permanent
+  flags at the rules' alert count in each week since opening; per week the share of mule accounts (closed ones
+  included) flagged so far, averaged over weeks 0-26. The rules' own value on the same scale: **0.141**. Also
+  `catch_0.1pct` (0.1% of open accounts per week). `--decide` picks the deciding measure.
+- **Noise measured** (`--placebo N`, trial `noise-placebo5`, 5 groups of shuffled columns): 2 x RMS placebo gain =
+  catch_rules 0.012, catch_0.1pct 0.005 (set in `NOISE`); weekly_recall 0.006, acc_pr_auc 0.008, caught_2wk 0.023
+  (reported only; the agreed 0.02 / 0.04 / 0.05 are left for the team). Bootstrap over each month's mule accounts:
+  catch_rules sd 0.026 per fold.
+- **roll4 at the rules' budget** (trial `roll4-recheck-rules-budget`, baseline store only): catch_rules 0.381 ->
+  0.457 (+0.128 / +0.072 / +0.027), `better`; start_recall up in all folds. The adoption holds.
+- **Two application scores** (`tuning.app_score_split`, group `app_split`): catch_rules -0.008 / -0.022 / +0.006 (no
+  clear change), catch_0.1pct `worse`, PR-AUC 0.870 -> 0.811, real-customer mules caught not higher. Drop.
+- **Graph features** (`python -m features graph`, `src/features/graph.py`: internal money in / out, internal payers,
+  forward-within-24h of internal money, neighbours so far, neighbours showing the closure footprint;
+  `src/models/graph_nb.py`: neighbours' out-of-fold scores from a two-stage model, no labels of neighbours):
+  `graph_struct` catch_rules -0.011 / -0.004 / -0.001 (`worse` by the all-folds rule, every fall below the noise
+  level), `graph_nb` -0.008 / +0.006 / +0.038 (no clear change), both together +0.001 / +0.004 / +0.029 (no clear
+  change). start_recall rises in every fold for every graph group (+0.02 to +0.04), PR-AUC 0.870 -> 0.895
+  (`graph_nb`); real-customer mules caught at the rules' budget with `graph_nb`: +1 in fold 1, -1 in fold 2, +1 in
+  fold 3. Not a promotion candidate at the rules' budget.
+- `--scratch DIR` for development runs (no ledger row). The ledger gained 10 columns; earlier lines are byte for
+  byte as before plus empty fields (`append_ledger` no longer re-writes old values). 29 ledger rows on v1_full now
+  (5 of them placebos).
+- **roll4 confirmed on fresh data (seed 43, one look):** `data/sensitivity/seed__43` rebuilt from its committed
+  manifest (same BAF hash and setting values; data card identical to the committed one, 10/10 checks), then preprocess
+  (`outputs/modelling/preprocess/seed__43/`), store and trial `roll4-confirm-seed43`: catch_rules 0.382 -> 0.452
+  (+0.076 / +0.079 / +0.055, `better`; rules 0.162), weekly recall +0.047 / +0.048 / +0.045, PR-AUC 0.691 -> 0.859.
+  Seed 44 not run (disk).
+- `outputs/modelling/feature_lab/PLAN.md`: the planned trials, their results and the seed-43 check.
+
+## 28 Oct 2026 — Feature list frozen
+
+No data, feature-store or code change. Decision (28 Oct 2026, Kee Chee Pheng, lead): the model inputs are frozen
+for tuning step 2, calibration on month 5 and scoring of test months 6–7: the 28 store features, the 8 `roll4`
+features (`features.candidates.ADOPTED`), `weeks_since_open` and the application score (`app_score`), 38 in all for
+the LightGBM activity + application model (the feature lab's baseline). Groups tried and not taken: `lag1`, `roll2`,
+`roll4_core`, `running_max`, `new_cp4`, `self4`, `speed_cum`, `max_out_hist`, `internal_out`. From now on feature-lab
+trials and `/feature-round` run only on explicit request, as report-appendix work. Re-checking `roll4` on Variants II
+and IV is a robustness check and does not reopen the list.
+
+## 28 Oct 2026 — `self4` not adopted
+
+No data, feature-store or code change. Decision (28 Oct 2026, Kee Chee Pheng, lead): the `self4` group (last 4 weeks
+vs the account's own earlier 4-week average: money in, money out, payments in) is **not** added to the model inputs,
+which stay store + `roll4` (`features.candidates.ADOPTED` unchanged). On v1_full against the adopted model its weekly
+recall gain (+0.030 / +0.037 / +0.022) is mostly re-flagging mules already found (later recall +0.053 / +0.077 /
++0.061; start-week recall +0.008 / +0.029 / +0.013), first catch within 2 weeks is unchanged (0.957) and it loses 1
+unwitting mule from the top 1% in fold 1. A flag is permanent, so re-flagging earns nothing. The group stays in
+`candidates.py` as a tried candidate.
+
+## 28 Oct 2026 — Feature round r01: real-customer mules
+
+No data change, no feature-store change, no change to the adopted features. First `/feature-round`, focus
+real-customer mules (66 witting + 69 unwitting in months 0–4 of v1_full). Report-appendix work.
+- EDA (`notebooks/07_eda_agent_r01.ipynb`, `outputs/modelling/eda_agent/r01/`, 669 AUCs listed in `checks.csv`):
+  for real customers no signal before laundering starts (21 of 376 checks in the 2 weeks before differ, ~19 expected by
+  chance); the Phase 1 hint (more rows before the start) disappears when compared at the same week since opening
+  (AUC 0.50). 4 start-week insights in `insights.csv`:
+  - r01-1 matched forwarding (pays out 80–100% of a payment just received within 24 h): AUC real 0.88, 58% of real
+    mules' start weeks vs 1.3% of normal weeks; needs raw transactions, so a team proposal; size partly an artefact
+    (normal accounts never forward a received amount).
+  - r01-2 largest payment out beats the account's earlier maximum: real 0.81 (store version 0.79).
+  - r01-3 same payee 2+ times a week: artefact (the simulator never repeats a normal payee within a week); recorded
+    so nobody trials it.
+  - r01-4 weekly share of money out to accounts inside the bank: real 0.75 vs fake 0.63.
+- Trials (new groups `max_out_hist`, `internal_out` in `features.candidates`, with hand-computed tests), vs store +
+  `roll4`, per fold on v1_full: `max_out_hist` weekly recall −0.006 / +0.003 / +0.012, no clear change (status
+  `tried`); `internal_out` −0.017 / +0.005 / −0.004, PR-AUC worse in all folds (status `dropped`). Start-week recall
+  and first catch within 2 weeks unchanged within fold noise; real-customer mules in the top 1% unchanged (27 of 32).
+  No promotion candidate, so seed 43 is still unused.
+- Looks: 34 ledger rows, 19 on v1_full.
+- `feature-engineer` prompt: the real-mule figure updated to the current model (27 of 32; 19 of 32 was before
+  `roll4`).
+
+## 27 Oct 2026 — EDA -> feature loop (report appendix)
+
+No data change, no feature-store change, no change to the adopted features or the frozen feature list. New:
+- `eda-explorer` agent (`.claude/agents/eda-explorer.md`): one round explores months 0–4 of v1_full through `amldata`
+  (store, raw transactions in DuckDB, labels with launderer type), data first and only then the simulator code, and
+  writes up to 5 insights with evidence (AUC with 95% bootstrap interval for all / fake / real-customer mules, within
+  income and age bands, against the closest store feature, before vs after the start), the simulator setting and its
+  `strength`, and an artefact verdict. Evidence notebook `notebooks/07_eda_agent_<round>.ipynb`.
+- `outputs/modelling/eda_agent/insights.csv`: append-only ledger (empty); `tests/test_eda_agent.py` checks it.
+- `/feature-round` skill: EDA agent -> the user picks insights -> `feature-engineer` (at most 3 trials) -> report.
+- `feature-engineer` agent: takes approved insight ids, updates their status, and judges a v1_full promotion
+  candidate once on `data/sensitivity/seed__43` (same settings as v1_full, seed 43, rules frozen at 1.516, unused by any
+  trial so far; store and cleaned table built on first use) against the multiple-looks risk.
+
+## 27 Oct 2026 — Feature lab splits gains by phase; agent trials merged
+
+No data change, no feature-store change, no change to the adopted features. Merged from the `feature-engineer` agent's
+worktree (trials of 26 Oct 2026):
+- `python -m models.feature_lab` also reports, with no verdict, where a gain comes from: `pre_start_recall` (fake
+  accounts before they launder), `start_recall` (start week and the next), `later_recall` (2+ weeks after), and
+  `first_caught_2wk` (as `caught_2wk`, but a flag is permanent: a mule flagged once leaves the pool).
+  `--baseline store` re-checks the adopted features against the store-only model. `NOISE`, folds, the existing
+  measures and verdicts are unchanged; the ledger gains columns, earlier rows are kept as they were.
+- Finding: `weekly_recall` also rewards flagging the same mule again in later weeks, worth nothing with a permanent flag.
+  `roll4` (re-check, v1_full): `start_recall` 0.703 -> 0.781 in all folds, so its gain is partly earlier catching;
+  `first_caught_2wk` 0.958 -> 0.957.
+- New candidate groups in `features.candidates` (with hand-computed tests): `new_cp4`, `self4`, `speed_cum`. On
+  v1_full against the adopted model: `self4` weekly recall +0.030 (+0.030 / +0.037 / +0.022), `start_recall` +0.008 /
+  +0.029 / +0.013, `first_caught_2wk` unchanged, loses 1 unwitting mule in fold 1: team decision open. `speed_cum`
+  +0.131, almost all in `later_recall` (+0.34 / +0.33 / +0.20): dropped. `new_cp4` (v1 only) no clear change: dropped.
+- 17 looks on v1_full against the same folds so far (ledger).
+- `.claude/agents/feature-engineer.md`: promotion also needs `start_recall` and `first_caught_2wk` not to fall;
+  clearer lab-editing rule, foreground v1_full runs, worktree data paths, report lists changed files and the
+  top-1%-vs-rules'-budget caveat.
 
 ## 26 Oct 2026 — Four-week-window features adopted into the model inputs
 

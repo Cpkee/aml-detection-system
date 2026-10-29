@@ -9,7 +9,10 @@ repeats its application values in all of them, so the trees learn to recognise i
   idea 2  app_score: the 56 prepared application columns become one number from a logistic regression, scored out of
           fold for training accounts, so the trees get the application's signal but cannot memorise accounts by it.
 
-Used by notebooks/06_lgbm_tuning.ipynb.
+  split   app_score_split: the same idea with two scores, one for fake accounts and one for recruited real
+          customers (proposal 28 Oct 2026; tried in the feature lab as the `app_split` variant).
+
+Used by notebooks/06_lgbm_tuning.ipynb and src/models/feature_lab.py.
 """
 from __future__ import annotations
 
@@ -46,3 +49,25 @@ def app_score(x_train, y_train, x_other, n_splits: int = 5, seed: int = 0) -> tu
     for fit_rows, score_rows in StratifiedKFold(n_splits, shuffle=True, random_state=seed).split(x_train, y_train):
         oof[score_rows] = _logreg().fit(x_train[fit_rows], y_train[fit_rows]).decision_function(x_train[score_rows])
     return oof, _logreg().fit(x_train, y_train).decision_function(x_other)
+
+
+def app_score_split(x_train, y_week0, y_week26, x_other, n_splits: int = 5, seed: int = 0) -> dict[str, tuple]:
+    """Two application scores instead of one (proposal 28 Oct 2026): {name: (training scores, other scores)}.
+
+      fake  label: mule at the end of week 0. Real customers start laundering in week 1 or later, so this is in
+            practice "a fake account" (fake accounts are mules from opening), learnt from a public label
+      real  label: mule by the end of week 26, fitted only on accounts that were not mules at week 0: what a
+            recruited real customer's application looks like, without fake accounts drowning it out
+
+    The single app_score's label (mule by week 26) is ~70% fake accounts, so it ranks real-customer mules no higher
+    than normal accounts (0 of 32 in the top 1% on v1_full). Both scores are out of fold for training accounts as in
+    app_score. Week-0 mules are not in the 'real' model's training rows, so a model fitted on all its rows scores
+    them, as it scores the other accounts."""
+    x_train, x_other = np.asarray(x_train), np.asarray(x_other)
+    y0, y26 = np.asarray(y_week0).astype(int), np.asarray(y_week26).astype(int)
+    fake = app_score(x_train, y0, x_other, n_splits, seed)
+    keep = y0 == 0
+    real_tr = np.zeros(len(x_train))
+    real_tr[keep], rest = app_score(x_train[keep], y26[keep], np.vstack([x_train[~keep], x_other]), n_splits, seed)
+    real_tr[~keep] = rest[:(~keep).sum()]
+    return {"fake": fake, "real": (real_tr, rest[(~keep).sum():])}

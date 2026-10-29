@@ -42,15 +42,44 @@ LightGBM (activity + application score, as notebook 06; `--views activity` for s
 (baseline folds, months 0–4 only) and judges it on the tuning measure, weekly earliness (decision 26 Oct 2026) ->
 `outputs/modelling/feature_lab/<data>/<name>/` and an append-only `ledger.csv`. **Adopted (26 Oct 2026, Kee Chee Pheng):**
 the 8 four-week-window features (`candidates.ADOPTED`, group `roll4`), added at load time with
-`lgbm_baseline.load_table(..., adopted=True)` (not stored; weeks must start at 0). Tuning step 2 and later models use them;
-the lab's baseline includes them. Notebooks 05/06 stay the records of the store-only runs.
-Feature selection (27 Oct 2026, steps 1–3): `python -m features select [--out D]` runs `notebooks/07_feature_selection.ipynb`
-(helpers `src/models/feature_selection.py`: `FAMILIES` of the 38 inputs, near-duplicate groups, permutation importance on
-weekly recall, SHAP) -> `outputs/modelling/feature_selection[/<run>]`; it labels each input needed / covered by a near-copy /
-mixed / weak and prints refit trials. `python -m models.feature_lab --drop NAME... [--together]` leaves families or single
-inputs out. v1_full: dropping the 16 weak inputs costs 0.402 -> 0.400 weekly recall (all 3 folds slightly down, so
-'worse' by the rule); dropping them plus 7 near-copies (15 left) 0.398. **Open team decision:** which inputs to drop. The `feature-engineer` agent (`.claude/agents/`) runs propose -> implement -> verify -> evaluate
+`lgbm_baseline.load_table(..., adopted=True)` (not stored; weeks must start at 0).
+**Feature list frozen (28 Oct 2026, Kee Chee Pheng):** for tuning step 2, calibration (month 5) and the test months the
+LightGBM inputs are the 28 store features + the 8 `roll4` features + `weeks_since_open` + the application score
+(`app_score`): 38, the lab's baseline. Changed only by team decision. Feature-lab trials and `/feature-round` run only on
+explicit request and are report-appendix work; re-checking `roll4` on Variant II / IV is a robustness check, not a
+reopening of the list. Tuning step 2 and later models use them;
+the lab's baseline includes them (`--baseline store` to re-check them). Notebooks 05/06 stay the records of the store-only
+runs. The lab also splits each gain by phase (`pre_start_recall`, `start_recall`, `later_recall`) and reports
+`first_caught_2wk` with permanent flags: weekly recall rewards re-flagging mules already found (26 Oct 2026 finding).
+Feature selection (report appendix, under the freeze): `python -m features select [--out D]` runs
+`notebooks/10_feature_selection.ipynb` (helpers `src/models/feature_selection.py`: `FAMILIES` of the 38 inputs,
+near-duplicate groups, grouped permutation importance, SHAP) -> `outputs/modelling/feature_selection[/<run>]`; it labels
+each input needed / covered by a near-copy / mixed / weak. `python -m models.feature_lab --drop NAME... [--together]`
+leaves families or single inputs out; `--params FILE` refits with given LightGBM settings (e.g. tuning step 2's
+`tuned_params.json`). Results with the tuned settings: see CHANGELOG. The `feature-engineer` agent (`.claude/agents/`) runs propose -> implement -> verify -> evaluate
 trials; it never changes the store, which stays a team decision.
+Agent trials 26 Oct 2026 (v1_full, vs the adopted model; groups `new_cp4`, `self4`, `speed_cum` in `candidates.py`,
+merged from the agent worktree 27 Oct 2026): `self4` (last 4 weeks vs the account's own earlier average)
+weekly recall +0.03, better in all folds, mostly later weeks, loses 1 unwitting mule in fold 1: **not adopted (decision
+28 Oct 2026, Kee Chee Pheng)**: the gain is re-flagging (later recall +0.05 to +0.08; start recall +0.008 to +0.029;
+first catch within 2 weeks unchanged), worth nothing with a permanent flag; stays a candidate group, not in `ADOPTED`;
+`speed_cum` +0.13 but almost all repeat flags: dropped; `new_cp4` (v1 only) no clear change: dropped. Finding: weekly
+recall rewards re-flagging mules already found, worth nothing with a permanent flag. Split by phase, `roll4` still lifts the
+start-week flag rate (0.703 -> 0.781, all folds), but first catch within 2 weeks with permanent flags stays 0.958 / 0.957.
+17 looks on v1_full against the same folds so far (multiple-looks risk).
+**EDA -> feature loop (decided 27 Oct 2026, report appendix only; never changes the frozen feature list):** `/feature-round`
+(`.claude/skills/feature-round/`) runs the `eda-explorer` agent (months 0–4 of v1_full via `amldata`: store, raw
+transactions, labels with type; explores the data first, then audits each finding against `src/sim/` / `sim.yaml`) ->
+up to 5 insights in `outputs/modelling/eda_agent/insights.csv` (append-only; only `status` / `trial` / `note` change;
+`tests/test_eda_agent.py`) with `notebooks/07_eda_agent_<round>.ipynb` as evidence -> the user picks -> the
+`feature-engineer` runs at most 3 trials -> a v1_full promotion candidate is judged **once** on `data/sensitivity/seed__43`
+(same settings as v1_full, seed 43, rules frozen at 1.516; never used by a trial before), its store and cleaned table built
+on first use. **Round r01 (28 Oct 2026, focus real-customer mules):** for real customers no signal before the start (21 of
+376 checks in the 2 weeks before, ~19 expected by chance); 4 start-week insights: r01-1 matched forwarding (strongest, AUC
+0.88 real, needs raw transactions: team proposal), r01-3 repeat payee (artefact: normal accounts never repeat a payee),
+r01-2 `max_out_hist` and r01-4 `internal_out` trialled: no gain on v1_full (r01-4 PR-AUC worse in all folds), so seed 43
+unused. The current model already flags 0.78 of mule weeks in the start week and the next, first catch within 2 weeks
+0.957, 27 of 32 real-customer mules in the top 1%. 19 looks on v1_full so far.
 Phase 4 baselines (untuned, 3 temporal folds, months 0–4, weeks 0–26): `notebooks/05_lgbm_baseline.ipynb` (helpers in
 `src/models/lgbm_baseline.py`) and `notebooks/04_logreg_baseline.ipynb` -> `outputs/modelling/models/<run>/`; both
 reproducible run to run (sorted rows via `weekly.load(months=)`, LightGBM `deterministic=True`, since 22 Oct 2026).
@@ -63,6 +92,25 @@ barely helps (combined 0.256 -> 0.279); the application as one out-of-fold logis
 fixes the memorising (gap 0.74 -> 0.18; 0.695). Activity alone still leads on account level (0.730), but activity +
 app score wins in 27 of 27 weeks and puts 15% of mules in each week's top 1% in weeks 0-8 vs 4%: earliness, which
 the account-level measure does not reward. It catches fewer real mules in the account top 1% (19/32 vs 25/32).
+Feature lab (`python -m models.feature_lab`, `src/features/candidates.py`, ledger `outputs/modelling/feature_lab/ledger.csv`,
+26-27 Oct 2026): candidate groups judged on the tuned model; `roll4` (8 four-week-window features) adopted 26 Oct, computed
+at load time (`load_table(..., adopted=True)`). **Proposal 28 Oct 2026, pending the team** (plan:
+`outputs/modelling/feature_lab/PLAN.md`): `--decide catch_rules` = permanent flags at the rules' own weekly alert count
+(`src/evaluation/budget.py`; ~0.02% of accounts a week vs the top 1%'s ~60x), the rules' own value beside it;
+`--placebo N` measures refit noise; special groups `app_split` (two application scores, `tuning.app_score_split`),
+`graph_struct` (`python -m features graph` -> `<out>/features/graph_weekly.parquet` + `graph_edges.parquet`, own
+manifest, store untouched) and `graph_nb` (neighbours' scores from a two-stage model, `src/models/graph_nb.py`, cached in
+`<out>/features/graph_nb/`); `--scratch DIR` for development runs that skip the ledger. Report-appendix work under the
+freeze: v1_full results (catch_rules: rules 0.141, frozen model 0.457; `roll4` holds at the rules' budget, `app_split` and the
+graph groups no clear gain) agree with the frozen 38 inputs; measured refit noise 0.012 (catch_rules), 0.006 (weekly recall).
+Phase 5 (28 Oct 2026): `python -m models train [--out D --params FILE]` fits the frozen model on months 0-4 ->
+`data/<run>/models/frozen/`; `python -m evaluation.score [--months 5]` runs the fixed-cohort harness at the rules' weekly
+budget -> `outputs/modelling/results/<run>/month5_dryrun/`; test months only with `--final-test`, once (lock file).
+Dry run, month 5 of v1_full, weeks 0-26: model 62 of 78 mules caught vs rules 16 (precision 0.50 vs 0.13), no flag before
+laundering starts (the budget is ~5 flags a week).
+29 Oct: `python -m models calibrate` (month 5, isotonic, out-of-fold check), `train --inputs activity` + `python -m evaluation.compare` (onboarding value: month 5 frozen 65 vs activity-only 61 of 78; seed 43 56 vs 56), age-band breakdown, machine recorded. Tuned model differs by machine (63 Windows vs 65 Mac): machine of record undecided; local runs `_macos`.
+Option B (29 Oct): train once, share the model files (`lgbm.txt`, `app_logreg.json`, `manifest.json`, later `calibration.json`) in `data/<run>/models/<name>/`; scoring a file is identical across machines. `python -m features fingerprint` compares data by content; `python -m models verify --model M --reference RUN` accepts an older shared model once by reproducing a committed run.
+**Model of record: `frozen_tuned`, committed in `outputs/modelling/models/v1_full/frozen_tuned/`** (lgbm.txt, app_logreg.json, manifest, verified.json, calibration.json); found there first by `models.train.load`, never retrained (`train` refuses the name). Do not retrain it: score with `python -m evaluation.score` (default model). Retraining on another machine gives slightly different trees.
 Sensitivity runs (rules frozen, 244k, one `test` value each): `python -m sim.sensitivity --list | --run [--only NAME]
 | --summarise` -> `data/sensitivity/<name>/` (large files deleted) and `outputs/sensitivity/summary.csv`.
 Single steps: `accounts`, `normal --batches 3-3`, `laundering`, `rules`, `finalize`. Use `--out` for another
@@ -151,6 +199,15 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
 - Branch per change, PR into `main`. Never commit `data/`. Run checks + pytest before committing.
 
 ## Next tasks
+**Status 27 Oct 2026** (team plan: doc tab "Team plan: final 3 weeks"): Phases 0–3 done; Phase 4 baselines, tuning step 1
+and feature adoption (`roll4`) done. Feature engineering is closing: `self4` not adopted (28 Oct; the agent worktree's lab code,
+phase split, `--baseline store` and trial outputs were merged 27 Oct), so the model inputs stay store + `roll4`; feature list
+frozen 28 Oct (see the Modelling commands above). Gate 28 Oct: tuning
+grid done (Li Ann, with `adopted=True`), ~~harness dry run on month 5 (Emmy Li)~~ done 28 Oct (`evaluation.score`), stress-test datasets and Variant II / IV
+stores built (teammate 4; then re-check `roll4` there). 4 Nov: models calibrated on month 5 and frozen. 5 Nov: test
+months 6–7 scored once. 11 Nov report final, 12 Nov submit (date to confirm). Caution: the lab and the tuning measure use
+each week's top 1% (~300–500 accounts a week); the rules flag ~7–9 cohort accounts a week in weeks 0–12 (111 of 50,061),
+about 60x fewer, so only the Phase 5 harness at the rules' budget shows whether the features help.
 1. ~~`--set key=value` override~~ done 7 Oct 2026 (with run manifest).
 2. ~~Full-size run~~ done 7 Oct 2026, regenerated 8 Oct after the R6 fix: rules at 93.4% (see above).
 3. Modelling. **Decisions 9 Oct 2026** (phased plan in the doc tab "Modelling: phased plan"): one pooled account-week

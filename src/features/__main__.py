@@ -1,4 +1,4 @@
-"""Command line: python -m features <command> [options]."""
+﻿"""Command line: python -m features <command> [options]."""
 from __future__ import annotations
 import argparse
 import os
@@ -40,6 +40,14 @@ def main(argv=None):
     w.add_argument("--weeks", default=f"0-{LAST_WEEK}", help=f"weeks since opening, e.g. 0-26 (default 0-{LAST_WEEK})")
     w.add_argument("--force", action="store_true", help="rebuild even if the store exists")
 
+    g = sub.add_parser("graph", help="payment-graph features <out>/features/graph_weekly.parquet (proposal 28 Oct 2026; "
+                                     "needs the weekly store)")
+    g.add_argument("--out", default="data/v1_full", help="data folder (default data/v1_full)")
+    g.add_argument("--force", action="store_true", help="rebuild even if the graph store is current")
+
+    fp = sub.add_parser("fingerprint", help="content fingerprints of the files a model reads (compare two machines)")
+    fp.add_argument("--out", default="data/v1_full", help="data folder (default data/v1_full)")
+
     e = sub.add_parser("eda", help="Phase 1 EDA: execute notebooks/01_eda_train.ipynb -> <report>/report.md, figures, CSVs")
     e.add_argument("--out", default="data/v1_full", help="data folder (default data/v1_full)")
     e.add_argument("--report", default=None,
@@ -55,7 +63,7 @@ def main(argv=None):
     c.add_argument("--report", default=None,
                    help="report folder (default outputs/modelling/features, or .../features/<data folder name>)")
 
-    s = sub.add_parser("select", help="feature selection steps 1-3: execute notebooks/07_feature_selection.ipynb -> "
+    s = sub.add_parser("select", help="feature selection steps 1-3: execute notebooks/10_feature_selection.ipynb -> "
                                       "<report>/report.md (inventory, near-duplicates, permutation importance)")
     s.add_argument("--out", default="data/v1_full", help="data folder with a built store and preprocess files")
     s.add_argument("--report", default=None, help="report folder (default outputs/modelling/feature_selection, "
@@ -65,6 +73,13 @@ def main(argv=None):
     if a.cmd == "weekly":
         path, n = build(a.out, parse_weeks(a.weeks), force=a.force)
         print(f"wrote {path}: {n:,} account-weeks")
+    elif a.cmd == "graph":
+        from .graph import build as build_graph
+        path, n = build_graph(a.out, force=a.force)
+        print(f"wrote {path}: {n:,} account-weeks")
+    elif a.cmd == "fingerprint":
+        from .fingerprint import main as fingerprint_main
+        fingerprint_main(a.out)
     elif a.cmd == "eda":
         run_notebook("01_eda_train.ipynb", a.out, a.report)
     elif a.cmd == "preprocess":
@@ -72,7 +87,7 @@ def main(argv=None):
     elif a.cmd == "store-check":
         run_notebook("03_feature_store.ipynb", a.out, a.report, report_root="outputs/modelling/features")
     elif a.cmd == "select":
-        run_notebook("07_feature_selection.ipynb", a.out, a.report, report_root="outputs/modelling/feature_selection")
+        run_notebook("10_feature_selection.ipynb", a.out, a.report, report_root="outputs/modelling/feature_selection")
     else:
         raise SystemExit(f"`{a.cmd}` is not built yet (see the modelling plan)")
 

@@ -1,0 +1,3 @@
+view,variant,n_features,weekly_recall_pooled,weekly_recall,d_weekly_recall,d_weekly_recall_folds,weekly_recall_verdict,acc_pr_auc,d_acc_pr_auc,d_acc_pr_auc_folds,acc_pr_auc_verdict,caught_2wk,d_caught_2wk,d_caught_2wk_folds,caught_2wk_verdict
+app,baseline,38,0.299509036413328,0.3141810380372472,0.0,+0.000 / +0.000 / +0.000,,0.7310791078184797,0.0,+0.000 / +0.000 / +0.000,,0.8660130718954249,0.0,+0.000 / +0.000 / +0.000,
+app,+speed_cum,40,0.5459426767348199,0.5648020905101515,0.2506210524729043,+0.234 / +0.291 / +0.226,better,0.9211875021709043,0.19010839435242466,+0.265 / +0.174 / +0.131,better,0.9248366013071895,0.05882352941176472,+0.176 / +0.000 / +0.000,no clear change

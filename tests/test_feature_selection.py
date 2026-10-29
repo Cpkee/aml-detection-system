@@ -60,6 +60,25 @@ def test_permutation_drop_finds_the_used_feature():
     assert mean["p"] > 0.5 and mean["r"] == 0.0
     assert len(d) == 4 and np.allclose(d["base"], measure(valid, valid["p"].to_numpy()))   # unshuffled score
 
+    # several measures on the same shuffles: one row per measure, the same shuffles give the same drops
+    two = fs.permutation_drop(_OnlyP(), valid, ["p", "r"], {"p": ["p"], "r": ["r"]},
+                              lambda v, s: {"m1": measure(v, s), "m2": 2 * measure(v, s)}, repeats=2)
+    assert len(two) == 8 and set(two["measure"]) == {"m1", "m2"}
+    m1, m2 = (two[two.measure == k].reset_index(drop=True) for k in ("m1", "m2"))
+    assert np.allclose(m1["drop"], d["drop"]) and np.allclose(m2["drop"], 2 * d["drop"])
+
+
+def test_read_params_and_lgbm_settings(tmp_path):
+    import json
+    p = tmp_path / "tuned.json"
+    p.write_text(json.dumps({"n_estimators": 500.0, "num_leaves": 15, "learning_rate": 0.03, "subsample_freq": 1}))
+    got = lab.read_params(str(p))
+    assert got["n_estimators"] == 500 and isinstance(got["n_estimators"], int) and got["learning_rate"] == 0.03
+    assert lab.read_params(None) == {}
+    s = lab.lgbm_settings(7, got)
+    assert s["random_state"] == 7 and s["class_weight"] == "balanced" and s["deterministic"] and s["num_leaves"] == 15
+    assert lab.lgbm_settings(42) == lab.lgbm_settings(42, {})            # no file -> the lab's defaults
+
 
 def test_drop_variants_take_families_and_single_inputs():
     v = lab.drop_variants(["peer", "n_out_wk"])
@@ -72,8 +91,10 @@ def test_drop_variants_take_families_and_single_inputs():
         lab.drop_variants(["not_a_feature"])
 
 
-def test_build_variants_adds_and_drops():
+def test_variant_columns_adds_and_drops():
     base = ["a", "b", "c", "app_score"]
-    v = lab.build_variants(base, {"+g": ["x"]}, {"-f": ["b", "c"], "-app": ["app_score", "absent"]})
-    assert v == {"baseline": base, "+g": base + ["x"], "-f": ["a", "app_score"], "-app": ["a", "b", "c"]}
+    assert lab.variant_columns(base, [], []) == base
+    assert lab.variant_columns(base, ["x"], []) == base + ["x"]
+    assert lab.variant_columns(base, [], ["b", "c"]) == ["a", "app_score"]
+    assert lab.variant_columns(base, [], ["app_score", "absent"]) == ["a", "b", "c"]   # absent column ignored
     assert base == ["a", "b", "c", "app_score"]                      # the input list is not changed
