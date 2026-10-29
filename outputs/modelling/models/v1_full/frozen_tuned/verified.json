@@ -1,0 +1,46 @@
+{
+  "verified": true,
+  "reference": "outputs/modelling/results/v1_full/month5_dryrun_frozen_tuned",
+  "compared": {
+    "launderers.csv": true,
+    "summary_w26.csv": true,
+    "summary_w77.csv": true,
+    "weekly_w26.csv": true,
+    "weekly_w77.csv": true
+  },
+  "date": "2026-10-29",
+  "machine": {
+    "os": "macOS-26.5.2-arm64-arm-64bit",
+    "processor": "arm",
+    "cpu_count": 8,
+    "python": "3.12.3"
+  },
+  "input_fingerprints": {
+    "duckdb": "1.5.6",
+    "accounts.parquet": {
+      "rows": 244000,
+      "fingerprint": 51646089
+    },
+    "features/accounts_linear.parquet": {
+      "rows": 244000,
+      "fingerprint": 82994433
+    },
+    "features/accounts_tree.parquet": {
+      "rows": 244000,
+      "fingerprint": 18593764
+    },
+    "features/peer_medians.parquet": {
+      "rows": 6162,
+      "fingerprint": 416730365
+    },
+    "features/weekly.parquet": {
+      "rows": 19032000,
+      "fingerprint": 3065472
+    }
+  },
+  "model_files_sha256": {
+    "lgbm.txt": "93ab86a188ad0d9628333199e0be1579a1b8ae519986256ff4c290d5a9bd7bbb",
+    "app_logreg.json": "cc94b7a276515bc17df3f6d5eb5b05f5fc6177a60849a46e1ec6b149915d24eb",
+    "manifest.json": "6c07f6fa011eee43c29953ebb178387994db2f675ecb68299cc1ecd1471dc091"
+  }
+}
