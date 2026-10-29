@@ -1,6 +1,6 @@
 # CLAUDE.md — aml-detection-system
 
-BT4102 group project (NUS). Question: can account-opening data plus early activity catch money-laundering
+BT4012 group project (NUS). Question: can account-opening data plus early activity catch money-laundering
 (mule) accounts **earlier** than a bank's existing rules? No public data links applications to later
 transactions, so we **simulate** one: real BAF applications -> hidden profiles -> 18 months of simulated UK
 banking -> laundering planted from published evidence -> the bank's 6 rules as the benchmark.
@@ -43,7 +43,13 @@ LightGBM (activity + application score, as notebook 06; `--views activity` for s
 `outputs/modelling/feature_lab/<data>/<name>/` and an append-only `ledger.csv`. **Adopted (26 Oct 2026, Kee Chee Pheng):**
 the 8 four-week-window features (`candidates.ADOPTED`, group `roll4`), added at load time with
 `lgbm_baseline.load_table(..., adopted=True)` (not stored; weeks must start at 0). Tuning step 2 and later models use them;
-the lab's baseline includes them. Notebooks 05/06 stay the records of the store-only runs. The `feature-engineer` agent (`.claude/agents/`) runs propose -> implement -> verify -> evaluate
+the lab's baseline includes them. Notebooks 05/06 stay the records of the store-only runs.
+Feature selection (27 Oct 2026, steps 1–3): `python -m features select [--out D]` runs `notebooks/07_feature_selection.ipynb`
+(helpers `src/models/feature_selection.py`: `FAMILIES` of the 38 inputs, near-duplicate groups, permutation importance on
+weekly recall, SHAP) -> `outputs/modelling/feature_selection[/<run>]`; it labels each input needed / covered by a near-copy /
+mixed / weak and prints refit trials. `python -m models.feature_lab --drop NAME... [--together]` leaves families or single
+inputs out. v1_full: dropping the 16 weak inputs costs 0.402 -> 0.400 weekly recall (all 3 folds slightly down, so
+'worse' by the rule); dropping them plus 7 near-copies (15 left) 0.398. **Open team decision:** which inputs to drop. The `feature-engineer` agent (`.claude/agents/`) runs propose -> implement -> verify -> evaluate
 trials; it never changes the store, which stays a team decision.
 Phase 4 baselines (untuned, 3 temporal folds, months 0–4, weeks 0–26): `notebooks/05_lgbm_baseline.ipynb` (helpers in
 `src/models/lgbm_baseline.py`) and `notebooks/04_logreg_baseline.ipynb` -> `outputs/modelling/models/<run>/`; both

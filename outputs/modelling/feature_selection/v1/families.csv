@@ -1,0 +1,11 @@
+family,n,perm_drop,folds_down,needed_members,family_needed
+volume_wk,8,0.01448551985952132,3,2,True
+volume_cum,3,0.017504815580342108,3,2,True
+counterparties,5,0.05889776191156002,3,2,True
+flow,4,0.010963946621172482,3,1,True
+self_vs_past,3,0.007311539156128847,3,1,True
+peer,1,0.003910809865784441,2,0,False
+mix,4,0.018399802677217355,3,1,True
+window_4wk,8,0.12687015504735188,3,2,True
+clock,1,0.02480272894216252,3,1,True
+application,1,0.09436141872597938,3,1,True

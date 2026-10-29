@@ -6,6 +6,32 @@ Assumptions and Use" doc.
 
 
 
+## 27 Oct 2026 — Feature selection, steps 1–3 (notebook 07) and `feature_lab --drop`
+
+No data change, no feature-store change, no change to the model's inputs (narrowing them is a team decision).
+- New `notebooks/07_feature_selection.ipynb` (`python -m features select [--out D --report R]`, helpers
+  `src/models/feature_selection.py`) -> `outputs/modelling/feature_selection/` (v1_full) and `.../v1/` (50k). On the
+  tuned model's 38 inputs (store 28 + adopted 8 + `weeks_since_open` + app score), months 0–4, the baseline's 3 folds:
+  single-feature AUCs, near-duplicate groups (|Spearman| >= 0.8 for every pair, an assumption), permutation
+  importance on weekly recall (single inputs, near-duplicate groups and families, 3 shuffles per fold), gain and
+  mean |SHAP|. Provisional label per input: needed (shuffle costs >= 0.005 weekly recall in all 3 folds, an
+  assumption) / covered by a near-copy / mixed / weak.
+- `python -m models.feature_lab --drop NAME... [--together]` leaves families or single inputs out (the opposite of
+  `--groups`); `tests/test_feature_selection.py`.
+- v1_full: 13 needed, 1 mixed, 7 covered, 16 weak; 7 near-duplicate groups (largest: the 7 weekly money-in /
+  payer / self-vs-past / peer features). Most relied on: app score (0.132), `out_1h_share_4wk` (0.098),
+  `n_payers_cum` (0.060), `internal_out_share_cum` (0.043), `weeks_since_open` (0.042). The notebook's baseline
+  equals the feature lab's on the same machine (weekly recall 0.409 / 0.366 / 0.446 per fold; pooled 0.402 on this
+  Windows machine vs 0.403 in the team's earlier runs).
+- Refit trials, v1_full: dropping the 16 weak inputs (38 -> 22): weekly recall 0.402 -> 0.400 pooled (−0.001 / −0.012 /
+  −0.003 per fold), PR-AUC 0.867 -> 0.856, `caught_2wk` 0.880 -> 0.885, real-customer mules in the top 1% unchanged;
+  verdict 'worse' because all 3 folds fall, though each fall is under the 0.02 noise level. Also dropping 7 spare
+  near-copies (38 -> 15): 0.398 (+0.001 / −0.016 / −0.007), PR-AUC 0.847, `caught_2wk` 0.870, one witting and one
+  unwitting mule fewer in the top 1%; verdict 'no clear change' only because one fold rose by 0.001. The rule
+  ('worse' = all folds fall, any size) reads small consistent losses as 'worse': the team decides whether 16 fewer
+  inputs are worth about 0.2 points of weekly recall.
+- `tests/test_hidden_files.py` reads files as UTF-8 (it failed on Windows on a notebook with non-ASCII text).
+
 ## 26 Oct 2026 — Four-week-window features adopted into the model inputs
 
 No data change, no feature-store change. The 8 features of the feature lab's `roll4` group (`n_rows_4wk`, `n_in_4wk`,
