@@ -6,10 +6,11 @@ import sys
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     if not argv or argv[0] in ("-h", "--help"):
-        print("usage: python -m models train [--out D] [--name N] [--params FILE] [--inputs frozen|activity] [--seed S]\n"
+        print("usage: python -m models train [--out D] [--name N] [--model lgbm|logreg] [--params FILE] "
+              "[--inputs frozen|activity] [--seed S]\n"
               "       python -m models calibrate [--out D] [--model N]\n"
               "       python -m models verify [--out D] --model N --reference RUN\n\n"
-              "  train      fit the frozen 38-input LightGBM on months 0-4 and save it (models.train)\n"
+              "  train      fit the frozen 38-input LightGBM (or --model logreg) on months 0-4 and save it (models.train)\n"
               "  calibrate  map a trained model's scores to probabilities on month 5 (models.calibrate)\n"
               "  verify     accept a model file from another machine by reproducing a committed run (models.verify)")
         return

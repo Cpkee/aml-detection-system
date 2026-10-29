@@ -2,6 +2,7 @@
 
     PYTHONPATH=src python -m models train --out data/v1_full                       # default LightGBM settings
     PYTHONPATH=src python -m models train --out data/v1_full --params tuned.json   # tuning step 2's settings
+    PYTHONPATH=src python -m models train --out data/v1_full --model logreg --name logreg --params logreg.json
 
 The model is the one the team froze on 28 Oct 2026: LightGBM on 38 inputs, the 28 store features + the 8 adopted
 `roll4` features + weeks_since_open + the application score. It is fitted on every account opened in months 0-4,
@@ -56,14 +57,28 @@ def data_identity(out: str) -> dict:
 
 
 VERIFIED = "verified.json"
-MODEL_FILES = ("lgbm.txt", "app_logreg.json", "manifest.json")
+# the main model's file per kind: LightGBM's text model, or the logistic regression as JSON (models.logreg)
+MODEL_FILE = {"lgbm": "lgbm.txt", "logreg": "logreg.json"}
+MODEL_FILES = ("lgbm.txt", "app_logreg.json", "manifest.json")      # a LightGBM model's files
+
+
+def model_kind(folder: str) -> str | None:
+    """'lgbm' or 'logreg' by the model file the folder holds; None when it holds neither."""
+    for kind, f in MODEL_FILE.items():
+        if os.path.exists(os.path.join(folder, f)):
+            return kind
+    return None
+
+
+def model_files(folder: str) -> tuple[str, ...]:
+    return (MODEL_FILE[model_kind(folder) or "lgbm"], "app_logreg.json", "manifest.json")
 
 
 def model_files_sha256(folder: str) -> dict:
     """Hashes of the model files with line endings normalised, so a Windows checkout (CRLF) matches a Mac one."""
     import hashlib
     return {f: hashlib.sha256(open(os.path.join(folder, f), "rb").read().replace(b"\r\n", b"\n")).hexdigest()
-            for f in MODEL_FILES}
+            for f in model_files(folder)}
 
 
 def model_dir(out: str, name: str) -> str:
@@ -80,7 +95,7 @@ def find_model_dir(out: str, name: str) -> str:
     """The model's folder: the shared copy in git when it holds a model file (the model of record, the same for every
     team member, decision option B 29 Oct 2026), else the one trained on this machine."""
     shared = shared_dir(out, name)
-    return shared if os.path.exists(os.path.join(shared, "lgbm.txt")) else model_dir(out, name)
+    return shared if model_kind(shared) else model_dir(out, name)
 
 
 def feature_table(out: str, months, weeks: tuple[int, int]) -> pd.DataFrame:
@@ -109,9 +124,12 @@ def app_scores_for(out: str, model: dict, ids) -> pd.Series:
 
 
 def train(out: str = amldata.DEFAULT_OUT, name: str = "frozen", params: dict | None = None, seed: int = 42,
-          report_root: str = REPORT_ROOT, input_set: str = "frozen") -> dict:
+          report_root: str = REPORT_ROOT, input_set: str = "frozen", kind: str = "lgbm") -> dict:
+    """kind 'lgbm' (default) or 'logreg' (models.logreg.MuleLogit; params = its settings, e.g. {"C": 0.01})."""
     import lightgbm as lgb
-    if os.path.exists(os.path.join(shared_dir(out, name, report_root), "lgbm.txt")):
+    if kind not in MODEL_FILE:
+        raise ValueError(f"unknown model kind {kind!r}; one of {list(MODEL_FILE)}")
+    if model_kind(shared_dir(out, name, report_root)):
         raise ValueError(f"`{name}` is a shared model in {shared_dir(out, name, report_root)} (committed, the same for "
                          "everyone): load it, or train under another name")
     t0 = time.time()
@@ -125,22 +143,36 @@ def train(out: str = amldata.DEFAULT_OUT, name: str = "frozen", params: dict | N
 
     df, _ = base.load_table(out, MONTHS, WEEKS, adopted=True)
     df["app_score"] = df["account_id"].map(pd.Series(oof, index=lin.index)).astype("float32")
-    settings = {**DEFAULT_PARAMS, "random_state": seed, **(params or {})}
     inputs = INPUT_SETS[input_set]
-    model = lgb.LGBMClassifier(n_jobs=-1, **settings).fit(df[inputs], df["mule_by_day"])
-
     folder = model_dir(out, name)
     os.makedirs(folder, exist_ok=True)
-    model.booster_.save_model(os.path.join(folder, "lgbm.txt"))
+    for stale in MODEL_FILE.values():                  # a folder holds one model kind
+        if os.path.exists(os.path.join(folder, stale)):
+            os.remove(os.path.join(folder, stale))
+    if kind == "lgbm":
+        settings = {**DEFAULT_PARAMS, "random_state": seed, **(params or {})}
+        model = lgb.LGBMClassifier(n_jobs=-1, **settings).fit(df[inputs], df["mule_by_day"])
+        model.booster_.save_model(os.path.join(folder, "lgbm.txt"))
+        gain = model.booster_.feature_importance("gain")
+        imp = pd.DataFrame({"feature": inputs, "gain": gain, "share": gain / gain.sum()}) \
+            .sort_values("gain", ascending=False)
+        params_key = "lightgbm_params"
+    else:
+        from models.logreg import DEFAULTS, MuleLogit
+        settings = {**DEFAULTS, **(params or {})}
+        model = MuleLogit(random_state=seed, **settings).fit(df[inputs], df["mule_by_day"])
+        with open(os.path.join(folder, "logreg.json"), "w") as f:
+            json.dump(model.to_dict(), f)
+        imp = model.coefficients()
+        params_key = "logreg_params"
     with open(os.path.join(folder, "app_logreg.json"), "w") as f:
         json.dump(app_model, f)
-    gain = model.booster_.feature_importance("gain")
-    imp = pd.DataFrame({"feature": inputs, "gain": gain, "share": gain / gain.sum()}).sort_values("gain", ascending=False)
     store = manifest.check(out, WEEKLY)
-    m = {"name": name, "data_folder": out, "input_set": input_set, "inputs": inputs, "n_inputs": len(inputs), "train_months": list(MONTHS),
+    m = {"name": name, "model_kind": kind, "data_folder": out, "input_set": input_set, "inputs": inputs,
+         "n_inputs": len(inputs), "train_months": list(MONTHS),
          "weeks": list(WEEKS), "label": "mule_by_day; account-weeks after closure dropped",
          "rows": int(len(df)), "mule_rows": int(df["mule_by_day"].sum()), "accounts": int(df["account_id"].nunique()),
-         "lightgbm_params": settings, "params_source": "default" if not params else "file",
+         params_key: settings, "params_source": "default" if not params else "file",
          "app_score": "LogisticRegression(class_weight='balanced', max_iter=2000) on accounts_linear; out of fold "
                       "(5 folds) for training rows, fitted on all training accounts for new ones",
          "run_manifest_sha256": manifest._sha256(os.path.join(out, "run_manifest.json")),
@@ -188,10 +220,12 @@ def data_problems(out: str, folder: str, m: dict) -> list[str]:
 
 
 def load(out: str = amldata.DEFAULT_OUT, name: str = "frozen", check_data: bool = True) -> tuple:
-    """(booster, app model dict, manifest), after checking the model was trained on this data run and store."""
+    """(model, app model dict, manifest), after checking the model was trained on this data run and store. The model
+    is a LightGBM Booster or a models.logreg.MuleLogit; both give the probability of 'mule' with .predict(x)."""
     import lightgbm as lgb
     folder = find_model_dir(out, name)
-    if not os.path.exists(os.path.join(folder, "lgbm.txt")):
+    kind = model_kind(folder)
+    if kind is None:
         raise FileNotFoundError(f"{folder} has no model - run `python -m models train --out {out}`")
     m = json.load(open(os.path.join(folder, "manifest.json")))
     problems = data_problems(out, folder, m) if check_data else []
@@ -201,8 +235,12 @@ def load(out: str = amldata.DEFAULT_OUT, name: str = "frozen", check_data: bool 
         problems.append(f"the {m.get('input_set', 'frozen')} input list changed")
     if problems:
         raise ValueError(f"model {folder} is stale: {'; '.join(problems)}. Retrain.")
-    booster = lgb.Booster(model_file=os.path.join(folder, "lgbm.txt"))
-    return booster, json.load(open(os.path.join(folder, "app_logreg.json"))), m
+    if kind == "lgbm":
+        model = lgb.Booster(model_file=os.path.join(folder, "lgbm.txt"))
+    else:
+        from models.logreg import MuleLogit
+        model = MuleLogit.from_dict(json.load(open(os.path.join(folder, "logreg.json"))))
+    return model, json.load(open(os.path.join(folder, "app_logreg.json"))), m
 
 
 def predict(out: str, months, weeks: tuple[int, int], name: str = "frozen", check_data: bool = True) -> pd.DataFrame:
@@ -223,7 +261,10 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="python -m models train", description=__doc__.split("\n")[0])
     ap.add_argument("--out", default=amldata.DEFAULT_OUT)
     ap.add_argument("--name", default="frozen", help="model folder name under <out>/models/")
-    ap.add_argument("--params", default=None, help="JSON file of LightGBM settings (tuning step 2), merged over defaults")
+    ap.add_argument("--model", default="lgbm", choices=list(MODEL_FILE),
+                    help="lgbm = LightGBM (default); logreg = logistic regression on the same inputs (models.logreg)")
+    ap.add_argument("--params", default=None, help="JSON file of the model's settings merged over its defaults "
+                                                   "(LightGBM: tuning step 2's file; logreg: e.g. {\"C\": 0.01})")
     ap.add_argument("--inputs", default="frozen", choices=list(INPUT_SETS),
                     help="frozen = the 38 inputs (default); activity = without app_score (onboarding-value yardstick)")
     ap.add_argument("--seed", type=int, default=42)
@@ -233,7 +274,7 @@ def main(argv=None):
         for k in ("n_estimators", "num_leaves", "min_child_samples", "subsample_freq", "max_depth"):
             if k in params:
                 params[k] = int(params[k])
-    m = train(a.out, a.name, params, a.seed, input_set=a.inputs)
+    m = train(a.out, a.name, params, a.seed, input_set=a.inputs, kind=a.model)
     print(f"trained {m['name']} on {m['rows']:,} account-weeks ({m['mule_rows']:,} mule weeks), "
           f"{m['n_inputs']} inputs, {m['seconds']}s -> {model_dir(a.out, a.name)}")
 

@@ -301,15 +301,17 @@ def lgbm_settings(seed: int, params: dict | None = None) -> dict:
 
 
 def fit_folds(df, cols, prof, start, scores, seed, ctx=None, fold_extra=None,
-              curves=None, params=None) -> tuple[pd.DataFrame, pd.DataFrame]:
+              curves=None, params=None, make_model=None) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Per-fold measures and the out-of-fold scores of one variant. ctx (rules_context) adds the catch measures;
-    curves, a list, collects their per-week curves. params: LightGBM settings over the lab's defaults."""
+    curves, a list, collects their per-week curves. params: LightGBM settings over the lab's defaults.
+    make_model: a function returning an unfitted model with fit / predict_proba (e.g. models.logreg.MuleLogit),
+    in place of LightGBM; the rows, folds and measures stay the same."""
     import lightgbm as lgb
     rows, oof = [], []
     for f, (train_m, valid_m) in enumerate(base.FOLDS, start=1):
         d = with_fold_columns(df, f, scores, fold_extra)
         train, valid = d[d.open_month.isin(train_m)], d[d.open_month == valid_m]
-        model = lgb.LGBMClassifier(**lgbm_settings(seed, params))
+        model = make_model() if make_model else lgb.LGBMClassifier(**lgbm_settings(seed, params))
         model.fit(train[cols], train["mule_by_day"])
         score = model.predict_proba(valid[cols])[:, 1]
         m = base.evaluate(valid, score, prof)
