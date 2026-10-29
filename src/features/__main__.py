@@ -10,9 +10,11 @@ ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DATA = "data/v1_full"
 
 
-def run_notebook(name: str, out: str, report: str | None, report_root: str = "outputs/modelling/eda") -> None:
+def run_notebook(name: str, out: str, report: str | None, report_root: str = "outputs/modelling/eda",
+                 timeout: int = 3600) -> None:
     """Execute notebooks/<name> on data folder `out` with EDA_DATA / EDA_REPORT set, and save the executed copy:
-    in place for the main dataset, else under the report folder (default <report_root>/<data folder name>)."""
+    in place for the main dataset, else under the report folder (default <report_root>/<data folder name>).
+    timeout: seconds one cell may run."""
     import nbformat
     from nbclient import NotebookClient
 
@@ -21,7 +23,7 @@ def run_notebook(name: str, out: str, report: str | None, report_root: str = "ou
         os.environ["EDA_REPORT"] = report
     src = ROOT / "notebooks" / name
     nb = nbformat.read(src, as_version=4)
-    NotebookClient(nb, timeout=3600, kernel_name="python3",
+    NotebookClient(nb, timeout=timeout, kernel_name="python3",
                    resources={"metadata": {"path": str(ROOT)}}).execute()
     main = os.path.normpath(out) == os.path.normpath(DEFAULT_DATA) and not report
     dest = src if main else Path(report or f"{report_root}/{os.path.basename(os.path.normpath(out))}") / name
@@ -87,7 +89,9 @@ def main(argv=None):
     elif a.cmd == "store-check":
         run_notebook("03_feature_store.ipynb", a.out, a.report, report_root="outputs/modelling/features")
     elif a.cmd == "select":
-        run_notebook("10_feature_selection.ipynb", a.out, a.report, report_root="outputs/modelling/feature_selection")
+        # the permutation cell runs for hours on v1_full with the tuned settings (it saves each finished fold)
+        run_notebook("10_feature_selection.ipynb", a.out, a.report, report_root="outputs/modelling/feature_selection",
+                     timeout=12 * 3600)
     else:
         raise SystemExit(f"`{a.cmd}` is not built yet (see the modelling plan)")
 

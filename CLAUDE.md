@@ -56,7 +56,9 @@ Feature selection (report appendix, under the freeze): `python -m features selec
 near-duplicate groups, grouped permutation importance, SHAP) -> `outputs/modelling/feature_selection[/<run>]`; it labels
 each input needed / covered by a near-copy / mixed / weak. `python -m models.feature_lab --drop NAME... [--together]`
 leaves families or single inputs out; `--params FILE` refits with given LightGBM settings (e.g. tuning step 2's
-`tuned_params.json`). Results with the tuned settings: see CHANGELOG. The `feature-engineer` agent (`.claude/agents/`) runs propose -> implement -> verify -> evaluate
+`tuned_params.json`). v1_full, tuned model (30 Oct 2026): 15 needed, 9 near-copies, 14 weak; dropping the 14 weak
+leaves weekly recall (0.426 -> 0.431) and catch_rules (0.452) unchanged but costs PR-AUC (0.876 -> 0.838); also
+dropping 8 near-copies costs earliness (first catch within 2 weeks 0.966 -> 0.942). Supports keeping all 38. The `feature-engineer` agent (`.claude/agents/`) runs propose -> implement -> verify -> evaluate
 trials; it never changes the store, which stays a team decision.
 Agent trials 26 Oct 2026 (v1_full, vs the adopted model; groups `new_cp4`, `self4`, `speed_cum` in `candidates.py`,
 merged from the agent worktree 27 Oct 2026): `self4` (last 4 weeks vs the account's own earlier average)

@@ -6,6 +6,39 @@ Assumptions and Use" doc.
 
 
 
+## 30 Oct 2026 — Feature selection for the report appendix (notebook 10)
+
+No data change, no feature-store change, **no change to the 38 frozen inputs** (decision 28 Oct 2026). Report-appendix
+evidence: does each frozen input earn its place? (Keith Tan)
+- `notebooks/10_feature_selection.ipynb` (`python -m features select [--out D]`, helpers `src/models/feature_selection.py`)
+  -> `outputs/modelling/feature_selection/`. The tuned model (tuning step 2's `tuned_params.json`), months 0–4, the
+  lab's 3 folds: single-feature AUCs, near-duplicate groups (|Spearman| >= 0.8 for every pair, an assumption),
+  grouped permutation importance on **weekly recall and catch_rules** (same shuffles, 3 per fold; single inputs,
+  near-duplicate groups, families), gain and mean |SHAP|. Label per input: needed (a shuffle costs at least 0.005
+  weekly recall or 0.010 catch_rules in all 3 folds; assumptions, catch_rules' line twice as high because its measured
+  noise is about twice as large) / covered by a near-copy / mixed / weak.
+- v1_full: 15 needed, 9 covered by a near-copy, 14 weak. Most relied on: `app_score` (weekly recall −0.157 when
+  shuffled; catch_rules −0.032), `out_1h_share_4wk` (−0.085; **−0.260 at the rules' budget**, where it carries the
+  model), `n_payers_cum`, `weeks_since_open`, `internal_out_share_cum`, the running totals; `money_in_4wk` and
+  `n_rows_4wk` matter at the rules' budget. Baseline per fold: weekly recall 0.428 / 0.397 / 0.470, catch_rules
+  0.464 / 0.455 / 0.436 (the rules' own alerts 0.146 / 0.132 / 0.143).
+- Refit checks (`feature_lab --drop ... --together --params tuned_params.json`, v1_full, vs the tuned 38-input model:
+  weekly recall 0.426 pooled, catch_rules 0.452, PR-AUC 0.876, first catch within 2 weeks 0.966):
+  - without the 14 weak inputs (24 left): weekly recall 0.431 (+0.009 / +0.005 / −0.000), catch_rules 0.452
+    (+0.009 / +0.002 / −0.010), both 'no clear change'; first catch within 2 weeks unchanged; PR-AUC 0.838, 'worse'
+    (−0.041 / −0.039 / −0.034); one unwitting mule fewer caught at the rules' budget (15 vs 16 of 18).
+  - also without 8 spare near-copies (16 left): weekly recall 0.421, 'worse' (−0.001 / −0.001 / −0.006);
+    catch_rules 0.446 (no clear change); first catch within 2 weeks 0.942 (−0.016 / −0.057 / 0.000); PR-AUC 0.848.
+  - Reading: the 14 weak inputs add nothing to earliness at either budget but carry account-level ranking (PR-AUC);
+    the near-copies add early catching. Dropping inputs gains nothing measurable, which supports keeping all 38.
+- Earlier runs on the untuned model (27 Oct, notebook then numbered 07; trials `drop-weak-v1_full`,
+  `drop-weak-and-copies-v1_full` in the ledger) gave the same picture; the 50k copy was not rerun.
+- Code: `feature_lab --drop NAME... [--together]` (families or single inputs left out) and `--params FILE` (LightGBM
+  settings, as `models train`; defaults unchanged); `feature_selection.permutation_drop` scores several measures on the
+  same shuffles; `run_notebook(..., timeout=)` (12 h for `select`; the notebook saves each finished fold under
+  `<data>/features/feature_selection_cache/` and resumes); the ledger writer handles CRLF line ends (Windows);
+  `tests/test_hidden_files.py` reads files as UTF-8 (Windows). Tests: `tests/test_feature_selection.py`.
+
 ## 29 Oct 2026 — Share one model file between machines (option B)
 
 No data change, no result change. Li Ann's `frozen_tuned` (Windows, 16 threads) and a retrain on Emmy Li's Mac
