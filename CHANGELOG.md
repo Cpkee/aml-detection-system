@@ -6,6 +6,31 @@ Assumptions and Use" doc.
 
 
 
+## 30 Oct 2026 — Harness gaps closed (Phase 5, approved by Kee Chee Pheng)
+
+No data change, no model change, no change to any existing result value: result files gain columns only. Re-run of
+the month-5 dry run (`outputs/modelling/results/v1_full/month5_dryrun_v2/`): every column of the committed
+`month5_dryrun_frozen_tuned` comes out identical (launderers.csv byte-identical).
+- **Scores from a file:** `python -m models predict --out D [--model M] --months 5 [--weeks 0-77] [--to PATH]` writes
+  `<out>/scores/<model>_m<months>.parquet` (account_id, weeks_since_open, score; data, git-ignored);
+  `python -m evaluation.score --scores PATH` scores any such file (`score.load_scores` refuses duplicate
+  account-weeks, accounts outside the cohort, weeks other than whole numbers 0-W and missing scores; warns on unscored account-weeks).
+  Month 5 via the file gives byte-identical result CSVs to the model path. Test months still need `--final-test`.
+- **New measures:** `recall_final_label` in `summary_w<W>.csv` (caught / all cohort launderers by the fixed final
+  label: month 5, weeks 0-26: model 0.649, rules 0.165, vs recall 0.808 / 0.205 against mules by week 26);
+  `median_min_days_earlier_model_only` in the head to head (launderers only the model catches: days from its flag to
+  the end of the horizon, "at least this much earlier": 84 days for weeks 0-26, 49 launderers); `tied_at_cut` in
+  `weekly_w<W>.csv` (accounts tied at each week's cut line, decided by account id: none on month 5).
+- **Any-time policy:** reported for horizons up to week 26 only; past week 26 the report marks it not meaningful
+  (the model is trained on weeks 0-26) and no longer calls it an upper bound. Its rows stay in the CSV files. Report
+  wording on this and on the budget (124 alerts vs 119 accounts, month 5, weeks 0-26) taken from draft PR #42.
+- **Final-test guard:** a final run writes `outputs/modelling/results/<data>/final_test/STARTED.json` before it reads
+  anything about months 6-7 and is refused while `STARTED.json` or `LOCK.json` exists (clearing it is a team decision);
+  a missing `--scores` file is refused before `STARTED.json` is written.
+- **Provenance in settings.json:** `score_source` (`model:<name>` or `file:<path>`), `scores_sha256`,
+  `run_manifest_sha256`, `git_commit`, `git_uncommitted_changes`.
+- `python -m models verify` compares only the reference run's columns, so the committed reference still verifies.
+
 ## 29 Oct 2026 — Share one model file between machines (option B)
 
 No data change, no result change. Li Ann's `frozen_tuned` (Windows, 16 threads) and a retrain on Emmy Li's Mac
