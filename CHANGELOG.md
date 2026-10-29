@@ -6,6 +6,54 @@ Assumptions and Use" doc.
 
 
 
+## 29 Oct 2026 — Share one model file between machines (option B)
+
+No data change, no result change. Li Ann's `frozen_tuned` (Windows, 16 threads) and a retrain on Emmy Li's Mac
+(8 threads) differ slightly (63 vs 65 of 78 month-5 mules), but **scoring a given model file is the same on both**:
+her `lgbm.txt` + `app_logreg.json`, scored on the Mac, reproduce her committed `month5_dryrun_frozen_tuned` file for
+file (summaries, weekly tables, every launderer's flag week). So the team can train once and share the model files.
+- `python -m features fingerprint` (`src/features/fingerprint.py`): content fingerprints (row count + exact sum of
+  each row's MD5) of the files a model reads, independent of parquet bytes and row order; cached in
+  `features/fingerprints.json`. v1_full on the Mac (DuckDB 1.5.6): accounts 51646089, accounts_linear 82994433,
+  accounts_tree 18593764, peer_medians 416730365, weekly 3065472.
+- `models.train`: new manifests record `data_identity` (seed, `--set`, config and BAF hashes) and
+  `input_fingerprints`; `load` accepts a model when the run manifest is the same file, or the fingerprints equal
+  the local data's, or (models trained before) a `verified.json` from `python -m models verify` still matches.
+- `python -m models verify --model M --reference RUN` (`src/models/verify.py`): rescores a committed harness run of
+  the model; only if every result file is identical does it write `verified.json` (local fingerprints + hashes of the
+  model files). `frozen_tuned` verified on the Mac against `month5_dryrun_frozen_tuned`.
+- `evaluation.score.run`: `check_data=False` / `results=` only for `verify`; the final test refuses both.
+- **The model of record is committed:** `outputs/modelling/models/v1_full/frozen_tuned/` now holds Li Ann's `lgbm.txt`
+  and `app_logreg.json` beside his manifest, plus `verified.json` (fingerprints of the data it reproduces, hashes of the
+  model files with line endings normalised) and `calibration.json`. `models.train.find_model_dir` prefers this
+  committed copy; `train` refuses to overwrite a shared model; `evaluation.score` and `models calibrate` default to
+  `frozen_tuned`; notebook 09 defaults to `RETRAIN = False`. `.gitattributes` keeps `lgbm.txt` byte-exact. Team
+  members no longer train the model: they need the data, its cleaned tables and the feature store, then score.
+- Calibration of `frozen_tuned` on month 5: isotonic chosen, out-of-fold Brier 0.0749 -> 0.0018, mean predicted
+  0.00235 = observed rate (`outputs/modelling/models/v1_full/frozen_tuned/calibration/report.md`).
+
+## 29 Oct 2026 — Calibration, onboarding value, age breakdown, seed-43 dry run (Phase 5)
+
+No data change, no feature-store change, frozen inputs and Li Ann's tuned settings unchanged. All runs below are on
+Emmy Li's Mac and carry the suffix `_macos`: the tuned model does not rebuild identically across machines (Li Ann,
+Windows: 63 of 78 mules caught on month 5; this Mac: 65; same data, same settings), so which machine produces the
+results of record is a team decision. Li Ann's committed `frozen_tuned` outputs are untouched.
+- `python -m models calibrate` (`src/models/calibrate.py`): isotonic and Platt mappings fitted on month 5 (open
+  account-weeks, weeks 0-26), checked out of fold over 5 groups of accounts, the lower Brier score chosen and saved to
+  `data/<run>/models/<model>/calibration.json`. `frozen_tuned_macos`: raw scores average 0.186 for a 0.235% mule rate
+  (class weights); isotonic 0.00235, Brier 0.0748 -> 0.0018, reliability close in every bin. Order-preserving, so the
+  harness's results do not change.
+- `python -m models train --inputs activity`: the frozen inputs without `app_score`, for the value of onboarding
+  information (professor's comment 2). `python -m evaluation.compare`: two harness runs on the same cohort side by
+  side. Month 5 at the rules' budget, weeks 0-26: frozen 65 of 78 caught vs activity only 61 (fake 60 vs 55,
+  witting 3 vs 4, unwitting 2 vs 2); catch_mean 0.385 vs 0.358; the frozen model ahead in 16 of 27 weeks, behind in
+  7. Seed 43 month 5: 56 vs 56 of 65, catch_mean 0.471 vs 0.462. At the rules' budget the application adds a few
+  fake accounts, mostly from week 12 on, and no early flags.
+- Harness: recall and false-positive rate by age band (under 30 / 30-49 / 50+, `by_age_w<h>.csv`) for Variant II;
+  every model, calibration and harness run records its machine (OS, processor, cores).
+- Seed 43 (chance yardstick): trained on its months 0-4 with the tuned settings, month 5 at the rules' budget, weeks
+  0-26: model 56 of 65 mules (precision 0.35) vs rules 19 (0.13); v1_full month 5: 65 of 78 (0.52) vs 16 (0.13).
+
 ## 28 Oct 2026 — Phase 5 harness, dry run on month 5
 
 No data change, no feature-store change, frozen inputs unchanged. New:

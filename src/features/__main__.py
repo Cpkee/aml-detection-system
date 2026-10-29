@@ -45,6 +45,9 @@ def main(argv=None):
     g.add_argument("--out", default="data/v1_full", help="data folder (default data/v1_full)")
     g.add_argument("--force", action="store_true", help="rebuild even if the graph store is current")
 
+    fp = sub.add_parser("fingerprint", help="content fingerprints of the files a model reads (compare two machines)")
+    fp.add_argument("--out", default="data/v1_full", help="data folder (default data/v1_full)")
+
     e = sub.add_parser("eda", help="Phase 1 EDA: execute notebooks/01_eda_train.ipynb -> <report>/report.md, figures, CSVs")
     e.add_argument("--out", default="data/v1_full", help="data folder (default data/v1_full)")
     e.add_argument("--report", default=None,
@@ -68,6 +71,9 @@ def main(argv=None):
         from .graph import build as build_graph
         path, n = build_graph(a.out, force=a.force)
         print(f"wrote {path}: {n:,} account-weeks")
+    elif a.cmd == "fingerprint":
+        from .fingerprint import main as fingerprint_main
+        fingerprint_main(a.out)
     elif a.cmd == "eda":
         run_notebook("01_eda_train.ipynb", a.out, a.report)
     elif a.cmd == "preprocess":

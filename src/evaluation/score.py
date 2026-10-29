@@ -1,6 +1,6 @@
 """Phase 5 harness: the frozen model against the bank's rules on a fixed cohort, at the rules' own weekly budget.
 
-    PYTHONPATH=src python -m evaluation.score --out data/v1_full                 # dry run: cohort = month 5
+    PYTHONPATH=src python -m evaluation.score --out data/v1_full                 # dry run: cohort = month 5, model of record
     PYTHONPATH=src python -m evaluation.score --out data/v1_full --months 6 7 --final-test   # once, 5 Nov 2026
 
 The comparison agreed on 8 Oct 2026 (CLAUDE.md, "Fixed cohort"): every account opened in the cohort months, a clock
@@ -40,6 +40,7 @@ from evaluation import budget as rules_budget
 
 RESULTS = "outputs/modelling/results"
 PROFILES = ("fake", "witting", "unwitting")
+AGE_BANDS = {"under 30": (0, 29), "30-49": (30, 49), "50+": (50, 200)}    # BAF customer_age is in decades
 
 
 # ---------------------------------------------------------------- inputs
@@ -47,7 +48,7 @@ def cohort_truth(out: str, months, allow_test: bool = False) -> pd.DataFrame:
     """Per cohort account: opening day, hidden label, type, laundering start, closure and first rule alert day."""
     m = rules_budget._months(months, allow_test)
     return amldata.evaluation(out).execute(f"""
-        SELECT a.account_id, a.open_month, a.open_day, t.is_launderer,
+        SELECT a.account_id, a.open_month, a.open_day, a.customer_age, t.is_launderer,
                CASE WHEN t.is_launderer = 1 THEN t.profile END AS profile, t.launder_start_day AS start_day,
                o.aml_exit_day AS exit_day, al.first_alert_day
         FROM accounts a JOIN accounts_truth t USING (account_id)
@@ -66,17 +67,11 @@ def mule_at(truth: pd.DataFrame, w: int) -> pd.Series:
     return (truth["is_launderer"] == 1) & ((truth["profile"] == "fake") | started)
 
 
-def score_cohort(out: str, months, weeks: tuple[int, int], model_name: str = "frozen") -> pd.DataFrame:
-    """account_id, weeks_since_open, score for every cohort account-week (public inputs only)."""
+def score_cohort(out: str, months, weeks: tuple[int, int], model_name: str = "frozen",
+                 check_data: bool = True) -> pd.DataFrame:
+    """account_id, weeks_since_open, score for every cohort account-week (public inputs only; models.train.predict)."""
     from models import train as trainer
-    booster, app_model, man = trainer.load(out, model_name)
-    trained = set(man["train_months"]) & {int(m) for m in months}
-    if trained:
-        raise ValueError(f"the model was trained on months {sorted(trained)}; score other months")
-    x = trainer.feature_table(out, months, weeks)
-    x["app_score"] = x["account_id"].map(trainer.app_scores_for(out, app_model, x["account_id"].unique())).astype("float32")
-    x["score"] = booster.predict(x[trainer.INPUTS])
-    return x[["account_id", "weeks_since_open", "score"]]
+    return trainer.predict(out, months, weeks, model_name, check_data)
 
 
 # ---------------------------------------------------------------- flagging
@@ -171,6 +166,25 @@ def measures(truth: pd.DataFrame, flags: dict[str, pd.Series], w_hi: int) -> tup
     return summary, weekly
 
 
+def by_age(truth: pd.DataFrame, flags: dict[str, pd.Series], w_hi: int) -> pd.DataFrame:
+    """Per policy and age band: mules caught (recall) and normal accounts flagged (false-positive rate), the fairness
+    view for Variant II. Normal = not a mule by the end of the horizon."""
+    t = truth.set_index("account_id")
+    mule = pd.Series(mule_at(truth, w_hi).to_numpy(), index=t.index)
+    rows = []
+    for name, f in flags.items():
+        hit = t.index.isin(f[f <= w_hi].index)
+        for band, (lo, hi) in AGE_BANDS.items():
+            inb = t["customer_age"].between(lo, hi).to_numpy()
+            m, n = inb & mule.to_numpy(), inb & ~mule.to_numpy()
+            rows.append({"policy": name, "age": band, "accounts": int(inb.sum()), "mules": int(m.sum()),
+                         "caught": int((hit & m).sum()), "recall": (hit & m).sum() / max(m.sum(), 1),
+                         "normal_flagged": int((hit & n).sum()),
+                         "false_positive_rate": (hit & n).sum() / max(n.sum(), 1),
+                         "precision": (hit & m).sum() / max((hit & inb).sum(), 1)})
+    return pd.DataFrame(rows)
+
+
 def head_to_head(truth: pd.DataFrame, model: pd.Series, rules: pd.Series, w_hi: int) -> dict:
     """Launderers caught by both / model only / rules only / either, and the model's lead over the rules."""
     mules = truth["account_id"][mule_at(truth, w_hi)]
@@ -192,12 +206,13 @@ def evaluate_horizon(truth: pd.DataFrame, live: pd.DataFrame, k: dict[int, int],
              "model_anytime": anytime_flags(live, int(sum(kh.values())))}
     summary, weekly = measures(truth, flags, w_hi)
     weekly["budget"] = weekly["week"].map(kh).fillna(0).astype(int)
-    return {"flags": flags, "summary": summary, "weekly": weekly,
+    return {"flags": flags, "summary": summary, "weekly": weekly, "by_age": by_age(truth, flags, w_hi),
             "h2h": head_to_head(truth, flags["model"], flags["rules"], w_hi), "budget": int(sum(kh.values()))}
 
 
 def run(out: str, months, horizons: list[int], name: str, model_name: str = "frozen",
-        final_test: bool = False) -> str:
+        final_test: bool = False, check_data: bool = True, results: str | None = None) -> str:
+    """check_data=False and results=<folder> only for `python -m models verify` (rescoring a reference run)."""
     t0 = time.time()
     months = tuple(int(m) for m in months)
     test = bool(set(months) & set(amldata.TEST_MONTHS))
@@ -206,15 +221,18 @@ def run(out: str, months, horizons: list[int], name: str, model_name: str = "fro
     if final_test and not test:
         raise SystemExit("--final-test is only for test months 6-7")
     data = os.path.basename(os.path.normpath(out))
+    root = results or RESULTS
+    if test and (not check_data or results):
+        raise SystemExit("the final test runs with every check and into the committed results folder")
     lock = os.path.join(RESULTS, data, "final_test", "LOCK.json")
     if test and os.path.exists(lock):
         raise SystemExit(f"the test months were already scored ({lock}); they are scored once")
-    report = os.path.join(RESULTS, data, "final_test" if test else name)
+    report = os.path.join(root, data, "final_test" if test else name)
     os.makedirs(report, exist_ok=True)
 
     w_max = max(horizons)
     truth = cohort_truth(out, months, allow_test=test)
-    scores = score_cohort(out, months, (0, w_max), model_name)
+    scores = score_cohort(out, months, (0, w_max), model_name, check_data)
     live = open_rows(scores, truth)
     b = rules_budget.weekly_budget(out, months, (0, w_max), allow_test=test).groupby("week")["alerts"].sum()
     k = {int(w): int(n) for w, n in b.items()}
@@ -228,13 +246,15 @@ def run(out: str, months, horizons: list[int], name: str, model_name: str = "fro
     for h, r in res.items():
         r["summary"].to_csv(os.path.join(report, f"summary_w{h}.csv"), index=False)
         r["weekly"].to_csv(os.path.join(report, f"weekly_w{h}.csv"), index=False)
+        r["by_age"].to_csv(os.path.join(report, f"by_age_w{h}.csv"), index=False)
         launderers[f"model_flag_week_w{h}"] = r["flags"]["model"].reindex(lt.index)
         launderers[f"model_anytime_flag_week_w{h}"] = r["flags"]["model_anytime"].reindex(lt.index)
     launderers.reset_index().to_csv(os.path.join(report, "launderers.csv"), index=False)
-    from models.train import load as load_model
-    man = load_model(out, model_name)[2]
+    from models.train import load as load_model, machine
+    man = load_model(out, model_name, check_data)[2]
     settings = {"data": out, "cohort_months": list(months), "horizons": sorted(horizons), "model": model_name,
                 "model_params_source": man["params_source"], "model_git_commit": man["git_commit"],
+                "model_machine": man.get("machine"), "machine": machine(),
                 "cohort_accounts": int(len(truth)), "launderers": int(len(lt)),
                 "budget_per_horizon": {str(h): r["budget"] for h, r in res.items()},
                 "seconds": round(time.time() - t0)}
@@ -265,6 +285,8 @@ def write_report(report, settings, res, test):
                   s.to_markdown(), "",
                   "### Head to head (permanent model flags vs the rules' first alerts)", "",
                   pd.Series(r["h2h"]).to_frame("value").to_markdown(floatfmt=".1f"), "",
+                  "### By age band (recall; false_positive_rate = share of normal accounts flagged)", "",
+                  r["by_age"].round(4).to_markdown(index=False), "",
                   "### By week since opening", "", w.to_markdown(index=False), ""]
     lines += ["- recall / precision: against mule accounts by the end of the horizon (fake accounts from opening, real "
               "customers from their start). precision_final_label: against launderers at any time in the 18 months.",
@@ -283,7 +305,8 @@ def main(argv=None):
     ap.add_argument("--months", nargs="+", type=int, default=[5], help="cohort opening months (default 5, dry run)")
     ap.add_argument("--horizons", nargs="+", type=int, default=[26, 77],
                     help="last week of each horizon since opening (default 26 = main, 77 = appendix)")
-    ap.add_argument("--model", default="frozen", help="model folder under <out>/models/")
+    ap.add_argument("--model", default="frozen_tuned",
+                    help="model name (default frozen_tuned, the shared model of record committed in git)")
     ap.add_argument("--name", default=None, help="report folder name (default month<M>_dryrun_w<W>)")
     ap.add_argument("--final-test", action="store_true", help="score test months 6-7, once")
     a = ap.parse_args(argv)
