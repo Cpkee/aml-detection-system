@@ -27,10 +27,7 @@ Measures, over weeks 0-W (W = 26 main, 77 appendix):
   any time    secondary policy (8 Oct 2026): one score threshold over the horizon, applied to each account's highest
               score, flagging as many accounts as the rules' total number of alerts. Not an upper bound: the model is
               trained on weeks 0-26 only, so past week 26 its running-total features leave the training range and
-              late scores are not comparable across weeks. Reported for horizons up to week 26 only; for longer
-              horizons its row stays in the CSVs but the report marks it not meaningful (30 Oct 2026)
-  ties        per week, accounts tied at the cut line (sharing the score of the last account flagged, some flagged
-              and some not, decided by account id): weekly column tied_at_cut
+              late scores are not comparable across weeks
   by type     caught per hidden type (fake / witting / unwitting); per week: accounts still open, mules, starts
 
 Test months 6-7 need --final-test and are scored once: before anything about them is read the run writes
@@ -355,9 +352,7 @@ def write_report(report, settings, res, test):
              "- The weekly budget counts the rules' alerts: an account alerted twice counts twice, so the model can "
              "flag slightly more distinct accounts than the rules (e.g. 124 vs 119 over weeks 0-26 in the month-5 dry run).",
              "- The model is trained on weeks 0-26 only (models.train WEEKS); weeks 27-77 are outside its training "
-             "range, so its running-total features drift there and late scores are not comparable across weeks.",
-             f"- Scores: {settings['score_source']}. `model_anytime` is shown for horizons up to week {TRAINED_WEEKS} "
-             "only; for longer horizons it is not meaningful (its rows stay in the CSV files).", ""]
+             "range, so its running-total features drift there and late scores are not comparable across weeks.", ""]
     for h, r in res.items():
         late = h > TRAINED_WEEKS
         s = r["summary"].set_index("policy")[show].T

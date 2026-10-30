@@ -3,7 +3,8 @@
 <out>/features/features_manifest.json records the feature-code commit, a fingerprint of the feature SQL, the
 feature list, the cut-off rule, the weeks built, a hash of the data run's run_manifest.json and of the frozen peer
 medians. `check(out, features=...)` refuses a store whose code, data or feature list differ from what the caller
-expects, the same pattern as the simulator's run manifest.
+expects, the same pattern as the simulator's run manifest. `check_preprocess(out)` does the same for the cleaned
+application tables (features/accounts_{linear,tree}.parquet, written by notebooks/02_preprocess.ipynb).
 """
 from __future__ import annotations
 import hashlib
@@ -13,6 +14,7 @@ import subprocess
 import sys
 
 MANIFEST = "features_manifest.json"
+PREPROCESS = "preprocess_manifest.json"
 CUTOFF_RULE = "rows with day <= open_day + 7*w + 6 (end of each account's week w, as amldata.labels)"
 
 
@@ -69,8 +71,9 @@ def check(out: str, features: list[str] | None = None, weeks: tuple[int, int] | 
     if m is None:
         raise FileNotFoundError(f"{out}/features/{MANIFEST} not found - run `python -m features weekly --out {out}`")
     problems = []
-    if m["run_manifest_sha256"] != _sha256(os.path.join(out, "run_manifest.json")):
-        problems.append("the data run changed since the features were built")
+    run = _sha256(os.path.join(out, "run_manifest.json"))
+    if run is None or m["run_manifest_sha256"] != run:
+        problems.append("the data run changed since the features were built (or its run_manifest.json is missing)")
     if features is not None and list(features) != m["features"]:
         problems.append(f"feature list differs: store has {m['features']}, caller expects {list(features)}")
     if weeks is not None and (weeks[0] < m["weeks"][0] or weeks[1] > m["weeks"][1]):
@@ -85,4 +88,18 @@ def check(out: str, features: list[str] | None = None, weeks: tuple[int, int] | 
         problems.append("the frozen peer medians changed since the store was built")
     if problems:
         raise ValueError(f"{out}/features is stale: " + "; ".join(problems) + ". Rebuild with --force.")
+    return m
+
+
+def check_preprocess(out: str) -> dict:
+    """The cleaned application tables in `out`/features must come from this data run (notebook 02's manifest)."""
+    path = os.path.join(out, "features", PREPROCESS)
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"{path} not found - run `python -m features preprocess --out {out}`")
+    with open(path) as f:
+        m = json.load(f)
+    run = _sha256(os.path.join(out, "run_manifest.json"))
+    if run is None or m.get("run_manifest_sha256") != run:
+        raise ValueError(f"{out}/features/accounts_*.parquet are stale: the data run changed since they were cleaned "
+                         f"(or its run_manifest.json is missing). Rerun `python -m features preprocess --out {out}`.")
     return m

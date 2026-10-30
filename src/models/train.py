@@ -99,6 +99,7 @@ def feature_table(out: str, months, weeks: tuple[int, int]) -> pd.DataFrame:
 
 
 def _linear(out: str) -> tuple[pd.DataFrame, list[str]]:
+    manifest.check_preprocess(out)
     lin = pd.read_parquet(os.path.join(out, "features", "accounts_linear.parquet")).set_index("account_id")
     return lin, [c for c in lin.columns if c != "open_month"]
 
