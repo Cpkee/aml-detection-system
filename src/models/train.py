@@ -2,6 +2,7 @@
 
     PYTHONPATH=src python -m models train --out data/v1_full                       # default LightGBM settings
     PYTHONPATH=src python -m models train --out data/v1_full --params tuned.json   # tuning step 2's settings
+    PYTHONPATH=src python -m models predict --out data/v1_full --months 5          # scores file for the harness
 
 The model is the one the team froze on 28 Oct 2026: LightGBM on 38 inputs, the 28 store features + the 8 adopted
 `roll4` features + weeks_since_open + the application score. It is fitted on every account opened in months 0-4,
@@ -12,7 +13,8 @@ out of fold for the training accounts, and fitted on all of them for scoring new
 Saved to <out>/models/<name>/ (data, git-ignored): lgbm.txt (LightGBM text model), app_logreg.json (columns,
 coefficients, intercept: readable, no pickle) and manifest.json (inputs, settings, data and store hashes, git commit).
 A copy of the manifest and the feature importances go to outputs/modelling/models/<data>/<name>/ (committed).
-Calibration on month 5 is a later step (4 Nov 2026); this file only trains.
+Calibration on month 5 is a later step (4 Nov 2026); this file only trains, and `predict` scores new months
+(`python -m models predict` writes <out>/scores/<model>_m<months>.parquet: account_id, weeks_since_open, score).
 """
 from __future__ import annotations
 import argparse
@@ -218,6 +220,26 @@ def predict(out: str, months, weeks: tuple[int, int], name: str = "frozen", chec
         x["app_score"] = x["account_id"].map(app_scores_for(out, app_model, x["account_id"].unique())).astype("float32")
     x["score"] = booster.predict(x[man["inputs"]])
     return x[["account_id", "weeks_since_open", "score"]]
+
+
+def predict_main(argv=None):
+    """python -m models predict: write a model's scores to a file that `python -m evaluation.score --scores` reads."""
+    ap = argparse.ArgumentParser(prog="python -m models predict", description="write a model's scores to a file")
+    ap.add_argument("--out", default=amldata.DEFAULT_OUT)
+    ap.add_argument("--model", default="frozen_tuned", help="model name (default frozen_tuned, the model of record)")
+    ap.add_argument("--months", nargs="+", type=int, required=True, help="opening months to score (e.g. 5)")
+    ap.add_argument("--weeks", default="0-77", help="weeks since opening, as FIRST-LAST (default 0-77)")
+    ap.add_argument("--to", default=None, help="output file (default <out>/scores/<model>_m<months>.parquet)")
+    a = ap.parse_args(argv)
+    weeks = tuple(int(w) for w in a.weeks.split("-"))
+    path = a.to or os.path.join(a.out, "scores", f"{a.model}_m{''.join(map(str, a.months))}.parquet")
+    s = predict(a.out, a.months, weeks, a.model)
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    if path.endswith(".csv"):
+        s.to_csv(path, index=False)
+    else:
+        s.to_parquet(path, index=False)
+    print(f"{len(s):,} account-weeks of {s['account_id'].nunique():,} accounts scored by {a.model} -> {path}")
 
 
 def main(argv=None):

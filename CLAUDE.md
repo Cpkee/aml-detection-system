@@ -113,6 +113,16 @@ laundering starts (the budget is ~5 flags a week).
 29 Oct: `python -m models calibrate` (month 5, isotonic, out-of-fold check), `train --inputs activity` + `python -m evaluation.compare` (onboarding value: month 5 frozen 65 vs activity-only 61 of 78; seed 43 56 vs 56), age-band breakdown, machine recorded. Tuned model differs by machine (63 Windows vs 65 Mac): machine of record undecided; local runs `_macos`.
 Option B (29 Oct): train once, share the model files (`lgbm.txt`, `app_logreg.json`, `manifest.json`, later `calibration.json`) in `data/<run>/models/<name>/`; scoring a file is identical across machines. `python -m features fingerprint` compares data by content; `python -m models verify --model M --reference RUN` accepts an older shared model once by reproducing a committed run.
 **Model of record: `frozen_tuned`, committed in `outputs/modelling/models/v1_full/frozen_tuned/`** (lgbm.txt, app_logreg.json, manifest, verified.json, calibration.json); found there first by `models.train.load`, never retrained (`train` refuses the name). Do not retrain it: score with `python -m evaluation.score` (default model). Retraining on another machine gives slightly different trees.
+30 Oct 2026 (harness gaps): `python -m models predict --out D [--model M] --months 5 [--weeks 0-77] [--to PATH]` writes
+`<out>/scores/<model>_m<months>.parquet` (account_id, weeks_since_open, score); `python -m evaluation.score --scores PATH`
+scores any such file (checked by `score.load_scores`; byte-identical results to the model path on month 5). New
+measures: `recall_final_label` (caught / all cohort launderers by the final label; month 5 weeks 0-26: model 0.649, rules
+0.165), `median_min_days_earlier_model_only` (model-only catches, flag to horizon end: 84 days), weekly `tied_at_cut`
+(none on month 5). `model_anytime` is reported for horizons <= 26 only (not meaningful past the training weeks 0-26; not
+an upper bound). A final run writes `final_test/STARTED.json` before reading months 6-7 and is refused while
+`STARTED.json` or `LOCK.json` exists (clearing it is a team decision). settings.json records `score_source`,
+`scores_sha256`, `run_manifest_sha256`, `git_commit`. Re-run: `results/v1_full/month5_dryrun_v2/` (existing columns
+identical to `month5_dryrun_frozen_tuned`).
 Sensitivity runs (rules frozen, 244k, one `test` value each): `python -m sim.sensitivity --list | --run [--only NAME]
 | --summarise` -> `data/sensitivity/<name>/` (large files deleted) and `outputs/sensitivity/summary.csv`.
 Single steps: `accounts`, `normal --batches 3-3`, `laundering`, `rules`, `finalize`. Use `--out` for another
