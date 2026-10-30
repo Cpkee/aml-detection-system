@@ -35,7 +35,9 @@ value by value, first-week AUCs with account-level bootstrap intervals, whole-st
 byte-identical rebuild, whole-store invariants); run it with `SIM_OUT` = a folder whose store is built. `python -m features eda [--out data/v1 --report DIR]` executes `notebooks/01_eda_train.ipynb`;
 `python -m features preprocess [--out data/v1_full --report DIR]` executes `notebooks/02_preprocess.ipynb` (Phase 2: all its
 code is in the notebook) -> `<out>/features/accounts_{linear,tree}.parquet` + `preprocess_manifest.json`, `<report>/params.json`
-+ `report.md` (default `outputs/modelling/preprocess[/<run>]`); `python -m models train` is a Phase 4 stub.
++ `report.md` (default `outputs/modelling/preprocess[/<run>]`); `python -m models train` fits and saves the frozen model
+(`src/models/train.py`); model code refuses cleaned tables whose `preprocess_manifest.json` does not match the data run
+(`features.manifest.check_preprocess`).
 Feature lab: candidate features live in `src/features/candidates.py` (built from the store, same and earlier weeks only;
 `tests/test_feature_candidates.py`); `python -m models.feature_lab --out data/v1 --groups G... --name N` refits the tuned
 LightGBM (activity + application score, as notebook 06; `--views activity` for store features only) with each group added
@@ -319,7 +321,8 @@ about 60x fewer, so only the Phase 5 harness at the rules' budget shows whether 
    = the rules' own alert count in each week. **Fixed cohort (8 Oct 2026):** main comparison = the 50,061 test
    accounts (opened months 6-7, 180 launderers), clock = weeks since each account opened (0-78), weekly budget =
    the rules' alerts on these accounts in that week of their life (after the R6 fix: 29 in weeks 0-3, 111 in
-   weeks 0-12, 731 in total); secondary = same total of 731 flags used at any time (upper bound on the head start).
+   weeks 0-12, 731 in total); secondary = same total of 731 flags under one score threshold over the horizon (a
+   secondary policy, not an upper bound on the head start: weeks 27+ are outside the model's training weeks 0-26).
    This answers comment 2 of the professor's feedback (verbatim in `docs/professor_feedback.md`). Accounts closed
    by the bank stay in the cohort as caught; report accounts still open per week.
    1. ~~Add that label to `amldata.labels()`~~ done 9 Oct 2026: `mule_by_day`, with `weeks_since_open=` cut-offs.
