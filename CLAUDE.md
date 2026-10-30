@@ -134,7 +134,9 @@ outlier --method rarity|rarity_sum|iforest`, `src/models/outlier.py`); settings 
 trained on bank-confirmed mules only (`models train --label bank`, `train.bank_confirmed` from `open_by_day`); M1b
 `truth_macos` = the frozen recipe retrained on this Mac, M2's yardstick. `python -m evaluation.hidden_mules --scores
 NAME=PATH ...` -> caught for bank-confirmed vs never confirmed, by type and pattern, top false alarms, bootstrap. One
-look on month 5 (6 Nov), after `settings.json` is committed; settings never change after a look.
+look on month 5 (6 Nov), after `settings.json` is committed; settings never change after a look:
+`python -m evaluation.outlier_look freeze | check | look` (look refuses unless the committed frozen settings equal the
+code and model files, and runs once).
 Sensitivity runs (rules frozen, 244k, one `test` value each): `python -m sim.sensitivity --list | --run [--only NAME]
 | --summarise` -> `data/sensitivity/<name>/` (large files deleted) and `outputs/sensitivity/summary.csv`.
 Single steps: `accounts`, `normal --batches 3-3`, `laundering`, `rules`, `finalize`. Use `--out` for another
