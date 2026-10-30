@@ -1,0 +1,2 @@
+# shared model files must stay byte-exact on every checkout (option B, 29 Oct 2026)
+outputs/modelling/models/**/lgbm.txt -text

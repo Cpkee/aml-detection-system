@@ -29,7 +29,9 @@ import pandas as pd
 
 PUBLIC = ["accounts", "transactions"]
 HIDDEN = ["accounts_truth", "aml_alerts", "aml_outcomes", "transactions_truth"]
+# Careful: TRAIN_MONTHS includes calibration month 5 (the months labels() may return). Fit models on FIT_MONTHS only.
 TRAIN_MONTHS = (0, 1, 2, 3, 4, 5)   # 0-4 train, 5 calibrate
+FIT_MONTHS = (0, 1, 2, 3, 4)        # months models and fitted preprocessing learn from
 TEST_MONTHS = (6, 7)                # stay closed until scoring
 DEFAULT_OUT = "data/v1_full"       # the main modelling dataset (244k); pass out="data/v1" for quick 50k work
 

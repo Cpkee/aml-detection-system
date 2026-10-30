@@ -124,6 +124,47 @@ def test_manifest_refuses_stale_store(tmp_path):
         weekly.load(folder)
 
 
+def test_manifest_refuses_store_without_run_manifest(tmp_path):
+    folder = _write(tmp_path / "d", BASE)
+    weekly.build(folder, (0, 3), force=True)
+    os.remove(os.path.join(folder, "run_manifest.json"))           # None == None must not pass
+    with pytest.raises(ValueError, match="run_manifest.json is missing"):
+        manifest.check(folder, weekly.FEATURES, (0, 3))
+
+
+def _cleaned(folder, run_hash):
+    """A tiny cleaned application table (both modes) with a preprocess manifest pointing at `run_hash`."""
+    feats = os.path.join(folder, "features")
+    os.makedirs(feats, exist_ok=True)
+    for mode in ("linear", "tree"):
+        ACCOUNTS[["account_id", "open_month", "income"]].to_parquet(
+            os.path.join(feats, f"accounts_{mode}.parquet"), index=False)
+    with open(os.path.join(feats, manifest.PREPROCESS), "w") as f:
+        json.dump({"run_manifest_sha256": run_hash}, f)
+
+
+def test_cleaned_tables_must_come_from_this_data_run(tmp_path):
+    from models import feature_lab, lgbm_baseline, train
+    folder = _write(tmp_path / "d", BASE)
+    run = os.path.join(folder, "run_manifest.json")
+    _cleaned(folder, manifest._sha256(run))
+    manifest.check_preprocess(folder)
+    assert len(train._linear(folder)[0]) == 3
+    _cleaned(folder, "another data run")
+    readers = [lambda: manifest.check_preprocess(folder), lambda: train._linear(folder),
+               lambda: lgbm_baseline.load_table(folder, (0,), (0, 3)), lambda: feature_lab.app_scores(folder, 42)]
+    for read in readers:                                          # every reader of accounts_*.parquet refuses
+        with pytest.raises(ValueError, match="stale"):
+            read()
+    _cleaned(folder, None)
+    os.remove(run)                                                 # no run manifest: None == None must not pass
+    with pytest.raises(ValueError, match="stale"):
+        manifest.check_preprocess(folder)
+    os.remove(os.path.join(folder, "features", manifest.PREPROCESS))
+    with pytest.raises(FileNotFoundError):
+        manifest.check_preprocess(folder)
+
+
 def test_manifest_refuses_store_built_by_other_feature_code(tmp_path, monkeypatch):
     folder = _write(tmp_path / "d", BASE)
     weekly.build(folder, (0, 3), force=True)
