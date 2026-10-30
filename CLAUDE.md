@@ -88,6 +88,12 @@ barely helps (combined 0.256 -> 0.279); the application as one out-of-fold logis
 fixes the memorising (gap 0.74 -> 0.18; 0.695). Activity alone still leads on account level (0.730), but activity +
 app score wins in 27 of 27 weeks and puts 15% of mules in each week's top 1% in weeks 0-8 vs 4%: earliness, which
 the account-level measure does not reward. It catches fewer real mules in the account top 1% (19/32 vs 25/32).
+Stability + 1:20 undersampling (`notebooks/10_stability_undersampling.ipynb`, helpers `src/models/stability.py`, 29 Oct
+2026, draft PR, this Mac's v1_full copy, months 0-4): the lab baseline is reproducible on one machine (two runs identical;
+equals 26 Oct); 0.4086 / 0.4023 / 0.4123 came from three machines and data copies (an app-score nudge of 1e-6 moves it as
+much). Tuned seed SD of `catch_0.1pct` 0.006-0.008 > 0.005, so the pre-registered rule recommends a 5-seed average (team
+decision pending); tuning's lead beats seed spread on weekly recall only. 1:20 whole-account undersampling: same
+earliness, weekly recall -0.007, PR-AUC -0.020, 2-4x faster; class weights stay. -> `outputs/modelling/models/v1_full/stability/`.
 Feature lab (`python -m models.feature_lab`, `src/features/candidates.py`, ledger `outputs/modelling/feature_lab/ledger.csv`,
 26-27 Oct 2026): candidate groups judged on the tuned model; `roll4` (8 four-week-window features) adopted 26 Oct, computed
 at load time (`load_table(..., adopted=True)`). **Proposal 28 Oct 2026, pending the team** (plan:
