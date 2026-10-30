@@ -126,9 +126,11 @@ identical to `month5_dryrun_frozen_tuned`).
 **Outlier appendix (30 Oct 2026, Kee Chee Pheng; plan `outputs/modelling/outlier/PLAN.md`, team doc
 https://claude.ai/artifact/MVKuDNLsRt74YdfLkygXZg):** can label-free detectors beat the rules, and do they find the 543
 mules the bank never confirmed (189 of 732 confirmed)? Decided: month 5 only, never 6-7 (D1); bank label = closed by
-the bank at any time (D2), from the true start (D3); no `amldata` change (D5). Methods: M3 rarity score (ECOD-style;
-replaced a z-score after a label-free check: 9 of 19 inputs have MAD 0) and M4 Isolation Forest on ranks
-(`python -m models outlier --method rarity|iforest`, `src/models/outlier.py`); M2 `bank_label` = the frozen recipe
+the bank at any time (D2), from the true start (D3); no `amldata` change (D5). Methods: M3 rarity score (per input the
+tail share in its suspicious direction, high except fast forwarding; mean of the 3 rarest; one reference per week
+since opening), M3s `rarity_sum` (ECOD's sum, side-by-side only) and M4 Isolation Forest on ranks (`python -m models
+outlier --method rarity|rarity_sum|iforest`, `src/models/outlier.py`); settings reviewed by label-free checks
+30 Oct (plan, "Review of the judgment calls"); M2 `bank_label` = the frozen recipe
 trained on bank-confirmed mules only (`models train --label bank`, `train.bank_confirmed` from `open_by_day`); M1b
 `truth_macos` = the frozen recipe retrained on this Mac, M2's yardstick. `python -m evaluation.hidden_mules --scores
 NAME=PATH ...` -> caught for bank-confirmed vs never confirmed, by type and pattern, top false alarms, bootstrap. One

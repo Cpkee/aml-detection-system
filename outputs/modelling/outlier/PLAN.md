@@ -47,7 +47,8 @@ SAML-D patterns, forwarded at RUSI speed). Expected blind spots, stated in advan
 | M1 | `frozen_tuned` (38 inputs) | simulator truth (`mule_by_day`) | exists: the upper reference |
 | M1b | `truth_macos`: M1's recipe and settings retrained on this Mac (added 30 Oct 2026) | simulator truth | built 30 Oct: M2's yardstick on the same machine (the recipe gave 63 vs 65 catches on two machines) |
 | M2 | Bank-label LightGBM (`bank_label`): same 38 inputs and tuned settings as M1, application score refitted the same way | **confirmed mules only**; every other account counts as normal | built 30 Oct (1,516 mule-weeks vs 8,327) |
-| M3 | Rarity score (ECOD-style; was robust z-score, changed 30 Oct 2026) | none | built 30 Oct |
+| M3 | Rarity score: per input the tail share in its suspicious direction, mean of the 3 rarest (was robust z-score, then two-sided; see the review below) | none | built 30 Oct |
+| M3s | `rarity_sum`: ECOD's own aggregation, the sum over all 19 inputs; a fixed side-by-side comparison, never used to choose (added 30 Oct 2026) | none | built 30 Oct |
 | M4 | Isolation Forest | none | built 30 Oct |
 | M5 | Autoencoder (optional, only if M2–M4 are done by 4 Nov) | none | new |
 
@@ -62,19 +63,21 @@ activity inputs is reported beside it, never used to choose.
 
 - Rows: months 0–4, weeks 0–26, open account-weeks only (`open_by_day = 1`; a bank knows what it closed). The same
   no-peek cut-off as the store.
-- Preparation: each input is compared with the training weeks of the same band by rank, not by raw value. A
-  missing value (no payment out that week; fewer than 4 past weeks for `self_vs_past_*`) counts as "no evidence"
-  (rarity 0, rank 0.5).
-- Week bands **0–3, 4–12, 13–26**: each band gets its own reference values and fitted models, because new
-  accounts behave differently.
-- M3 (**changed 30 Oct 2026, Kee Chee Pheng**, before any label was looked at; was a robust z-score): rarity score
-  (ECOD-style, Li et al. 2022). Per input, the share of training weeks in the band at least as extreme, on either
-  side (+1 smoothed); rarity = −log10 of it. Score = mean of the 3 largest rarities. Why: the label-free spread
-  check found a MAD of 0 for 9 of the 19 inputs in at least one band (`out_1h_share_wk` among them) and tails of
-  thousands of MADs, so z-scores would skip the speed shares and be ruled by the longest tail.
-- M4: scikit-learn `IsolationForest(n_estimators=300, max_samples=256, random_state=42)` on each input's mid-rank
-  within its band (0–1), score = `-score_samples`. Fitted on all account-weeks, mules included: a bank cannot
-  remove what it does not know. (Ranks as inputs: changed 30 Oct 2026 with M3.)
+- Preparation: each input is compared by rank, not by raw value, with the training account-weeks of the same week
+  since opening. A missing value (no payment out that week; fewer than 4 past weeks for `self_vs_past_*`) counts as
+  "no evidence" (rarity 0, rank 0.5).
+- **One reference per week since opening (0, 1, …, 26)** (changed 30 Oct 2026, Kee Chee Pheng; was bands 0–3,
+  4–12, 13–26): each account-week is compared with accounts of exactly the same age.
+- M3 (changed 30 Oct 2026, Kee Chee Pheng; first a robust z-score, then two-sided tails): rarity score. Per input,
+  the share of training weeks at least as extreme **in its suspicious direction**: high for 18 inputs, low for
+  `med_in_out_minutes_wk` (fast forwarding) (+1 smoothed); rarity = −log10 of it. Score = mean of the 3 largest
+  rarities. The tail shares follow ECOD (Li et al. 2022); the fixed directions and the top-3 mean depart from it
+  (ECOD picks each tail by skewness and sums all inputs). Why not z-scores: a MAD of 0 for 9 of the 19 inputs in
+  at least one band (`out_1h_share_wk` among them) and tails of thousands of MADs.
+- M3s (`rarity_sum`): the same rarities summed over all 19 inputs (ECOD's aggregation).
+- M4: scikit-learn `IsolationForest(n_estimators=300, max_samples=256, random_state=42)` per week since opening, on
+  each input's mid-rank (0–1), score = `-score_samples`. Fitted on all account-weeks, mules included: a bank cannot
+  remove what it does not know. Direction-free by design.
 - M5: torch, 19 → 8 → 3 → 8 → 19 on the same ranks, ReLU, 20 epochs, Adam 1e-3, seed 42; score = mean squared
   rebuild error.
 - M2: label = `mule_by_day` **and** confirmed by the bank at any time in the window (decisions D2, D3). The
@@ -88,7 +91,7 @@ activity inputs is reported beside it, never used to choose.
 
 Before the single look, only label-free checks are allowed:
 
-- score distributions per week band;
+- score distributions by account age;
 - the 50 highest-scored account-weeks of months 0–4, inspected by their features only;
 - runtime;
 - two runs give identical scores.
@@ -101,8 +104,34 @@ except `new_payer_share_wk`, 0%). Isolation Forest's top weeks are unusual mixes
 shares together).
 
 Scoring chain checked end to end on training month 4 (30 Oct 2026; `evaluation.hidden_mules` counts equal the
-harness's). That run showed M3/M4 catch counts on month 4, in-sample; recorded here because the settings must not
-change after it, and none did. M2 and M1b trained in 40 s / 35 s with `frozen_tuned`'s settings and 38 inputs.
+harness's). **Disclosure:** that run printed in-sample catch counts on month 4 (bands and two-sided version: rarity
+19, Isolation Forest 9, rules 21 of 76 mules). Two settings changed after it (week references and direction,
+below). Those changes come from label-free checks run by review agents that never saw these counts, and each has a
+label-free reason recorded below; still, they were made after the counts were seen. M2 and M1b trained in 40 s /
+35 s with `frozen_tuned`'s settings and 38 inputs.
+
+Re-run with the reviewed settings (30 Oct 2026, same rows): rarity 1 s fit / 9 s score, rarity_sum the same,
+Isolation Forest 15 s / 41 s; two runs identical; no missing scores. Ties: one week has 2 account-weeks tied at its
+top rarity score; 8 of the 675 rows in the weekly top 25s share a score (the harness breaks ties by account id and
+reports them). Rarity's top weeks are fan-in bursts (13–16 payers, money forwarded within hours); the inputs among
+the 3 rarest in its top 1% are now led by the speed shares (`out_1h_share_4wk` 34%, `med_in_out_minutes_wk` 28%,
+`out_1h_share_wk` 25%) and abroad / high-risk (21–24%); `passthrough_wk` 0% and `passthrough_4wk` 6% (were driven
+by their innocent low side).
+
+## Review of the judgment calls (30 Oct 2026)
+
+Five review agents checked the five judgment calls in parallel. The outlier settings were judged without labels (by
+the published method, label-free statistics and stability); M2's settings only with the bank's own labels on
+months 0–4. No agent read months 5–7. Scripts and outputs: session scratchpad (not committed). Decided by Kee Chee
+Pheng, 30 Oct 2026.
+
+| # | Judgment call | Finding | Decision |
+|---|---|---|---|
+| 1 | Two-sided rarity | Half of the top 1% had a low-side input among its 3 rarest, mostly innocent (money kept: `passthrough_*`; accounts going quiet). In the weekly top 0.05%, 20% were there partly for such a low side. ECOD's skewness rule would pick the innocent low tail of pass-through and the slow tail of forwarding time | **Changed:** fixed direction, high for 18 inputs, low for `med_in_out_minutes_wk`. Matches this plan's definition and the rules R3 / R4. ~17% of the weekly top 0.05% changes |
+| 2 | Mean of the 3 rarest | ECOD, COPOD and HBOS all sum over every input. Summing adds ~0.3 per non-missing input even when nothing is unusual, so it favours busy, ordinary accounts (27% of its top 25s have no input rarer than 1 in 1,000 vs 0.3%); K = 1 is fragile (top-5 stability 0.69 vs 0.86) | **Approved** (K = 3). ECOD's sum added as M3s, reported beside it |
+| 3 | Bands 0–3 / 4–12 / 13–26 | Weeks 0–3 never settle (4-week windows fill up; week 0 vs its band KS 0.43); week 4 is a real edge (`self_vs_past_*` start); nothing supports the 12/13 cut (a monthly bill cycle runs through weeks 4–26). ~165k account-weeks per week is enough for each reference | **Changed:** one reference per week. ~14% of the rarity top 1% changes (about one flag a week); for Isolation Forest no more than a seed change |
+| 4 | The 19 inputs | No pair above 0.73 at the extremes; none tied to income beyond ±0.11 except `passthrough_4wk` (−0.3); each of the 15 SAML-D shapes covered by at least one input; cash smurfing and cash withdrawal (4% of shape weight) only partly, and the store features that would add them mostly re-count activity | **Approved** (unchanged) |
+| 5 | M2 keeps M1's tuned settings | On bank labels, 3 temporal folds: frozen settings 0.507 catch at the rules' budget vs 0.492–0.499 for min_child_samples 500 / 200 and num_leaves 31, all within noise (bootstrap 0.034–0.061 per fold); the trees use every leaf, so min_child_samples 2000 does not bind | **Approved** (unchanged). Caveat for the report: every bank-confirmed mule was first alerted by the rules, so bank labels teach "find the rules' mules, earlier"; M2's real test is the month-5 look against the truth |
 
 The settings are then written to `outputs/modelling/outlier/v1_full/settings.json` and committed **before** month 5
 is scored.
@@ -171,8 +200,8 @@ Each method writes `account_id, weeks_since_open, score` for the month-5 cohort.
    manifests' sha256). No setting changes after this.
 3. 4–5 Nov: pause (calibration, final test run).
 4. 6 Nov, the one look: `models predict --months 5 --weeks 0-26` for `frozen_tuned`, `truth_macos`, `bank_label`;
-   `models outlier --method rarity|iforest`; `evaluation.score --scores PATH --horizons 26` for each;
-   `evaluation.hidden_mules --scores NAME=PATH ...` with all five.
+   `models outlier --method rarity|rarity_sum|iforest`; `evaluation.score --scores PATH --horizons 26` for each;
+   `evaluation.hidden_mules --scores NAME=PATH ...` with all six.
 5. 7–9 Nov: `notebooks/12_outlier_detection.ipynb`, `report.md`, appendix text, read against "How to read the result".
 6. 10 Nov: into the report draft.
 
