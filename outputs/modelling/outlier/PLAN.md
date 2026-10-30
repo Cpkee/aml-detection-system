@@ -164,6 +164,18 @@ Each method writes `account_id, weeks_since_open, score` for the month-5 cohort.
 | D4 | Include the autoencoder M5 | only if M2–M4 are done by 4 Nov |
 | D5 | Code additions outside `src/models/` | **Decided 30 Oct 2026 (Kee Chee Pheng):** no `amldata` change (M2's bank label comes from the existing `open_by_day`, a new use of it as a label); only `src/evaluation/hidden_mules.py`, inside the data rules. Team informed |
 
+## Next steps (30 Oct 2026; draft PR #47)
+
+1. Team reviews this plan and PR #47; decides D4 (autoencoder) by 4 Nov.
+2. 3 Nov: commit `outputs/modelling/outlier/v1_full/settings.json` (`models.outlier.settings()` + the M2 / M1b
+   manifests' sha256). No setting changes after this.
+3. 4–5 Nov: pause (calibration, final test run).
+4. 6 Nov, the one look: `models predict --months 5 --weeks 0-26` for `frozen_tuned`, `truth_macos`, `bank_label`;
+   `models outlier --method rarity|iforest`; `evaluation.score --scores PATH --horizons 26` for each;
+   `evaluation.hidden_mules --scores NAME=PATH ...` with all five.
+5. 7–9 Nov: `notebooks/12_outlier_detection.ipynb`, `report.md`, appendix text, read against "How to read the result".
+6. 10 Nov: into the report draft.
+
 ## Timeline (around the 4–5 Nov calibration and test run, which take priority)
 
 | Date | Step |
