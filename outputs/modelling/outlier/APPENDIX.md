@@ -39,10 +39,14 @@ tuning the result to the data. We also wrote down in advance how each possible r
 | Isolation Forest, no labels (M4) | 16 | 13 |
 | Rarity summed over all inputs, no labels (side by side only) | 39 | 30 |
 
-1. **Without labels, outlier detection only matches the rules.** Both label-free detectors catch 16 mules, the same as
-   the rules (95% intervals of the difference −11 to +10 and −10 to +10). They catch different mules from the rules:
-   only 4 of their 16 are mules the rules also catch. So our model's advantage comes from learning from labels, not
-   from the activity features alone.
+1. **Without labels, outlier detection matches the rules, and finds different mules.** Both label-free detectors catch
+   16 mules, the same as the rules (95% intervals of the difference −11 to +10 and −10 to +10). A random pick of 124
+   accounts would catch fewer than one mule (124 × 78 / 29,120 ≈ 0.3), so the detectors do find real signal. They also
+   look in different places from the rules: only 4 of their 16 catches are mules the rules also catch, so 12 are
+   mules the rules miss (and the rules catch 12 that each detector misses). The rules and the rarity score together
+   catch 28, but with twice the alerts (248 instead of 124). So outlier detection is a useful complement to the rules,
+   not a better replacement for them. Our model's large advantage comes from learning from labels, not from the
+   activity features alone.
 2. **With the bank's own labels, our model still wins clearly.** It catches 54 instead of 63: 9 fewer (interval 2 to
    16). That is a real loss, but it keeps 86% of its catches and still finds 38 more mules than the rules (interval 28
    to 49). Of the 62 mules the bank never confirmed, it finds 42. Most of its catches are fake accounts (50 of 54),
@@ -58,9 +62,12 @@ tuning the result to the data. We also wrote down in advance how each possible r
 
 Our main result survives realistic labels. Trained only on what the bank knows, the model still catches more than
 three times as many mules as the rules at the same alert budget. With perfect labels it catches 9 more (63 instead of 54),
-so the main result is a best case, and we state that cost as a limitation. Outlier detection on its own is no
-substitute for labels in our data. It catches a few mules the bank-label model misses (5 never confirmed), so
-combining the two could help, but we did not test that at a fair budget.
+so the main result is a best case, and we state that cost as a limitation. With no labels at all, outlier detection
+catches as many mules as the rules at the same cost, mostly different ones, so it is a useful second line next to the
+rules. Once a bank has even its own imperfect labels, a supervised model does far better (54 against 16). Outlier
+detection still catches a few mules the bank-label model misses (8, of which 5 were never confirmed), so combining
+the methods could help. We did not test a combined list at the same alert budget (124 flags), so this stays a
+suggestion, not a result.
 
 ## Limitations
 
