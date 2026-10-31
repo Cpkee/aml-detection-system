@@ -123,6 +123,9 @@ an upper bound). A final run writes `final_test/STARTED.json` before reading mon
 `STARTED.json` or `LOCK.json` exists (clearing it is a team decision). settings.json records `score_source`,
 `scores_sha256`, `run_manifest_sha256`, `git_commit`. Re-run: `results/v1_full/month5_dryrun_v2/` (existing columns
 identical to `month5_dryrun_frozen_tuned`).
+31 Oct 2026 (Emmy Li): the harness also writes `by_month_w<W>.csv` (catches and flag shares per opening month, the
+calendar-drift check for the 6+7 cohort). Final-test rehearsal on `data/v1` with stand-in `rehearsal_tuned` passed
+(`results/v1/final_test/`, locked; a code check, not a result). Commit before the 5 Nov run.
 **Outlier appendix (30 Oct 2026, Kee Chee Pheng; plan `outputs/modelling/outlier/PLAN.md`, team doc
 https://claude.ai/artifact/MVKuDNLsRt74YdfLkygXZg):** can label-free detectors beat the rules, and do they find the 543
 mules the bank never confirmed (189 of 732 confirmed)? Decided: month 5 only, never 6-7 (D1); bank label = closed by
