@@ -1,0 +1,4 @@
+policy,open_month,accounts,mules,caught,recall,flagged,precision,share_accounts,share_mules,share_flags
+model,5,29120,78,39,0.5,124,0.31451612903225806,1.0,1.0,1.0
+rules,5,29120,78,16,0.20512820512820512,119,0.13445378151260504,1.0,1.0,1.0
+model_anytime,5,29120,78,45,0.5769230769230769,124,0.3629032258064516,1.0,1.0,1.0
