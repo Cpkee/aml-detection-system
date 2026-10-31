@@ -203,9 +203,9 @@ Each method writes `account_id, weeks_since_open, score` for the month-5 cohort.
    `outputs/modelling/models/v1_full/<name>/` (shared, as `frozen_tuned`); both committed. No setting changes after
    this.
 3. 4–5 Nov: pause (calibration, final test run).
-4. ~~6 Nov~~ **the one look, done 31 Oct 2026, 19:03–19:04** (Kee Chee Pheng; earlier than planned, before PR #49
-   was merged and before the final test run): `check` passed, then `look` on commit `39119ed` (the committed freeze,
-   branch `outlier-freeze`). The settings were frozen and committed first, so the pre-registration holds; only the
+4. ~~6 Nov~~ **the one look, done 31 Oct 2026, 19:03–19:04** (Kee Chee Pheng; earlier than planned, before the
+   final test run): `check` passed, then `look` on commit `39119ed` (the committed freeze, merged in PR #49 at
+   19:02); results in PR #50. The settings were frozen and committed first, so the pre-registration holds; only the
    date moved. It reads month 5 only and changes nothing in the frozen model or the final test. It wrote the six
    score files, the harness on each (weeks 0–26) and `evaluation.hidden_mules` on all six
    (`outputs/modelling/outlier/v1_full/`). First reading (month 5, 78 mules by week 26, 124 flags): rules 16,
