@@ -35,7 +35,9 @@ value by value, first-week AUCs with account-level bootstrap intervals, whole-st
 byte-identical rebuild, whole-store invariants); run it with `SIM_OUT` = a folder whose store is built. `python -m features eda [--out data/v1 --report DIR]` executes `notebooks/01_eda_train.ipynb`;
 `python -m features preprocess [--out data/v1_full --report DIR]` executes `notebooks/02_preprocess.ipynb` (Phase 2: all its
 code is in the notebook) -> `<out>/features/accounts_{linear,tree}.parquet` + `preprocess_manifest.json`, `<report>/params.json`
-+ `report.md` (default `outputs/modelling/preprocess[/<run>]`); `python -m models train` is a Phase 4 stub.
++ `report.md` (default `outputs/modelling/preprocess[/<run>]`); `python -m models train` fits and saves the frozen model
+(`src/models/train.py`); model code refuses cleaned tables whose `preprocess_manifest.json` does not match the data run
+(`features.manifest.check_preprocess`).
 Feature lab: candidate features live in `src/features/candidates.py` (built from the store, same and earlier weeks only;
 `tests/test_feature_candidates.py`); `python -m models.feature_lab --out data/v1 --groups G... --name N` refits the tuned
 LightGBM (activity + application score, as notebook 06; `--views activity` for store features only) with each group added
@@ -92,6 +94,12 @@ barely helps (combined 0.256 -> 0.279); the application as one out-of-fold logis
 fixes the memorising (gap 0.74 -> 0.18; 0.695). Activity alone still leads on account level (0.730), but activity +
 app score wins in 27 of 27 weeks and puts 15% of mules in each week's top 1% in weeks 0-8 vs 4%: earliness, which
 the account-level measure does not reward. It catches fewer real mules in the account top 1% (19/32 vs 25/32).
+Stability + 1:20 undersampling (`notebooks/10_stability_undersampling.ipynb`, helpers `src/models/stability.py`, 29 Oct
+2026, draft PR, this Mac's v1_full copy, months 0-4): the lab baseline is reproducible on one machine (two runs identical;
+equals 26 Oct); 0.4086 / 0.4023 / 0.4123 came from three machines and data copies (an app-score nudge of 1e-6 moves it as
+much). Tuned seed SD of `catch_0.1pct` 0.006-0.008 > 0.005, so the pre-registered rule recommends a 5-seed average (team
+decision pending); tuning's lead beats seed spread on weekly recall only. 1:20 whole-account undersampling: same
+earliness, weekly recall -0.007, PR-AUC -0.020, 2-4x faster; class weights stay. -> `outputs/modelling/models/v1_full/stability/`.
 Feature lab (`python -m models.feature_lab`, `src/features/candidates.py`, ledger `outputs/modelling/feature_lab/ledger.csv`,
 26-27 Oct 2026): candidate groups judged on the tuned model; `roll4` (8 four-week-window features) adopted 26 Oct, computed
 at load time (`load_table(..., adopted=True)`). **Proposal 28 Oct 2026, pending the team** (plan:
@@ -111,6 +119,16 @@ laundering starts (the budget is ~5 flags a week).
 29 Oct: `python -m models calibrate` (month 5, isotonic, out-of-fold check), `train --inputs activity` + `python -m evaluation.compare` (onboarding value: month 5 frozen 65 vs activity-only 61 of 78; seed 43 56 vs 56), age-band breakdown, machine recorded. Tuned model differs by machine (63 Windows vs 65 Mac): machine of record undecided; local runs `_macos`.
 Option B (29 Oct): train once, share the model files (`lgbm.txt`, `app_logreg.json`, `manifest.json`, later `calibration.json`) in `data/<run>/models/<name>/`; scoring a file is identical across machines. `python -m features fingerprint` compares data by content; `python -m models verify --model M --reference RUN` accepts an older shared model once by reproducing a committed run.
 **Model of record: `frozen_tuned`, committed in `outputs/modelling/models/v1_full/frozen_tuned/`** (lgbm.txt, app_logreg.json, manifest, verified.json, calibration.json); found there first by `models.train.load`, never retrained (`train` refuses the name). Do not retrain it: score with `python -m evaluation.score` (default model). Retraining on another machine gives slightly different trees.
+30 Oct 2026 (harness gaps): `python -m models predict --out D [--model M] --months 5 [--weeks 0-77] [--to PATH]` writes
+`<out>/scores/<model>_m<months>.parquet` (account_id, weeks_since_open, score); `python -m evaluation.score --scores PATH`
+scores any such file (checked by `score.load_scores`; byte-identical results to the model path on month 5). New
+measures: `recall_final_label` (caught / all cohort launderers by the final label; month 5 weeks 0-26: model 0.649, rules
+0.165), `median_min_days_earlier_model_only` (model-only catches, flag to horizon end: 84 days), weekly `tied_at_cut`
+(none on month 5). `model_anytime` is reported for horizons <= 26 only (not meaningful past the training weeks 0-26; not
+an upper bound). A final run writes `final_test/STARTED.json` before reading months 6-7 and is refused while
+`STARTED.json` or `LOCK.json` exists (clearing it is a team decision). settings.json records `score_source`,
+`scores_sha256`, `run_manifest_sha256`, `git_commit`. Re-run: `results/v1_full/month5_dryrun_v2/` (existing columns
+identical to `month5_dryrun_frozen_tuned`).
 Sensitivity runs (rules frozen, 244k, one `test` value each): `python -m sim.sensitivity --list | --run [--only NAME]
 | --summarise` -> `data/sensitivity/<name>/` (large files deleted) and `outputs/sensitivity/summary.csv`.
 Single steps: `accounts`, `normal --batches 3-3`, `laundering`, `rules`, `finalize`. Use `--out` for another
@@ -325,7 +343,8 @@ about 60x fewer, so only the Phase 5 harness at the rules' budget shows whether 
    = the rules' own alert count in each week. **Fixed cohort (8 Oct 2026):** main comparison = the 50,061 test
    accounts (opened months 6-7, 180 launderers), clock = weeks since each account opened (0-78), weekly budget =
    the rules' alerts on these accounts in that week of their life (after the R6 fix: 29 in weeks 0-3, 111 in
-   weeks 0-12, 731 in total); secondary = same total of 731 flags used at any time (upper bound on the head start).
+   weeks 0-12, 731 in total); secondary = same total of 731 flags under one score threshold over the horizon (a
+   secondary policy, not an upper bound on the head start: weeks 27+ are outside the model's training weeks 0-26).
    This answers comment 2 of the professor's feedback (verbatim in `docs/professor_feedback.md`). Accounts closed
    by the bank stay in the cohort as caught; report accounts still open per week.
    1. ~~Add that label to `amldata.labels()`~~ done 9 Oct 2026: `mule_by_day`, with `weeks_since_open=` cut-offs.

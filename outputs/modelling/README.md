@@ -11,6 +11,6 @@ Committed results of the modelling phases (plan: the "Modelling: phased plan" ta
 | `eda_agent/` | the `eda-explorer` agent, via `/feature-round` | appendix: `insights.csv` (append-only ledger of findings and their status) and `<round>/` figures and CSVs; the evidence notebooks are `notebooks/07_eda_agent_<round>.ipynb` |
 | `feature_selection/` | `python -m features select` (runs `notebooks/10_feature_selection.ipynb`) | appendix: how much each of the 38 frozen inputs contributes (`report.md`, `summary.csv` label per input, `families.csv`, `near_copy_groups.csv`, `spearman.csv`, `permutation.csv`, 2 figures); `v1/` = the 50k run |
 | `models/<run>/` | `python -m models train` | 4: models, calibrators, importances, model cards |
-| `results/<run>/` | `python -m evaluation.score` | 5: weekly scoring against the rules on the test cohort |
+| `results/<run>/` | `python -m evaluation.score` (model of record, or `--scores FILE` from `python -m models predict`) | 5: weekly scoring against the rules on the test cohort (`summary_w<W>.csv`, `weekly_w<W>.csv`, `by_age_w<W>.csv`, `launderers.csv`, `settings.json` with provenance, `report.md`); `final_test/STARTED.json` + `LOCK.json` guard the single final run |
 
 Feature stores themselves are data (`data/<run>/features/`, git-ignored); only their manifests are described here.

@@ -7,8 +7,9 @@ For a shared model trained before models recorded input fingerprints (Li Ann's f
 manifest only holds a hash of the trainer's run_manifest.json, which differs per machine even for identical data. So
 the model is rescored here on the reference run's cohort (outputs/modelling/results/<data>/<reference>/) and every
 result file present in both runs must come out identical: the summaries, the weekly tables and each launderer's flag
-weeks. Identical results mean identical inputs and an identical model. Then verified.json records this machine's
-input fingerprints and the hashes of the model files, and models.train.load accepts the model while both still hold.
+weeks (the reference's columns; columns the harness added since are ignored). Identical results mean identical
+inputs and an identical model. Then verified.json records this machine's input fingerprints and the hashes of the
+model files, and models.train.load accepts the model while both still hold.
 Nothing is written when any file differs.
 """
 from __future__ import annotations
@@ -26,6 +27,11 @@ from features import fingerprint
 from models import train
 
 
+def same_columns(ref: pd.DataFrame, new: pd.DataFrame) -> bool:
+    """Every column of the reference file comes out identical (columns added to the harness later are ignored)."""
+    return set(ref.columns) <= set(new.columns) and new[ref.columns].equals(ref)
+
+
 def verify(out: str, model: str, reference: str) -> dict:
     data = os.path.basename(os.path.normpath(out))
     ref_dir = os.path.join(sc.RESULTS, data, reference)
@@ -41,7 +47,8 @@ def verify(out: str, model: str, reference: str) -> dict:
         files = sorted(f for f in os.listdir(ref_dir) if f.endswith(".csv") and os.path.exists(os.path.join(new, f)))
         if not any(f.startswith("summary_") for f in files):
             raise SystemExit(f"{reference} has no summary files to compare")
-        result = {f: pd.read_csv(os.path.join(new, f)).equals(pd.read_csv(os.path.join(ref_dir, f))) for f in files}
+        result = {f: same_columns(pd.read_csv(os.path.join(ref_dir, f)), pd.read_csv(os.path.join(new, f)))
+                  for f in files}
     record = {"verified": all(result.values()), "reference": ref_dir, "compared": result,
               "date": datetime.date.today().isoformat(), "machine": train.machine()}
     if record["verified"]:
