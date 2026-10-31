@@ -50,9 +50,9 @@ SAML-D patterns, forwarded at RUSI speed). Expected blind spots, stated in advan
 | M3 | Rarity score: per input the tail share in its suspicious direction, mean of the 3 rarest (was robust z-score, then two-sided; see the review below) | none | built 30 Oct |
 | M3s | `rarity_sum`: ECOD's own aggregation, the sum over all 19 inputs; a fixed side-by-side comparison, never used to choose (added 30 Oct 2026) | none | built 30 Oct |
 | M4 | Isolation Forest | none | built 30 Oct |
-| M5 | Autoencoder (optional, only if M2–M4 are done by 4 Nov) | none | new |
+| M5 | Autoencoder | none | **not included** (D4, decided 31 Oct 2026): further work |
 
-**Inputs for M3–M5** (activity only, behaviour shape, not size; no `app_score`): `passthrough_wk`,
+**Inputs for M3–M4** (activity only, behaviour shape, not size; no `app_score`): `passthrough_wk`,
 `out_1h_share_wk`, `out_24h_share_wk`, `med_in_out_minutes_wk`, `n_payers_wk`, `n_payees_wk`,
 `new_payer_share_wk`, `self_vs_past_money_in`, `self_vs_past_payers`, `self_vs_past_rows`, `peer_ratio_money_in`,
 `internal_out_share_cum`, `cash_in_share_cum`, `abroad_out_share_cum`, `high_risk_out_share_cum`,
@@ -78,8 +78,8 @@ activity inputs is reported beside it, never used to choose.
 - M4: scikit-learn `IsolationForest(n_estimators=300, max_samples=256, random_state=42)` per week since opening, on
   each input's mid-rank (0–1), score = `-score_samples`. Fitted on all account-weeks, mules included: a bank cannot
   remove what it does not know. Direction-free by design.
-- M5: torch, 19 → 8 → 3 → 8 → 19 on the same ranks, ReLU, 20 epochs, Adam 1e-3, seed 42; score = mean squared
-  rebuild error.
+- M5 (not included, D4 31 Oct 2026; the design is kept for the further-work note): torch, 19 → 8 → 3 → 8 → 19 on
+  the same ranks, ReLU, 20 epochs, Adam 1e-3, seed 42; score = mean squared rebuild error.
 - M2: label = `mule_by_day` **and** confirmed by the bank at any time in the window (decisions D2, D3). The
   application score is refitted out-of-fold with the same bank label. D2 and D3 decided 30 Oct 2026.
   "Confirmed at any time" = closed by the end of the window: `amldata.labels(..., as_of_day=<after the last
@@ -142,7 +142,7 @@ Each method writes `account_id, weeks_since_open, score` for the month-5 cohort.
 --scores PATH` then scores it at the rules' weekly budget with permanent flags, the same as the month-5 dry run
 (29,120 accounts, 78 mules by week 26, 124 flags).
 
-1. **Main table** (M0–M5): caught, precision, `recall_final_label`, median days from start, caught by type,
+1. **Main table** (M0–M4): caught, precision, `recall_final_label`, median days from start, caught by type,
    head-to-head with the rules.
 2. **Hidden mules:** the 78 mules split into confirmed by the bank vs never confirmed (`aml_outcomes`), with
    caught per method in each group. A new scoring-only module, `src/evaluation/hidden_mules.py`; the harness stays
@@ -176,7 +176,7 @@ Each method writes `account_id, weeks_since_open, score` for the month-5 cohort.
 
 | Item | Purpose |
 |---|---|
-| `src/models/outlier.py` | `fit(train, settings)` / `score(df, fitted)` for M3–M5: pure functions |
+| `src/models/outlier.py` | `fit(train, settings)` / `score(df, fitted)` for M3–M4: pure functions |
 | `src/models/train.py` | M2: `train --label bank` (`bank_confirmed`); `--params` also takes a model's manifest. Default unchanged |
 | `src/evaluation/hidden_mules.py` | sections 2–4 of the evaluation |
 | `notebooks/12_outlier_detection.ipynb` | the write-up |
@@ -190,16 +190,18 @@ Each method writes `account_id, weeks_since_open, score` for the month-5 cohort.
 | D1 | Appendix only, month 5 only, not in the final test run | **Decided 30 Oct 2026 (Kee Chee Pheng): month 5 only** |
 | D2 | When the bank "knows" a mule: confirmed at any time in the window, or only by a fixed training date | **Decided 30 Oct 2026 (Kee Chee Pheng): any time** (separates incomplete labels from late labels; simpler) |
 | D3 | M2's mule weeks for a confirmed account: from its true start (investigators rebuild the timeline), or from the bank's first alert | **Decided 30 Oct 2026 (Kee Chee Pheng): true start** |
-| D4 | Include the autoencoder M5 | only if M2–M4 are done by 4 Nov |
+| D4 | Include the autoencoder M5 | **Decided 31 Oct 2026 (Kee Chee Pheng): not included.** Like Isolation Forest it scores unusual combinations without a suspicious direction, so it would mostly repeat M4 on 19 ranked inputs, and its open settings (one network per week or pooled, deterministic torch) could not be reviewed before the 3 Nov freeze. Isolation Forest is our "unusual combination" method (fewer settings); the autoencoder is named as further work |
 | D5 | Code additions outside `src/models/` | **Decided 30 Oct 2026 (Kee Chee Pheng):** no `amldata` change (M2's bank label comes from the existing `open_by_day`, a new use of it as a label); only `src/evaluation/hidden_mules.py`, inside the data rules. Team informed |
 
-## Next steps (30 Oct 2026; draft PR #47)
+## Next steps (updated 31 Oct 2026; PR #47 merged)
 
-1. Team reviews this plan and PR #47; decides D4 (autoencoder) by 4 Nov.
-2. 3 Nov, freeze: `python -m evaluation.outlier_look freeze --out data/v1_full` writes
-   `outputs/modelling/outlier/v1_full/settings.json` (outlier settings + sha256 of each model's files) and copies the
-   M1b / M2 model files to `outputs/modelling/models/v1_full/<name>/` (shared, as `frozen_tuned`); commit both. No
-   setting changes after this.
+1. ~~Team reviews this plan and PR #47; decides D4 (autoencoder) by 4 Nov.~~ PR #47 merged; D4 decided 31 Oct
+   (not included).
+2. ~~3 Nov, freeze~~ **done 31 Oct 2026, 18:24** (early: nothing was left to decide): `python -m
+   evaluation.outlier_look freeze --out data/v1_full` wrote `outputs/modelling/outlier/v1_full/settings.json`
+   (outlier settings + sha256 of each model's files, code commit `2d0f91f`) and copied the M1b / M2 model files to
+   `outputs/modelling/models/v1_full/<name>/` (shared, as `frozen_tuned`); both committed. No setting changes after
+   this.
 3. 4–5 Nov: pause (calibration, final test run).
 4. 6 Nov, the one look: `python -m evaluation.outlier_look check` (reads no label), then `... look`. It refuses
    unless the frozen settings are committed and still equal the code and model files, and runs once
@@ -212,10 +214,10 @@ Each method writes `account_id, weeks_since_open, score` for the month-5 cohort.
 
 | Date | Step |
 |---|---|
-| 30–31 Oct | D1, D2, D3, D5 decided 30 Oct; team decides D4 |
-| 31 Oct – 3 Nov | Build M2–M4, tests, label-free checks; commit `settings.json` |
+| 30–31 Oct | D1, D2, D3, D5 decided 30 Oct; D4 decided 31 Oct (no autoencoder) |
+| 31 Oct – 3 Nov | Build M2–M4, tests, label-free checks; commit `settings.json` (frozen 31 Oct) |
 | 4–5 Nov | Pause (calibration, final test run) |
-| 6 Nov | The one look on month 5; M5 if agreed |
+| 6 Nov | The one look on month 5 |
 | 7–9 Nov | Notebook, `report.md`, appendix text |
 | 10 Nov | Into the report draft (final 11 Nov) |
 
