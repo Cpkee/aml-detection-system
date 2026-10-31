@@ -71,6 +71,21 @@ def test_mulelogit_learns_and_round_trips_through_json():
     assert list(c.columns) == ["column", "coef", "odds_ratio"] and len(c) == len(logreg.columns_out(m.prep_))
 
 
+def test_interactions_scale_a_share_by_the_money_behind_it():
+    df, y = _table()
+    m = logreg.MuleLogit(C=1.0, interactions=True).fit(df[logreg.INPUTS], y)
+    cols = logreg.columns_out(m.prep_, m.inter_)
+    assert "out_1h_share_4wk_x_money_in_4wk" in cols and len(m.inter_) == len(logreg.INTERACTIONS)
+    assert cols.index("out_1h_share_4wk_x_money_in_4wk") < cols.index("out_1h_share_wk__missing")  # flags stay last
+    two = df.iloc[:2].copy()
+    two["out_1h_share_4wk"], two["money_in_4wk"] = [1.0, 1.0], [20.0, 5000.0]   # same share, little vs real money
+    x = logreg.transform(two, m.prep_, m.inter_)[:, cols.index("out_1h_share_4wk_x_money_in_4wk")]
+    assert x[1] > x[0]
+    again = logreg.MuleLogit.from_dict(json.loads(json.dumps(m.to_dict())))
+    assert np.allclose(again.predict(df), m.predict(df), rtol=0, atol=1e-12)
+    assert logreg.MuleLogit().fit(df[logreg.INPUTS], y).inter_ == []          # off by default
+
+
 def test_smaller_c_shrinks_coefficients():
     df, y = _table()
     big = logreg.MuleLogit(C=1.0).fit(df[logreg.INPUTS], y)

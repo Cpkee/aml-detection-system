@@ -34,7 +34,12 @@ PLAIN = ["weeks_since_open", "app_score"]
 LOGGED = [c for c in INPUTS if c not in SHARES + ZSCORE + PLAIN]
 KIND = {**{c: "log" for c in LOGGED}, **{c: "share" for c in SHARES}, **{c: "z" for c in ZSCORE},
         **{c: "std" for c in PLAIN}}
-DEFAULTS = {"C": 1.0, "class_weight": "balanced", "max_iter": 2000}       # notebook 04's settings
+DEFAULTS = {"C": 1.0, "class_weight": "balanced", "max_iter": 2000, "interactions": False}
+# Optional interaction terms (decision 31 Oct 2026, tried as a variant): a share times log(1 + money in) over the same
+# window. A linear model cannot learn by itself that a fast pay-out matters only when real money moves; on its own,
+# a share of 1 on a GBP 20 balance scores as high as on GBP 5,000 (notebook 11's diagnosis).
+INTERACTIONS = [("out_1h_share_4wk", "money_in_4wk"), ("out_24h_share_4wk", "money_in_4wk"),
+                ("passthrough_4wk", "money_in_4wk"), ("out_1h_share_wk", "money_in_wk")]
 
 
 def _shape(x: np.ndarray, kind: str) -> np.ndarray:
@@ -62,13 +67,32 @@ def fit_prep(df: pd.DataFrame, cols: list[str]) -> dict:
     return prep
 
 
-def columns_out(prep: dict) -> list[str]:
-    """Names of the prepared columns, in order: every input, then the missing flags."""
-    return list(prep) + [f"{c}__missing" for c, p in prep.items() if p["flag"]]
+def _raw_interaction(df: pd.DataFrame, prep: dict, a: str, b: str) -> np.ndarray:
+    """share a (filled, clipped to [0, 1]) x log(1 + money b) (filled, clipped at 0), before standardising."""
+    def filled(c):
+        x = df[c].to_numpy(dtype="float64")
+        return _shape(np.where(np.isnan(x), prep[c]["median"], x), prep[c]["kind"])
+    return filled(a) * filled(b)
 
 
-def transform(df: pd.DataFrame, prep: dict) -> np.ndarray:
-    """The prepared matrix (rows of df, columns_out(prep)); no NaN."""
+def fit_interactions(df: pd.DataFrame, prep: dict) -> list[dict]:
+    """Mean / sd of each interaction term on the training rows (prep fitted on the same rows)."""
+    out = []
+    for a, b in INTERACTIONS:
+        v = _raw_interaction(df, prep, a, b)
+        sd = float(v.std())
+        out.append({"a": a, "b": b, "mean": float(v.mean()), "sd": sd if sd > 0 else 1.0})
+    return out
+
+
+def columns_out(prep: dict, inter: list[dict] | None = None) -> list[str]:
+    """Names of the prepared columns, in order: every input, the interaction terms, then the missing flags."""
+    return list(prep) + [f"{t['a']}_x_{t['b']}" for t in inter or []] + \
+        [f"{c}__missing" for c, p in prep.items() if p["flag"]]
+
+
+def transform(df: pd.DataFrame, prep: dict, inter: list[dict] | None = None) -> np.ndarray:
+    """The prepared matrix (rows of df, columns_out(prep, inter)); no NaN."""
     out, flags = [], []
     for c, p in prep.items():
         x = df[c].to_numpy(dtype="float64")
@@ -76,6 +100,8 @@ def transform(df: pd.DataFrame, prep: dict) -> np.ndarray:
         out.append((_shape(np.where(miss, p["median"], x), p["kind"]) - p["mean"]) / p["sd"])
         if p["flag"]:
             flags.append(miss.astype("float64"))
+    for t in inter or []:
+        out.append((_raw_interaction(df, prep, t["a"], t["b"]) - t["mean"]) / t["sd"])
     return np.column_stack(out + flags)
 
 
@@ -83,22 +109,25 @@ class MuleLogit:
     """Prepare (fitted on the training rows) + class-weighted logistic regression, scikit-learn style."""
 
     def __init__(self, C: float = DEFAULTS["C"], class_weight=DEFAULTS["class_weight"],
-                 max_iter: int = DEFAULTS["max_iter"], random_state: int = 42):
+                 max_iter: int = DEFAULTS["max_iter"], interactions: bool = DEFAULTS["interactions"],
+                 random_state: int = 42):
         self.C, self.class_weight, self.max_iter, self.random_state = C, class_weight, max_iter, random_state
+        self.interactions = interactions
 
     def fit(self, x: pd.DataFrame, y) -> "MuleLogit":
         from sklearn.linear_model import LogisticRegression
         self.inputs_ = list(x.columns)
         self.prep_ = fit_prep(x, self.inputs_)
+        self.inter_ = fit_interactions(x, self.prep_) if self.interactions else []
         lr = LogisticRegression(C=self.C, class_weight=self.class_weight, max_iter=self.max_iter,
                                 random_state=self.random_state)
-        lr.fit(transform(x, self.prep_), np.asarray(y).astype(int))
+        lr.fit(transform(x, self.prep_, self.inter_), np.asarray(y).astype(int))
         self.coef_, self.intercept_ = lr.coef_[0].copy(), float(lr.intercept_[0])
         self.n_iter_ = int(lr.n_iter_[0])
         return self
 
     def decision_function(self, x: pd.DataFrame) -> np.ndarray:
-        return transform(x[self.inputs_], self.prep_) @ self.coef_ + self.intercept_
+        return transform(x[self.inputs_], self.prep_, self.inter_) @ self.coef_ + self.intercept_
 
     def predict_proba(self, x: pd.DataFrame) -> np.ndarray:
         p = 1 / (1 + np.exp(-self.decision_function(x)))
@@ -110,20 +139,22 @@ class MuleLogit:
 
     def coefficients(self) -> pd.DataFrame:
         """Coefficient per prepared column (per standard deviation for inputs; for flags, missing vs not)."""
-        return pd.DataFrame({"column": columns_out(self.prep_), "coef": self.coef_}) \
+        return pd.DataFrame({"column": columns_out(self.prep_, self.inter_), "coef": self.coef_}) \
             .assign(odds_ratio=lambda d: np.exp(d["coef"])).sort_values("coef", key=np.abs, ascending=False)
 
     def to_dict(self) -> dict:
         return {"model": "logistic regression", "inputs": self.inputs_, "prep": self.prep_,
-                "columns": columns_out(self.prep_), "coef": self.coef_.tolist(), "intercept": self.intercept_,
-                "settings": {"C": self.C, "class_weight": self.class_weight, "max_iter": self.max_iter},
+                "interactions": self.inter_, "columns": columns_out(self.prep_, self.inter_),
+                "coef": self.coef_.tolist(), "intercept": self.intercept_,
+                "settings": {"C": self.C, "class_weight": self.class_weight, "max_iter": self.max_iter,
+                             "interactions": self.interactions},
                 "n_iter": self.n_iter_}
 
     @classmethod
     def from_dict(cls, d: dict) -> "MuleLogit":
         m = cls(**d["settings"])
-        m.inputs_, m.prep_ = d["inputs"], d["prep"]
+        m.inputs_, m.prep_, m.inter_ = d["inputs"], d["prep"], d.get("interactions", [])
         m.coef_, m.intercept_, m.n_iter_ = np.asarray(d["coef"], dtype="float64"), float(d["intercept"]), d["n_iter"]
-        if columns_out(m.prep_) != d["columns"]:
+        if columns_out(m.prep_, m.inter_) != d["columns"]:
             raise ValueError("saved logistic model: columns do not match its preparation")
         return m
