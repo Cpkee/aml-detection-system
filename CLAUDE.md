@@ -136,10 +136,13 @@ outlier --method rarity|rarity_sum|iforest`, `src/models/outlier.py`); settings 
 30 Oct (plan, "Review of the judgment calls"); M2 `bank_label` = the frozen recipe
 trained on bank-confirmed mules only (`models train --label bank`, `train.bank_confirmed` from `open_by_day`); M1b
 `truth_macos` = the frozen recipe retrained on this Mac, M2's yardstick. `python -m evaluation.hidden_mules --scores
-NAME=PATH ...` -> caught for bank-confirmed vs never confirmed, by type and pattern, top false alarms, bootstrap. One
-look on month 5 (6 Nov), after `settings.json` is committed; settings never change after a look:
+NAME=PATH ...` -> caught for bank-confirmed vs never confirmed, by type and pattern, top false alarms, bootstrap.
 `python -m evaluation.outlier_look freeze | check | look` (look refuses unless the committed frozen settings equal the
-code and model files, and runs once).
+code and model files, and runs once). D4 (31 Oct): no autoencoder. Frozen 31 Oct (PR #49); **the one look ran 31 Oct
+2026** (planned 6 Nov; PR #50; spent: never re-run, settings never change). Month 5, 78 mules, 124 flags: rules 16,
+M1 63, M1b 63, M2 54, M3 16, M3s 39, M4 16; never-confirmed (62): rules 3, M1 50, M2 42. Write-up:
+`notebooks/12_outlier_detection.ipynb` (reads only the committed look outputs) -> `outputs/modelling/outlier/v1_full/
+report.md`; draft appendix text `outputs/modelling/outlier/APPENDIX.md`. On this Mac run commands with `venv/bin/python`.
 Sensitivity runs (rules frozen, 244k, one `test` value each): `python -m sim.sensitivity --list | --run [--only NAME]
 | --summarise` -> `data/sensitivity/<name>/` (large files deleted) and `outputs/sensitivity/summary.csv`.
 Single steps: `accounts`, `normal --batches 3-3`, `laundering`, `rules`, `finalize`. Use `--out` for another
