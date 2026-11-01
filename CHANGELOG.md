@@ -6,6 +6,28 @@ Assumptions and Use" doc.
 
 
 
+## 30 Oct 2026 — Model of record: 5-seed average `frozen_tuned_avg5` (decision by Kee Chee Pheng)
+
+No data change. New model of record; `frozen_tuned` and its results stay committed for comparison.
+- **Why:** notebook 10's pre-registered rule (average 5 seeds if the seed SD of `catch_0.1pct` > 0.005 in any fold;
+  it was 0.006-0.008 in all 3). The tuned settings sample 92% of rows and 90% of inputs per tree, so a single seed's
+  flags at the rules' small budget depend partly on chance.
+- **What:** the tuned settings (tuning step 2) fitted with LightGBM `random_state` 1-5 on the same rows and the same
+  application score (out-of-fold split seed 42, as notebook 10 measured); score = mean of the 5 probabilities.
+  `python -m models train --name frozen_tuned_avg5 --params .../tuned_params.json --tree-seeds 1 2 3 4 5` (110 s,
+  this Mac). Files `lgbm_seed1-5.txt`, `app_logreg.json`, `manifest.json` (`tree_files`, `tree_seeds`,
+  `app_score_seed`), `calibration.json` (isotonic, refitted on month 5: out-of-fold Brier 0.00180) in
+  `outputs/modelling/models/v1_full/frozen_tuned_avg5/`. `train.MODEL_OF_RECORD` is now the default of `predict`,
+  `calibrate` and `evaluation.score`.
+- **Code:** `models.train.load` returns a list of boosters and `predict` averages them; a single-model folder
+  (`lgbm.txt`) works as before: `frozen_tuned` re-scored on month 5 with the new code reproduces every result file of
+  `month5_dryrun_v2`. `load` refuses a folder whose LightGBM files differ from the manifest's. Test:
+  `test_seed_average_is_the_mean_of_its_seeds`.
+- **Month 5 dry run** (`results/v1_full/month5_dryrun_frozen_tuned_avg5/`), weeks 0-26: model 65 of 78 mules caught
+  (recall 0.833, precision 0.524) vs rules 16 (frozen_tuned: 63, 0.508); no flag before laundering starts; weeks
+  0-77: 79 of 97 (frozen_tuned 76). Seed spread (`results/v1_full/month5_seed_spread/`): each seed alone catches 63-65
+  of 78, so 1-2 mules between single-seed runs is chance.
+
 ## 30 Oct 2026 — Harness gaps closed (Phase 5, approved by Kee Chee Pheng)
 
 No data change, no model change, no change to any existing result value: result files gain columns only. Re-run of

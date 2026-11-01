@@ -106,14 +106,41 @@ def test_model_trains_reloads_and_refuses_its_training_months(tmp_path):
     try:
         m = train.train(DATA, name, report_root=str(tmp_path))
         assert m["n_inputs"] == 38 and m["inputs"] == train.INPUTS
-        booster, app, man = train.load(DATA, name)
-        assert booster.num_feature() == 38 and len(app["coef"]) == len(app["columns"])
+        boosters, app, man = train.load(DATA, name)
+        assert len(boosters) == 1 and boosters[0].num_feature() == 38 and len(app["coef"]) == len(app["columns"])
         with pytest.raises(ValueError):
             sc.score_cohort(DATA, [4], (0, 2), name)
         s = sc.score_cohort(DATA, [5], (0, 2), name)
         assert s["score"].between(0, 1).all() and set(s["weeks_since_open"]) == {0, 1, 2}
     finally:
         shutil.rmtree(train.model_dir(DATA, name), ignore_errors=True)
+
+
+@needs_store
+def test_seed_average_is_the_mean_of_its_seeds(tmp_path):
+    """A seed average (decision 30 Oct 2026) scores the mean of its seeds' probabilities, each seed's model equals a
+    single model trained with that seed, and every seed shares one application score."""
+    from models import train
+    params = {"n_estimators": 20, "subsample": 0.8, "subsample_freq": 1, "colsample_bytree": 0.8}
+    names = {"avg": "pytest_avg", 1: "pytest_seed1", 2: "pytest_seed2"}
+    try:
+        m = train.train(DATA, names["avg"], params, report_root=str(tmp_path), tree_seeds=[1, 2])
+        assert m["tree_files"] == ["lgbm_seed1.txt", "lgbm_seed2.txt"] and m["app_score_seed"] == 42
+        assert "random_state" not in m["lightgbm_params"]
+        for s in (1, 2):
+            train.train(DATA, names[s], {**params, "random_state": s}, report_root=str(tmp_path))
+        score = {k: sc.score_cohort(DATA, [5], (0, 2), n)["score"].to_numpy() for k, n in names.items()}
+        assert not np.array_equal(score[1], score[2])                       # the seeds differ...
+        assert np.allclose(score["avg"], (score[1] + score[2]) / 2, rtol=0, atol=1e-12)    # ...and are averaged
+        app = [json.load(open(os.path.join(train.model_dir(DATA, n), "app_logreg.json"))) for n in names.values()]
+        assert app[0] == app[1] == app[2]
+        folder = train.model_dir(DATA, names["avg"])
+        os.remove(os.path.join(folder, "lgbm_seed2.txt"))
+        with pytest.raises(ValueError):                                    # a missing seed file is refused
+            train.load(DATA, names["avg"])
+    finally:
+        for n in names.values():
+            shutil.rmtree(train.model_dir(DATA, n), ignore_errors=True)
 
 
 def test_by_age_counts_recall_and_false_positives():
