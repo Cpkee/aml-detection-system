@@ -126,6 +126,16 @@ identical to `month5_dryrun_frozen_tuned`).
 31 Oct 2026 (Emmy Li): the harness also writes `by_month_w<W>.csv` (catches and flag shares per opening month, the
 calendar-drift check for the 6+7 cohort). Final-test rehearsal on `data/v1` with stand-in `rehearsal_tuned` passed
 (`results/v1/final_test/`, locked; a code check, not a result). Commit before the 5 Nov run.
+**Final test ran 2 Nov 2026** (moved forward from 5 Nov; `frozen_tuned_avg5`, `results/v1_full/final_test/`, locked):
+weeks 0-26 model 120 vs rules 50 of 163 mules (precision 0.429 vs 0.189). **This is the headline result.**
+**Re-using the test months (decision 2 Nov 2026, Kee Chee Pheng; a limitation stated in the report):** improvements may be
+re-scored on months 6-7 with `evaluation.score --months 6 7 --final-test --model M --retest "REASON"` -> new folder
+`final_test_r<N>`; before any read it appends a row to `results/v1_full/final_test_looks.csv` (look, folder, started,
+score_source, git_commit, reason; look 1 = the first final test). Rules: the change and its months 0-5 evidence
+(training folds or the month-5 dry run) are written down and committed before the look, one look per change, never pick
+among several changes by their months 6-7 scores, every look is reported (also crashed or unhelpful ones), the first
+result stays the headline; `final_test/` is never touched. Optional confirmation of a large gain: a fresh dataset
+(e.g. seed 45, same settings), scored once.
 **Outlier appendix (30 Oct 2026, Kee Chee Pheng; plan `outputs/modelling/outlier/PLAN.md`, team doc
 https://claude.ai/artifact/MVKuDNLsRt74YdfLkygXZg):** can label-free detectors beat the rules, and do they find the 543
 mules the bank never confirmed (189 of 732 confirmed)? Decided: month 5 only, never 6-7 (D1); bank label = closed by
@@ -236,8 +246,8 @@ and feature adoption (`roll4`) done. Feature engineering is closing: `self4` not
 phase split, `--baseline store` and trial outputs were merged 27 Oct), so the model inputs stay store + `roll4`; feature list
 frozen 28 Oct (see the Modelling commands above). Gate 28 Oct: tuning
 grid done (Li Ann, with `adopted=True`), ~~harness dry run on month 5 (Emmy Li)~~ done 28 Oct (`evaluation.score`), stress-test datasets and Variant II / IV
-stores built (teammate 4; then re-check `roll4` there). 4 Nov: models calibrated on month 5 and frozen. 5 Nov: test
-months 6–7 scored once. 11 Nov report final, 12 Nov submit (date to confirm). Caution: the lab and the tuning measure use
+stores built (teammate 4; then re-check `roll4` there). ~~4 Nov: models calibrated on month 5 and frozen. 5 Nov: test
+months 6–7 scored once~~ done 2 Nov (`frozen_tuned_avg5`; later looks only as counted re-tests, see Phase 5 above). 11 Nov report final, 12 Nov submit (date to confirm). Caution: the lab and the tuning measure use
 each week's top 1% (~300–500 accounts a week); the rules flag ~7–9 cohort accounts a week in weeks 0–12 (111 of 50,061),
 about 60x fewer, so only the Phase 5 harness at the rules' budget shows whether the features help.
 1. ~~`--set key=value` override~~ done 7 Oct 2026 (with run manifest).
