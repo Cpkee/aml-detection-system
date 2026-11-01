@@ -211,10 +211,13 @@ Each method writes `account_id, weeks_since_open, score` for the month-5 cohort.
    (`outputs/modelling/outlier/v1_full/`). First reading (month 5, 78 mules by week 26, 124 flags): rules 16,
    M1 `frozen_tuned` 63 (equals `month5_dryrun_v2`), M1b `truth_macos` 63, M2 `bank_label` 54, M3 `rarity` 16, M3s
    `rarity_sum` 39, M4 `iforest` 16. Against "How to read the result": M3 / M4 ≈ the rules (difference 0, 95%
-   interval −10 to 11); M2 below M1b by 9 (interval 2 to 16) but 38 above the rules; never-confirmed mules caught
+   intervals −11 to +10 and −10 to +10; corrected 31 Oct, first written with the bounds flipped); M2 below M1b by 9 (interval 2 to 16) but 38 above the rules; never-confirmed mules caught
    (of 62): rules 3, M1 50, M2 42, M3 12, M4 13; M3 / M4 catch 8 mules M2 misses (union of their flags, so twice
    the budget). `rarity_sum` (side by side only, never used to choose) beats the rules by 23 (interval 12 to 33).
-5. 7–9 Nov: `notebooks/12_outlier_detection.ipynb`, `report.md`, appendix text, read against "How to read the result".
+5. ~~7–9 Nov~~ **done 31 Oct 2026:** `notebooks/12_outlier_detection.ipynb` (reads only the look's committed outputs:
+   no data folder, no label, so re-running it is not a new look; every number in its interpretation is asserted
+   against the files) -> `outputs/modelling/outlier/v1_full/report.md`, two figures and CSVs; draft appendix text
+   `outputs/modelling/outlier/APPENDIX.md`.
 6. 10 Nov: into the report draft.
 
 ## Timeline (around the 4–5 Nov calibration and test run, which take priority)

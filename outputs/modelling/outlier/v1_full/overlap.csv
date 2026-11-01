@@ -1,0 +1,8 @@
+catches \ misses,rules,frozen_tuned,truth_macos,bank_label,rarity,rarity_sum,iforest
+rules,0,2,2,3,12,6,12
+frozen_tuned,49,0,2,10,49,29,50
+truth_macos,49,2,0,11,49,28,49
+bank_label,41,1,2,0,40,21,44
+rarity,12,2,2,2,0,1,12
+rarity_sum,29,5,4,6,24,0,26
+iforest,12,3,2,6,12,3,0

@@ -96,3 +96,12 @@ def test_weeks_outside_bands_get_no_score():
 def test_test_months_are_refused():
     with pytest.raises(ValueError, match="D1"):
         outlier.run("data/none", "rarity", months=(6,))
+
+
+def test_notebook_12_runs_on_the_committed_look(tmp_path, monkeypatch):
+    """The write-up reads only committed files, so it runs anywhere; its asserts check every quoted number."""
+    from features.__main__ import run_notebook
+    monkeypatch.setenv("EDA_REPORT", str(tmp_path))
+    run_notebook("12_outlier_detection.ipynb", "data/v1_full", str(tmp_path))
+    for name in ("12_outlier_detection.ipynb", "report.md", "01_vs_rules.png", "02_caught_by_week.png"):
+        assert (tmp_path / name).exists(), name
