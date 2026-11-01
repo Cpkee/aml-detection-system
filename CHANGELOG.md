@@ -27,6 +27,13 @@ No data change. New model of record; `frozen_tuned` and its results stay committ
   (recall 0.833, precision 0.524) vs rules 16 (frozen_tuned: 63, 0.508); no flag before laundering starts; weeks
   0-77: 79 of 97 (frozen_tuned 76). Seed spread (`results/v1_full/month5_seed_spread/`): each seed alone catches 63-65
   of 78, so 1-2 mules between single-seed runs is chance.
+- **Committed 2 Nov** (built 30 Oct on an older `main`, merged with today's `main`: bank label, by-month table,
+  outlier appendix). Checks before the final test, this Mac, same data copy (`run_manifest.json` 4ce1c4fb...):
+  retraining with the merged code (`--params .../frozen_tuned/manifest.json --tree-seeds 1 2 3 4 5`, 86 s) gives the
+  5 tree files and `app_logreg.json` byte-identical to the committed ones; re-fitting the calibration gives the same
+  `calibration.json`; the month-5 dry run with today's harness (`results/v1_full/month5_dryrun_avg5_v2/`, adds
+  `by_month_w<W>.csv`) gives every other result file identical to `month5_dryrun_frozen_tuned_avg5`.
+
 ## 31 Oct 2026 — Harness: by-opening-month table; final-test rehearsal on data/v1 (Emmy Li)
 
 No data change, no model change, no change to any existing result value.
