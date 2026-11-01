@@ -6,6 +6,20 @@ Assumptions and Use" doc.
 
 
 
+## 2 Nov 2026 — Final test on months 6-7 (run once; Kee Chee Pheng, moved forward from 5 Nov)
+
+No data change, no model change. `python -m evaluation.score --out data/v1_full --months 6 7 --final-test` with the
+model of record `frozen_tuned_avg5` at commit 9e748c8 (no uncommitted changes) -> `outputs/modelling/results/v1_full/
+final_test/` (`LOCK.json` written: never re-run; clearing it is a team decision). Cohort 50,061 accounts.
+- **Weeks 0-26** (163 mules by week 26): model 120 caught vs rules 50 (recall 0.736 vs 0.307; precision 0.429 vs
+  0.189; 280 model flags vs 264 rule alerts); by the final label 0.667 vs 0.278. Both 43, model only 77, rules only 7,
+  neither 36; when both catch a mule the model is first 26 times, the rules 13 (median 2 days earlier); model-only
+  catches at least 91 days earlier (median). 2 model flags before laundering started. By type: fake 109/147 vs
+  46/147, witting 8/11 vs 3/11, unwitting 3/5 vs 1/5.
+- **By opening month:** model recall month 6 0.774, month 7 0.686 (rules 0.323 / 0.286); month 7 holds 43% of the
+  mules and 37% of model flags: the drift notebook 11 warned of, smaller than feared.
+- **Weeks 0-77** (180 mules, appendix): model 138 vs rules 59 (0.767 vs 0.328).
+
 ## 2 Nov 2026 — Model of record: 5-seed average `frozen_tuned_avg5` (decided 30 Oct, confirmed 2 Nov, Kee Chee Pheng)
 
 No data change. New model of record; `frozen_tuned` and its results stay committed for comparison.
