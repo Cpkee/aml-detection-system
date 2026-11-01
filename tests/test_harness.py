@@ -153,6 +153,18 @@ def test_by_age_counts_recall_and_false_positives():
     assert t.loc["50+", "false_positive_rate"] == 0.0 and t["accounts"].sum() == len(TRUTH)
 
 
+def test_by_month_splits_catches_and_flag_shares():
+    truth = TRUTH.assign(open_month=[6, 6, 7, 7, 7, 7])                      # C, F in month 6; N1-N3, R in month 7
+    live = sc.open_rows(_scores(), truth)
+    flags = {"model": sc.permanent_flags(live, {0: 1, 1: 1, 2: 2})}            # N1, N2, R, F
+    t = sc.by_month(truth, flags, 3).set_index("open_month")
+    # month 6: mules C (missed, closed) and F (caught), 1 flag; month 7: mule R (caught), 3 flags (N1, N2, R)
+    assert (t.loc[6, "mules"], t.loc[6, "caught"], t.loc[6, "flagged"]) == (2, 1, 1)
+    assert (t.loc[7, "mules"], t.loc[7, "caught"], t.loc[7, "flagged"]) == (1, 1, 3)
+    assert t.loc[6, "share_mules"] == 2 / 3 and t.loc[7, "share_flags"] == 0.75
+    assert t["share_accounts"].sum() == 1 and t["accounts"].sum() == len(truth)
+
+
 def test_calibration_keeps_order_and_matches_rates():
     from models import calibrate as cal
     rng = np.random.default_rng(0)

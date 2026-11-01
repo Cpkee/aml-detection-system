@@ -6,7 +6,7 @@ Assumptions and Use" doc.
 
 
 
-## 30 Oct 2026 — Model of record: 5-seed average `frozen_tuned_avg5` (decision by Kee Chee Pheng)
+## 2 Nov 2026 — Model of record: 5-seed average `frozen_tuned_avg5` (decided 30 Oct, confirmed 2 Nov, Kee Chee Pheng)
 
 No data change. New model of record; `frozen_tuned` and its results stay committed for comparison.
 - **Why:** notebook 10's pre-registered rule (average 5 seeds if the seed SD of `catch_0.1pct` > 0.005 in any fold;
@@ -27,6 +27,21 @@ No data change. New model of record; `frozen_tuned` and its results stay committ
   (recall 0.833, precision 0.524) vs rules 16 (frozen_tuned: 63, 0.508); no flag before laundering starts; weeks
   0-77: 79 of 97 (frozen_tuned 76). Seed spread (`results/v1_full/month5_seed_spread/`): each seed alone catches 63-65
   of 78, so 1-2 mules between single-seed runs is chance.
+## 31 Oct 2026 — Harness: by-opening-month table; final-test rehearsal on data/v1 (Emmy Li)
+
+No data change, no model change, no change to any existing result value.
+- **By opening month:** `evaluation.score` writes `by_month_w<W>.csv` and a report section (per policy and opening
+  month: accounts, mules, caught, recall, flags, precision, and each month's share of the cohort's accounts, mules and
+  flags). Added before the final test because notebook 11 found month-7 accounts get too few top application scores
+  when ranked with month 6 (`velocity_*` drift); a month whose share of flags is far below its share of mules is being
+  under-ranked. Month 5 of v1_full re-run: the 7 existing result files are identical to `month5_dryrun_v2`.
+- **Rehearsal of the final test** on `data/v1` (50k, not the main data; v1_full untouched): a stand-in model
+  `rehearsal_tuned` trained on v1 months 0-4 with `frozen_tuned`'s settings (`models train --params
+  .../frozen_tuned/manifest.json`), then the 5 Nov command `evaluation.score --months 6 7 --final-test` on it.
+  It ran end to end in 5 s (1.2 GB): `STARTED.json` before the read, `LOCK.json` after, all files including
+  `by_month`; a second run, by model or by `--scores` file, is refused. Records: `outputs/modelling/results/v1/final_test/`,
+  `outputs/modelling/models/v1/rehearsal_tuned/`. Numbers there are a code check only (22 mules), not a result.
+  For 5 Nov: commit first (`settings.json` records `git_uncommitted_changes`).
 
 ## 30 Oct 2026 — Harness gaps closed (Phase 5, approved by Kee Chee Pheng)
 

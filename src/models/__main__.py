@@ -10,11 +10,13 @@ def main(argv=None):
               "                           [--tree-seeds S...]\n"
               "       python -m models predict [--out D] [--model N] --months M... [--weeks 0-77] [--to PATH]\n"
               "       python -m models calibrate [--out D] [--model N]\n"
-              "       python -m models verify [--out D] --model N --reference RUN\n\n"
+              "       python -m models verify [--out D] --model N --reference RUN\n"
+              "       python -m models outlier [--out D] --method rarity|rarity_sum|iforest [--months 5] [--to PATH]\n\n"
               "  train      fit the frozen 38-input LightGBM on months 0-4 and save it (models.train)\n"
               "  predict    write a model's scores per account-week to a file for evaluation.score --scores\n"
               "  calibrate  map a trained model's scores to probabilities on month 5 (models.calibrate)\n"
-              "  verify     accept a model file from another machine by reproducing a committed run (models.verify)")
+              "  verify     accept a model file from another machine by reproducing a committed run (models.verify)\n"
+              "  outlier    label-free outlier scores for the appendix (models.outlier)")
         return
     if argv[0] == "train":
         from .train import main as train_main
@@ -28,8 +30,11 @@ def main(argv=None):
     elif argv[0] == "verify":
         from .verify import main as verify_main
         verify_main(argv[1:])
+    elif argv[0] == "outlier":
+        from .outlier import main as outlier_main
+        outlier_main(argv[1:])
     else:
-        raise SystemExit(f"unknown command `{argv[0]}` (known: train, predict, calibrate, verify)")
+        raise SystemExit(f"unknown command `{argv[0]}` (known: train, predict, calibrate, verify, outlier)")
 
 
 if __name__ == "__main__":

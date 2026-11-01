@@ -49,6 +49,18 @@ DEFAULT_PARAMS = {"class_weight": "balanced", "random_state": 42, "deterministic
                   "verbose": -1}
 REPORT_ROOT = "outputs/modelling/models"
 MODEL_OF_RECORD = "frozen_tuned_avg5"     # decision 30 Oct 2026: tuned settings, LightGBM seeds 1-5 averaged
+# truth = the simulator's answer key (the frozen model); bank = only the mules the bank confirmed count, all other
+# accounts are normal: what a real bank could train on (outlier appendix, M2, decisions D2/D3 30 Oct 2026)
+LABELS = ("truth", "bank")
+AFTER_LAST_DAY = 10 ** 6
+
+
+def bank_confirmed(out: str, months) -> pd.Series:
+    """1 for the accounts the bank closed at any time in the window, else 0, by account_id. The simulator closes an
+    account only after an investigator confirms an alert, so these are exactly the bank's confirmed mules (v1_full
+    months 0-5: 32 / 24 / 23 / 22 / 17 / 23, no normal account). From `open_by_day` (months 0-5 only)."""
+    y = amldata.labels(out, months=tuple(months), as_of_day=AFTER_LAST_DAY).set_index("account_id")
+    return (1 - y["open_by_day"]).astype(int)
 
 
 def machine() -> dict:
@@ -127,10 +139,13 @@ def app_scores_for(out: str, model: dict, ids) -> pd.Series:
 
 
 def train(out: str = amldata.DEFAULT_OUT, name: str = "frozen", params: dict | None = None, seed: int = 42,
-          report_root: str = REPORT_ROOT, input_set: str = "frozen", tree_seeds: list[int] | None = None) -> dict:
+          report_root: str = REPORT_ROOT, input_set: str = "frozen", label: str = "truth",
+          tree_seeds: list[int] | None = None) -> dict:
     """seed: the application score's out-of-fold split, and LightGBM's random_state unless tree_seeds is given;
     tree_seeds: one LightGBM model per random_state, all on the same rows and application score (a seed average)."""
     import lightgbm as lgb
+    if label not in LABELS:
+        raise ValueError(f"label must be one of {LABELS}")
     if tree_files(shared_dir(out, name, report_root)):
         raise ValueError(f"`{name}` is a shared model in {shared_dir(out, name, report_root)} (committed, the same for "
                          "everyone): load it, or train under another name")
@@ -138,12 +153,18 @@ def train(out: str = amldata.DEFAULT_OUT, name: str = "frozen", params: dict | N
     lin, cols = _linear(out)
     lin = lin[lin["open_month"].isin(MONTHS)]
     y26 = amldata.labels(out, months=MONTHS, weeks_since_open=WEEKS[1]).set_index("account_id")["mule_by_day"]
+    bank = bank_confirmed(out, MONTHS) if label == "bank" else None
+    if label == "bank":                           # unconfirmed mules count as normal, as in the bank's own records
+        y26 = y26 * bank.loc[y26.index]
     oof, _ = app_score(lin[cols], y26.loc[lin.index], lin[cols].iloc[:1], seed=seed)
     full = _logreg().fit(lin[cols].to_numpy(), y26.loc[lin.index].to_numpy().astype(int))
     app_model = {"columns": cols, "coef": full.coef_[0].tolist(), "intercept": float(full.intercept_[0]),
-                 "label": "mule_by_day at week 26", "fitted_on_months": list(MONTHS)}
+                 "label": "mule_by_day at week 26" + (", bank-confirmed only" if label == "bank" else ""),
+                 "fitted_on_months": list(MONTHS)}
 
     df, _ = base.load_table(out, MONTHS, WEEKS, adopted=True)
+    if label == "bank":
+        df["mule_by_day"] = df["mule_by_day"] * df["account_id"].map(bank)
     df["app_score"] = df["account_id"].map(pd.Series(oof, index=lin.index)).astype("float32")
     settings = {**DEFAULT_PARAMS, "random_state": seed, **(params or {})}
     inputs = INPUT_SETS[input_set]
@@ -165,7 +186,9 @@ def train(out: str = amldata.DEFAULT_OUT, name: str = "frozen", params: dict | N
     imp = pd.DataFrame({"feature": inputs, "gain": gain, "share": gain / gain.sum()}).sort_values("gain", ascending=False)
     store = manifest.check(out, WEEKLY)
     m = {"name": name, "data_folder": out, "input_set": input_set, "inputs": inputs, "n_inputs": len(inputs), "train_months": list(MONTHS),
-         "weeks": list(WEEKS), "label": "mule_by_day; account-weeks after closure dropped",
+         "weeks": list(WEEKS), "label": "mule_by_day; account-weeks after closure dropped"
+         + ("; bank label: only mules the bank closed at any time count (models.train.bank_confirmed)"
+            if label == "bank" else ""), "label_source": label,
          "rows": int(len(df)), "mule_rows": int(df["mule_by_day"].sum()), "accounts": int(df["account_id"].nunique()),
          "lightgbm_params": settings, "params_source": "default" if not params else "file",
          "tree_files": list(files.values()),
@@ -278,7 +301,10 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="python -m models train", description=__doc__.split("\n")[0])
     ap.add_argument("--out", default=amldata.DEFAULT_OUT)
     ap.add_argument("--name", default="frozen", help="model folder name under <out>/models/")
-    ap.add_argument("--params", default=None, help="JSON file of LightGBM settings (tuning step 2), merged over defaults")
+    ap.add_argument("--params", default=None, help="JSON file of LightGBM settings (tuning step 2), merged over "
+                    "defaults; a model's manifest.json works too (its lightgbm_params)")
+    ap.add_argument("--label", default="truth", choices=LABELS,
+                    help="truth = the simulator's answer key (default); bank = only bank-confirmed mules (M2)")
     ap.add_argument("--inputs", default="frozen", choices=list(INPUT_SETS),
                     help="frozen = the 38 inputs (default); activity = without app_score (onboarding-value yardstick)")
     ap.add_argument("--seed", type=int, default=42,
@@ -288,10 +314,11 @@ def main(argv=None):
     a = ap.parse_args(argv)
     params = json.load(open(a.params)) if a.params else None
     if params:
+        params = params.get("lightgbm_params", params)
         for k in ("n_estimators", "num_leaves", "min_child_samples", "subsample_freq", "max_depth"):
             if k in params:
                 params[k] = int(params[k])
-    m = train(a.out, a.name, params, a.seed, input_set=a.inputs, tree_seeds=a.tree_seeds)
+    m = train(a.out, a.name, params, a.seed, input_set=a.inputs, label=a.label, tree_seeds=a.tree_seeds)
     print(f"trained {m['name']} ({len(m['tree_files'])} LightGBM model(s)) on {m['rows']:,} account-weeks "
           f"({m['mule_rows']:,} mule weeks), {m['n_inputs']} inputs, {m['seconds']}s -> {model_dir(a.out, a.name)}")
 
