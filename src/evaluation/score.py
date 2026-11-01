@@ -2,7 +2,7 @@
 
     PYTHONPATH=src python -m evaluation.score --out data/v1_full                 # dry run: cohort = month 5, model of record
     PYTHONPATH=src python -m evaluation.score --out data/v1_full --months 6 7 --final-test   # once, 5 Nov 2026
-    PYTHONPATH=src python -m evaluation.score --out data/v1_full --scores data/v1_full/scores/frozen_tuned_m5.parquet
+    PYTHONPATH=src python -m evaluation.score --out data/v1_full --scores data/v1_full/scores/frozen_tuned_avg5_m5.parquet
 
 The comparison agreed on 8 Oct 2026 (CLAUDE.md, "Fixed cohort"): every account opened in the cohort months, a clock
 that counts weeks since each account opened, and in week w of their lives the model may flag as many accounts as the
@@ -424,8 +424,8 @@ def main(argv=None):
     ap.add_argument("--months", nargs="+", type=int, default=[5], help="cohort opening months (default 5, dry run)")
     ap.add_argument("--horizons", nargs="+", type=int, default=[26, 77],
                     help="last week of each horizon since opening (default 26 = main, 77 = appendix)")
-    ap.add_argument("--model", default="frozen_tuned",
-                    help="model name (default frozen_tuned, the shared model of record committed in git)")
+    ap.add_argument("--model", default="frozen_tuned_avg5",
+                    help="model name (default frozen_tuned_avg5, the shared model of record committed in git)")
     ap.add_argument("--name", default=None, help="report folder name (default month<M>_dryrun_w<W>)")
     ap.add_argument("--scores", default=None,
                     help="score this file (parquet/csv: account_id, weeks_since_open, score) instead of --model")

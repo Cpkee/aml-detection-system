@@ -7,6 +7,7 @@ def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     if not argv or argv[0] in ("-h", "--help"):
         print("usage: python -m models train [--out D] [--name N] [--params FILE] [--inputs frozen|activity] [--seed S]\n"
+              "                           [--tree-seeds S...]\n"
               "       python -m models predict [--out D] [--model N] --months M... [--weeks 0-77] [--to PATH]\n"
               "       python -m models calibrate [--out D] [--model N]\n"
               "       python -m models verify [--out D] --model N --reference RUN\n"

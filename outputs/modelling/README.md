@@ -10,7 +10,7 @@ Committed results of the modelling phases (plan: the "Modelling: phased plan" ta
 | `feature_lab/<data>/<trial>/` | `python -m models.feature_lab` | 4: candidate feature trials (`report.md`, `folds.csv`, `screen.csv`, `summary.csv`) and the append-only `ledger.csv` of every trial (the number of looks) |
 | `eda_agent/` | the `eda-explorer` agent, via `/feature-round` | appendix: `insights.csv` (append-only ledger of findings and their status) and `<round>/` figures and CSVs; the evidence notebooks are `notebooks/07_eda_agent_<round>.ipynb` |
 | `outlier/` | `PLAN.md`; `python -m evaluation.outlier_look freeze` / `look` -> `v1_full/settings.json`, `LOOK*.json`, one harness folder per method, `hidden_mules.md` + CSVs; `notebooks/12_outlier_detection.ipynb` -> `v1_full/report.md`, figures; `APPENDIX.md` | appendix: label-free detectors and bank labels, one look on month 5 (31 Oct 2026) |
-| `models/<run>/` | `python -m models train` | 4: models, calibrators, importances, model cards |
+| `models/<run>/` | `python -m models train` | 4: models, calibrators, importances, model cards; model of record `v1_full/frozen_tuned_avg5/` (5 LightGBM seeds averaged, decision 30 Oct 2026) |
 | `results/<run>/` | `python -m evaluation.score` (model of record, or `--scores FILE` from `python -m models predict`) | 5: weekly scoring against the rules on the test cohort (`summary_w<W>.csv`, `weekly_w<W>.csv`, `by_age_w<W>.csv`, `launderers.csv`, `settings.json` with provenance, `report.md`); `final_test/STARTED.json` + `LOCK.json` guard the single final run |
 
 Feature stores themselves are data (`data/<run>/features/`, git-ignored); only their manifests are described here.

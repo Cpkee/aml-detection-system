@@ -2,6 +2,8 @@
 
     PYTHONPATH=src python -m models train --out data/v1_full                       # default LightGBM settings
     PYTHONPATH=src python -m models train --out data/v1_full --params tuned.json   # tuning step 2's settings
+    PYTHONPATH=src python -m models train --out data/v1_full --params tuned.json --name frozen_tuned_avg5 \
+        --tree-seeds 1 2 3 4 5                                                     # 5 seeds, scores averaged
     PYTHONPATH=src python -m models predict --out data/v1_full --months 5          # scores file for the harness
 
 The model is the one the team froze on 28 Oct 2026: LightGBM on 38 inputs, the 28 store features + the 8 adopted
@@ -10,8 +12,14 @@ weeks 0-26 since opening, label mule_by_day, closed weeks dropped (lgbm_baseline
 application score is the logistic regression of notebook 06 (accounts_linear, label: mule by the end of week 26),
 out of fold for the training accounts, and fitted on all of them for scoring new accounts.
 
-Saved to <out>/models/<name>/ (data, git-ignored): lgbm.txt (LightGBM text model), app_logreg.json (columns,
-coefficients, intercept: readable, no pickle) and manifest.json (inputs, settings, data and store hashes, git commit).
+Seed average (decision 30 Oct 2026, Kee Chee Pheng; notebook 10's pre-registered rule): with --tree-seeds the same
+model is fitted once per LightGBM random_state on the same rows and the same application score (fixed by --seed), and
+its score is the mean of their probabilities. The tuned settings sample rows and columns per tree, so one seed's flags
+at the rules' small budget depend partly on chance (seed SD of catch_0.1pct 0.006-0.008 > 0.005).
+
+Saved to <out>/models/<name>/ (data, git-ignored): lgbm.txt (LightGBM text model; lgbm_seed<S>.txt per seed for a
+seed average), app_logreg.json (columns, coefficients, intercept: readable, no pickle) and manifest.json (inputs,
+settings, data and store hashes, git commit).
 A copy of the manifest and the feature importances go to outputs/modelling/models/<data>/<name>/ (committed).
 Calibration on month 5 is a later step (4 Nov 2026); this file only trains, and `predict` scores new months
 (`python -m models predict` writes <out>/scores/<model>_m<months>.parquet: account_id, weeks_since_open, score).
@@ -40,6 +48,7 @@ INPUT_SETS = {"frozen": INPUTS, "activity": [c for c in INPUTS if c != "app_scor
 DEFAULT_PARAMS = {"class_weight": "balanced", "random_state": 42, "deterministic": True, "force_row_wise": True,
                   "verbose": -1}
 REPORT_ROOT = "outputs/modelling/models"
+MODEL_OF_RECORD = "frozen_tuned_avg5"     # decision 30 Oct 2026: tuned settings, LightGBM seeds 1-5 averaged
 # truth = the simulator's answer key (the frozen model); bank = only the mules the bank confirmed count, all other
 # accounts are normal: what a real bank could train on (outlier appendix, M2, decisions D2/D3 30 Oct 2026)
 LABELS = ("truth", "bank")
@@ -73,11 +82,17 @@ VERIFIED = "verified.json"
 MODEL_FILES = ("lgbm.txt", "app_logreg.json", "manifest.json")
 
 
+def tree_files(folder: str) -> list[str]:
+    """The LightGBM files of a model: lgbm.txt, or lgbm_seed<S>.txt per seed of a seed average."""
+    return sorted(f for f in os.listdir(folder) if f.startswith("lgbm") and f.endswith(".txt")) \
+        if os.path.isdir(folder) else []
+
+
 def model_files_sha256(folder: str) -> dict:
     """Hashes of the model files with line endings normalised, so a Windows checkout (CRLF) matches a Mac one."""
     import hashlib
     return {f: hashlib.sha256(open(os.path.join(folder, f), "rb").read().replace(b"\r\n", b"\n")).hexdigest()
-            for f in MODEL_FILES}
+            for f in tree_files(folder) + ["app_logreg.json", "manifest.json"]}
 
 
 def model_dir(out: str, name: str) -> str:
@@ -94,7 +109,7 @@ def find_model_dir(out: str, name: str) -> str:
     """The model's folder: the shared copy in git when it holds a model file (the model of record, the same for every
     team member, decision option B 29 Oct 2026), else the one trained on this machine."""
     shared = shared_dir(out, name)
-    return shared if os.path.exists(os.path.join(shared, "lgbm.txt")) else model_dir(out, name)
+    return shared if tree_files(shared) else model_dir(out, name)
 
 
 def feature_table(out: str, months, weeks: tuple[int, int]) -> pd.DataFrame:
@@ -124,11 +139,14 @@ def app_scores_for(out: str, model: dict, ids) -> pd.Series:
 
 
 def train(out: str = amldata.DEFAULT_OUT, name: str = "frozen", params: dict | None = None, seed: int = 42,
-          report_root: str = REPORT_ROOT, input_set: str = "frozen", label: str = "truth") -> dict:
+          report_root: str = REPORT_ROOT, input_set: str = "frozen", label: str = "truth",
+          tree_seeds: list[int] | None = None) -> dict:
+    """seed: the application score's out-of-fold split, and LightGBM's random_state unless tree_seeds is given;
+    tree_seeds: one LightGBM model per random_state, all on the same rows and application score (a seed average)."""
     import lightgbm as lgb
     if label not in LABELS:
         raise ValueError(f"label must be one of {LABELS}")
-    if os.path.exists(os.path.join(shared_dir(out, name, report_root), "lgbm.txt")):
+    if tree_files(shared_dir(out, name, report_root)):
         raise ValueError(f"`{name}` is a shared model in {shared_dir(out, name, report_root)} (committed, the same for "
                          "everyone): load it, or train under another name")
     t0 = time.time()
@@ -150,14 +168,21 @@ def train(out: str = amldata.DEFAULT_OUT, name: str = "frozen", params: dict | N
     df["app_score"] = df["account_id"].map(pd.Series(oof, index=lin.index)).astype("float32")
     settings = {**DEFAULT_PARAMS, "random_state": seed, **(params or {})}
     inputs = INPUT_SETS[input_set]
-    model = lgb.LGBMClassifier(n_jobs=-1, **settings).fit(df[inputs], df["mule_by_day"])
-
     folder = model_dir(out, name)
+    if os.path.isdir(folder):
+        for f in tree_files(folder):            # a retrain replaces every tree file (a single model or all seeds)
+            os.remove(os.path.join(folder, f))
     os.makedirs(folder, exist_ok=True)
-    model.booster_.save_model(os.path.join(folder, "lgbm.txt"))
+    files = {s: f"lgbm_seed{s}.txt" for s in tree_seeds} if tree_seeds else {settings["random_state"]: "lgbm.txt"}
+    gain = np.zeros(len(inputs))
+    for s, file in files.items():
+        model = lgb.LGBMClassifier(n_jobs=-1, **{**settings, "random_state": s}).fit(df[inputs], df["mule_by_day"])
+        model.booster_.save_model(os.path.join(folder, file))
+        gain += model.booster_.feature_importance("gain") / len(files)
+    if tree_seeds:
+        settings = {k: v for k, v in settings.items() if k != "random_state"}
     with open(os.path.join(folder, "app_logreg.json"), "w") as f:
         json.dump(app_model, f)
-    gain = model.booster_.feature_importance("gain")
     imp = pd.DataFrame({"feature": inputs, "gain": gain, "share": gain / gain.sum()}).sort_values("gain", ascending=False)
     store = manifest.check(out, WEEKLY)
     m = {"name": name, "data_folder": out, "input_set": input_set, "inputs": inputs, "n_inputs": len(inputs), "train_months": list(MONTHS),
@@ -166,6 +191,9 @@ def train(out: str = amldata.DEFAULT_OUT, name: str = "frozen", params: dict | N
             if label == "bank" else ""), "label_source": label,
          "rows": int(len(df)), "mule_rows": int(df["mule_by_day"].sum()), "accounts": int(df["account_id"].nunique()),
          "lightgbm_params": settings, "params_source": "default" if not params else "file",
+         "tree_files": list(files.values()),
+         **({"tree_seeds": list(tree_seeds), "app_score_seed": seed,
+             "score": "mean of the tree files' probabilities"} if tree_seeds else {}),
          "app_score": "LogisticRegression(class_weight='balanced', max_iter=2000) on accounts_linear; out of fold "
                       "(5 folds) for training rows, fitted on all training accounts for new ones",
          "run_manifest_sha256": manifest._sha256(os.path.join(out, "run_manifest.json")),
@@ -213,34 +241,39 @@ def data_problems(out: str, folder: str, m: dict) -> list[str]:
 
 
 def load(out: str = amldata.DEFAULT_OUT, name: str = "frozen", check_data: bool = True) -> tuple:
-    """(booster, app model dict, manifest), after checking the model was trained on this data run and store."""
+    """(list of boosters, app model dict, manifest), after checking the model was trained on this data run and store.
+    One booster for a single model, one per seed for a seed average (predict averages their probabilities)."""
     import lightgbm as lgb
     folder = find_model_dir(out, name)
-    if not os.path.exists(os.path.join(folder, "lgbm.txt")):
+    if not tree_files(folder):
         raise FileNotFoundError(f"{folder} has no model - run `python -m models train --out {out}`")
     m = json.load(open(os.path.join(folder, "manifest.json")))
+    files = m.get("tree_files", ["lgbm.txt"])          # models trained before 30 Oct 2026: one lgbm.txt
     problems = data_problems(out, folder, m) if check_data else []
+    if tree_files(folder) != sorted(files):
+        problems.append(f"the folder's LightGBM files {tree_files(folder)} are not the manifest's {files}")
     if m["store_code_sha256"] != manifest.check(out, WEEKLY).get("code_sha256"):
         problems.append("the feature store code changed")
     if m["inputs"] != INPUT_SETS[m.get("input_set", "frozen")]:
         problems.append(f"the {m.get('input_set', 'frozen')} input list changed")
     if problems:
         raise ValueError(f"model {folder} is stale: {'; '.join(problems)}. Retrain.")
-    booster = lgb.Booster(model_file=os.path.join(folder, "lgbm.txt"))
-    return booster, json.load(open(os.path.join(folder, "app_logreg.json"))), m
+    boosters = [lgb.Booster(model_file=os.path.join(folder, f)) for f in files]
+    return boosters, json.load(open(os.path.join(folder, "app_logreg.json"))), m
 
 
 def predict(out: str, months, weeks: tuple[int, int], name: str = "frozen", check_data: bool = True) -> pd.DataFrame:
-    """account_id, weeks_since_open, score (the model's raw probability) for every account-week of the accounts
-    opened in `months` (public inputs only; the caller decides which weeks are open)."""
-    booster, app_model, man = load(out, name, check_data)
+    """account_id, weeks_since_open, score (the model's raw probability; the mean over seeds for a seed average) for
+    every account-week of the accounts opened in `months` (public inputs only; the caller decides which weeks are
+    open)."""
+    boosters, app_model, man = load(out, name, check_data)
     trained = set(man["train_months"]) & {int(m) for m in months}
     if trained:
         raise ValueError(f"the model was trained on months {sorted(trained)}; score other months")
     x = feature_table(out, months, weeks)
     if "app_score" in man["inputs"]:
         x["app_score"] = x["account_id"].map(app_scores_for(out, app_model, x["account_id"].unique())).astype("float32")
-    x["score"] = booster.predict(x[man["inputs"]])
+    x["score"] = np.mean([b.predict(x[man["inputs"]]) for b in boosters], axis=0)
     return x[["account_id", "weeks_since_open", "score"]]
 
 
@@ -248,7 +281,7 @@ def predict_main(argv=None):
     """python -m models predict: write a model's scores to a file that `python -m evaluation.score --scores` reads."""
     ap = argparse.ArgumentParser(prog="python -m models predict", description="write a model's scores to a file")
     ap.add_argument("--out", default=amldata.DEFAULT_OUT)
-    ap.add_argument("--model", default="frozen_tuned", help="model name (default frozen_tuned, the model of record)")
+    ap.add_argument("--model", default=MODEL_OF_RECORD, help=f"model name (default {MODEL_OF_RECORD}, the model of record)")
     ap.add_argument("--months", nargs="+", type=int, required=True, help="opening months to score (e.g. 5)")
     ap.add_argument("--weeks", default="0-77", help="weeks since opening, as FIRST-LAST (default 0-77)")
     ap.add_argument("--to", default=None, help="output file (default <out>/scores/<model>_m<months>.parquet)")
@@ -274,7 +307,10 @@ def main(argv=None):
                     help="truth = the simulator's answer key (default); bank = only bank-confirmed mules (M2)")
     ap.add_argument("--inputs", default="frozen", choices=list(INPUT_SETS),
                     help="frozen = the 38 inputs (default); activity = without app_score (onboarding-value yardstick)")
-    ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--seed", type=int, default=42,
+                    help="application score's fold split, and LightGBM's random_state without --tree-seeds")
+    ap.add_argument("--tree-seeds", nargs="+", type=int, default=None,
+                    help="one LightGBM model per random_state, scores averaged (model of record: 1 2 3 4 5)")
     a = ap.parse_args(argv)
     params = json.load(open(a.params)) if a.params else None
     if params:
@@ -282,9 +318,9 @@ def main(argv=None):
         for k in ("n_estimators", "num_leaves", "min_child_samples", "subsample_freq", "max_depth"):
             if k in params:
                 params[k] = int(params[k])
-    m = train(a.out, a.name, params, a.seed, input_set=a.inputs, label=a.label)
-    print(f"trained {m['name']} on {m['rows']:,} account-weeks ({m['mule_rows']:,} mule weeks), "
-          f"{m['n_inputs']} inputs, {m['seconds']}s -> {model_dir(a.out, a.name)}")
+    m = train(a.out, a.name, params, a.seed, input_set=a.inputs, label=a.label, tree_seeds=a.tree_seeds)
+    print(f"trained {m['name']} ({len(m['tree_files'])} LightGBM model(s)) on {m['rows']:,} account-weeks "
+          f"({m['mule_rows']:,} mule weeks), {m['n_inputs']} inputs, {m['seconds']}s -> {model_dir(a.out, a.name)}")
 
 
 if __name__ == "__main__":

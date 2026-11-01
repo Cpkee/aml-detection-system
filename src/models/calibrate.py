@@ -1,6 +1,6 @@
 """Phase 5, step 2: calibrate a trained model on month 5 (due 4 Nov 2026).
 
-    PYTHONPATH=src python -m models calibrate --out data/v1_full --model frozen_tuned
+    PYTHONPATH=src python -m models calibrate --out data/v1_full --model frozen_tuned_avg5
 
 The model is trained with class_weight='balanced', so its raw scores are far too high as probabilities (a mule
 account-week is ~0.2% of rows, but the model's average score is far higher). Calibration maps each raw score to the
@@ -172,7 +172,8 @@ def load(out: str, model: str) -> dict:
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="python -m models calibrate", description=__doc__.split("\n")[0])
     ap.add_argument("--out", default=amldata.DEFAULT_OUT)
-    ap.add_argument("--model", default="frozen_tuned", help="model name (default frozen_tuned, the model of record)")
+    ap.add_argument("--model", default=trainer.MODEL_OF_RECORD,
+                    help=f"model name (default {trainer.MODEL_OF_RECORD}, the model of record)")
     a = ap.parse_args(argv)
     m = calibrate(a.out, a.model)
     print(f"{a.model}: chose {m['method']}; out-of-fold Brier raw {m['out_of_fold']['raw']['brier']:.5f}, "
