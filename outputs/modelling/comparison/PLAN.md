@@ -88,4 +88,9 @@ Recorded 2 Nov 2026 from the reference run (commit 9e1a46f), before any rival wa
 
 ## Amendments
 
-(none)
+- **2 Nov 2026, A4b (post hoc, decided by Kee Chee Pheng).** The pre-registered A4 ran as planned (`catch_rules`
+  0.016 / 0.043 / 0.019) and stays reported. Diagnosis on fold 1: without the 8 `roll4` columns the same logistic
+  reaches account PR-AUC 0.173; adding them one at a time, only `out_1h_share_4wk` breaks it (0.022). It is clipped
+  to [0, 1] like every share, and its rare 1s (raw values reach 164) put normal accounts at the top of the ranking.
+  A4b = A4 without `out_1h_share_4wk` (fold 1: `catch_rules` 0.305). It was chosen after seeing fold 1, so it is
+  labelled post hoc; the change only helps a rival, so it cannot flatter our model.

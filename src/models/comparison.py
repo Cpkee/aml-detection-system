@@ -63,8 +63,9 @@ def app_only(train: pd.DataFrame, valid: pd.DataFrame) -> np.ndarray:
     return valid["app_score"].to_numpy(dtype=float)
 
 
-def logistic(train: pd.DataFrame, valid: pd.DataFrame) -> np.ndarray:
-    """A4: logistic regression on the 38 inputs with notebook 04's recipe (balanced class weights)."""
+def logistic(train: pd.DataFrame, valid: pd.DataFrame, drop: tuple[str, ...] = ()) -> np.ndarray:
+    """A4: logistic regression on the 38 inputs with notebook 04's recipe (balanced class weights); A4b drops
+    out_1h_share_4wk (amendment 2 Nov 2026: its rare clipped 1s swamp the top of A4's ranking)."""
     from sklearn.compose import ColumnTransformer
     from sklearn.impute import SimpleImputer
     from sklearn.linear_model import LogisticRegression
@@ -74,9 +75,10 @@ def logistic(train: pd.DataFrame, valid: pd.DataFrame) -> np.ndarray:
     def part(fn):
         return make_pipeline(SimpleImputer(strategy="median", add_indicator=True),
                              FunctionTransformer(fn, feature_names_out="one-to-one"), StandardScaler())
-    shares = [c for c in stability.INPUTS if "share" in c or c.startswith("passthrough")]
-    zscore = [c for c in stability.INPUTS if c.startswith("self_vs_past")]
-    logged = [c for c in WEEKLY + candidates.ADOPTED if c not in shares + zscore]
+    inputs = [c for c in stability.INPUTS if c not in drop]
+    shares = [c for c in inputs if "share" in c or c.startswith("passthrough")]
+    zscore = [c for c in inputs if c.startswith("self_vs_past")]
+    logged = [c for c in WEEKLY + candidates.ADOPTED if c in inputs and c not in shares + zscore]
     pipe = make_pipeline(ColumnTransformer([
         ("log", part(lambda x: np.log1p(np.clip(x, 0, None))), logged),
         ("share", part(lambda x: np.clip(x, 0, 1)), shares),
@@ -100,7 +102,8 @@ def methods(out: str) -> dict:
             "A1_activity": lgbm(ACTIVITY, tuned),
             "A2_raw_app": lgbm(ACTIVITY + app_columns(out), tuned),
             "A3_app_only": app_only,
-            "A4_logistic": logistic}
+            "A4_logistic": logistic,
+            "A4b_logistic": lambda train, valid: logistic(train, valid, drop=("out_1h_share_4wk",))}
 
 
 # ---------------------------------------------------------------- measures
