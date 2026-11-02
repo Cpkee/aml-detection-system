@@ -75,7 +75,16 @@ Out-of-fold scores in `data/v1_full/comparison/` (not committed). Write-up: `not
 
 ## Smallest detectable gain
 
-(recorded from the reference run before any rival is fitted)
+Recorded 2 Nov 2026 from the reference run (commit 9e1a46f), before any rival was fitted; `v1_full/MDE.json`.
+
+- `ref` on the folds: `catch_rules` 0.473 / 0.450 / 0.440 (the 28-29 Oct seed-spread means were 0.470 / 0.453 /
+  0.437); caught 58/64, 58/70, 64/76 mules by week 26.
+- Bootstrap SD of `ref`'s `catch_rules`: 0.027 / 0.028 / 0.027 per fold, 0.016 pooled over the 3 folds.
+- With 13 rivals (Holm's first bar, two-sided 0.05/13) and 80% power, and treating a rival's errors as independent of
+  ours (SD of a difference = sqrt(2) x SD), the smallest detectable pooled gain is **0.085 `catch_rules`**. Pairing
+  lowers the real figure, and month 5 adds a 4th cohort; both are recomputed at the 17 Nov gate.
+- So on the folds alone a rival must lift `catch_rules` from about 0.45 to about 0.54 to be sure of a win; smaller
+  real gains may be missed, and "no winner" means "no gain above about 0.085 ruled in", not "no gain".
 
 ## Amendments
 
