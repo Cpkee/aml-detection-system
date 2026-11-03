@@ -59,10 +59,11 @@ def app_score_split(x_train, y_week0, y_week26, x_other, n_splits: int = 5, seed
       real  label: mule by the end of week 26, fitted only on accounts that were not mules at week 0: what a
             recruited real customer's application looks like, without fake accounts drowning it out
 
-    The single app_score's label (mule by week 26) is ~70% fake accounts, so it ranks real-customer mules no higher
-    than normal accounts (0 of 32 in the top 1% on v1_full). Both scores are out of fold for training accounts as in
-    app_score. Week-0 mules are not in the 'real' model's training rows, so a model fitted on all its rows scores
-    them, as it scores the other accounts."""
+    The single app_score's label (mule by week 26) is 89% fake accounts on v1_full months 0-4 (320 of 361; fakes are
+    70% of all launderers, but every fake counts from opening and only started real customers count), so it ranks
+    real-customer mules no higher than normal accounts (0 of 32 in the top 1% on v1_full). Both scores are out of
+    fold for training accounts as in app_score. Week-0 mules are not in the 'real' model's training rows, so a model
+    fitted on all its rows scores them, as it scores the other accounts."""
     x_train, x_other = np.asarray(x_train), np.asarray(x_other)
     y0, y26 = np.asarray(y_week0).astype(int), np.asarray(y_week26).astype(int)
     fake = app_score(x_train, y0, x_other, n_splits, seed)

@@ -1,9 +1,10 @@
 """Phase 5 harness (src/evaluation/score.py) and the frozen-model trainer (src/models/train.py).
 
 Hand-made cohorts, no data needed: flags are permanent and follow the weekly budget, closed accounts leave the pool,
-the any-time policy spends exactly its total, and the measures match a hand count. Guards: test months need
---final-test and are scored once. On data/v1 (skipped without its store): a model trains, reloads and refuses to
-score its own training months.
+ties go to the lower account id, later scores never change earlier flags, the any-time policy spends exactly its
+total, a scores file is checked and gives the same results as the model, and the measures match a hand count. Guards:
+test months need --final-test and are scored once (STARTED.json before any read); settings.json records provenance.
+On data/v1 (skipped without its store): a model trains, reloads and refuses to score its own training months.
 """
 import json
 import os
@@ -235,3 +236,129 @@ def test_model_hashes_ignore_line_endings(tmp_path):
         for f in train.MODEL_FILES:
             (tmp_path / folder / f).write_bytes(f"line one{eol}line two{eol}".encode())
     assert train.model_files_sha256(str(tmp_path / "unix")) == train.model_files_sha256(str(tmp_path / "windows"))
+
+
+# ---------------------------------------------------------------- harness gaps (30 Oct 2026)
+def test_ties_flag_the_lower_account_id_whatever_the_row_order():
+    s = pd.DataFrame({"account_id": ["B", "C", "A", "D"], "weeks_since_open": 0, "score": [0.5, 0.5, 0.5, 0.9]})
+    for seed in range(5):
+        ties = {}
+        f = sc.permanent_flags(s.sample(frac=1, random_state=seed), {0: 3}, ties)
+        assert sorted(f.index) == ["A", "B", "D"] and ties == {0: 3}       # D first, then A, B of the tied A, B, C
+
+
+def test_no_peeking_later_scores_never_change_earlier_flags():
+    live = sc.open_rows(_scores(), TRUTH)
+    k = {0: 1, 1: 1, 2: 2, 3: 1}
+    full = sc.permanent_flags(live, k)
+    rng = np.random.default_rng(0)
+    for w in range(3):
+        changed = live.copy()
+        later = changed["weeks_since_open"] > w
+        changed.loc[later, "score"] = rng.uniform(size=later.sum())
+        f = sc.permanent_flags(changed, k)
+        assert f[f <= w].to_dict() == full[full <= w].to_dict()
+
+
+def test_new_flags_follow_the_budget_until_the_pool_runs_out():
+    rng = np.random.default_rng(1)
+    s = pd.DataFrame([{"account_id": f"A{i:02d}", "weeks_since_open": w, "score": rng.uniform()}
+                      for i in range(12) for w in range(8)])
+    k = {w: int(rng.integers(0, 4)) for w in range(8)}
+    f = sc.permanent_flags(s, k)
+    for w in range(8):
+        pool = 12 - int((f < w).sum())
+        assert int((f == w).sum()) == min(k[w], pool)                        # k[w] while the pool is large enough
+
+
+def test_budget_larger_than_the_pool_flags_the_whole_pool():
+    live = sc.open_rows(_scores(), TRUTH)
+    f = sc.permanent_flags(live, {0: 100})
+    assert sorted(f.index) == sorted(TRUTH["account_id"]) and (f == 0).all()
+
+
+def test_load_scores_checks_the_file(tmp_path):
+    good = _scores()
+    ids = TRUTH["account_id"]
+    path = str(tmp_path / "s.parquet")
+    good.to_parquet(path, index=False)
+    assert sc.load_scores(path, ids, 3).equals(good)
+    good.to_csv(tmp_path / "s.csv", index=False)
+    assert sc.load_scores(str(tmp_path / "s.csv"), ids, 3).equals(good)
+    bad = {"duplicate": pd.concat([good, good.iloc[:1]]),
+           "outside cohort": pd.concat([good, pd.DataFrame({"account_id": ["Z"], "weeks_since_open": [0],
+                                                            "score": [0.1]})]),
+           "week out of range": good.assign(weeks_since_open=good["weeks_since_open"] + 1),
+           "fractional week": good.assign(weeks_since_open=good["weeks_since_open"] + 0.5 * (good.index == 0)),
+           "nan": good.assign(score=good["score"].where(good.index > 0))}
+    for name, df in bad.items():
+        df.to_parquet(path, index=False)
+        with pytest.raises(ValueError):
+            sc.load_scores(path, ids, 3)
+    good.iloc[1:].to_parquet(path, index=False)
+    with pytest.warns(UserWarning, match="1 cohort account-weeks"):
+        assert len(sc.load_scores(path, ids, 3)) == len(good) - 1
+
+
+def _tiny_run(tmp_path, monkeypatch, name, scores_path=None):
+    """run() on the hand cohort: cohort, budget, model scores and model manifest monkeypatched, no data read."""
+    from models import train
+    out = tmp_path / "v1_full"
+    out.mkdir(exist_ok=True)
+    (out / "run_manifest.json").write_text('{"seed": 42}')
+    monkeypatch.setattr(sc, "cohort_truth", lambda *a, **k: TRUTH)
+    monkeypatch.setattr(sc.rules_budget, "weekly_budget", lambda *a, **k: pd.DataFrame(
+        {"open_month": 5, "week": [0, 1, 2], "alerts": [1, 1, 2]}))
+    monkeypatch.setattr(sc, "score_cohort", lambda *a, **k: _scores())
+    monkeypatch.setattr(train, "load", lambda *a, **k: (None, None, {"params_source": "file", "git_commit": "abc"}))
+    return sc.run(str(out), [5], [3], name, results=str(tmp_path / "results"), scores_path=scores_path)
+
+
+def test_scores_file_gives_the_same_results_as_the_model(tmp_path, monkeypatch):
+    path = str(tmp_path / "scores.parquet")
+    _scores().sample(frac=1, random_state=0).to_parquet(path, index=False)        # row order must not matter
+    a, b = _tiny_run(tmp_path, monkeypatch, "model"), _tiny_run(tmp_path, monkeypatch, "file", path)
+    files = sorted(f for f in os.listdir(a) if f.endswith(".csv"))
+    assert files and all(open(os.path.join(a, f)).read() == open(os.path.join(b, f)).read() for f in files)
+    launderers = pd.read_csv(os.path.join(b, "launderers.csv")).set_index("account_id")
+    assert launderers.loc[["F", "R"], "model_flag_week_w3"].tolist() == [2, 2]        # as in the budget test above
+
+
+def test_recall_final_label_and_censored_lead_by_hand():
+    live = sc.open_rows(_scores(), TRUTH)
+    flags = {"model": sc.permanent_flags(live, {0: 1, 1: 2}), "rules": sc.rules_flags(TRUTH, 3)}
+    assert flags["model"].to_dict() == {"N1": 0, "N2": 1, "F": 1}
+    m1 = sc.measures(TRUTH, flags, 1)[0].set_index("policy").loc["model"]
+    assert np.isclose(m1.recall, 1 / 2) and np.isclose(m1.recall_final_label, 1 / 3)   # mules by week 1: C, F
+    h = sc.head_to_head(TRUTH, flags["model"], flags["rules"], 3)
+    assert h["model_only"] == 1 and h["median_min_days_earlier_model_only"] == 27 - 13   # F: flag day 13, end day 27
+
+
+def test_started_file_blocks_a_second_final_run_before_any_read(tmp_path, monkeypatch):
+    monkeypatch.setattr(sc, "RESULTS", str(tmp_path))
+
+    def no_read(*a, **k):
+        raise RuntimeError("hidden data read")
+    monkeypatch.setattr(sc.amldata, "evaluation", no_read)               # every hidden read goes through it
+    started = tmp_path / "v1_full" / "final_test" / "STARTED.json"
+    with pytest.raises(SystemExit, match="not found"):                   # a mistyped scores file: refused, no STARTED
+        sc.run("data/v1_full", [6, 7], [26], "x", final_test=True, scores_path=str(tmp_path / "typo.parquet"))
+    assert not started.exists()
+    with pytest.raises(RuntimeError):                                    # first run: crashes at its first read ...
+        sc.run("data/v1_full", [6, 7], [26], "x", final_test=True)
+    assert started.exists()                                              # ... but STARTED.json was written before it
+    with pytest.raises(SystemExit, match="team decision"):               # second run: refused, nothing read
+        sc.run("data/v1_full", [6, 7], [26], "x", final_test=True)
+
+
+def test_settings_record_provenance(tmp_path, monkeypatch):
+    from features import manifest
+    path = str(tmp_path / "scores.csv")
+    _scores().to_csv(path, index=False)
+    for name, scores_path in (("model", None), ("file", path)):
+        s = json.load(open(os.path.join(_tiny_run(tmp_path, monkeypatch, name, scores_path), "settings.json")))
+        assert s["run_manifest_sha256"] == manifest._sha256(str(tmp_path / "v1_full" / "run_manifest.json"))
+        assert "git_commit" in s and "git_uncommitted_changes" in s
+        assert s["score_source"] == ("model:frozen" if scores_path is None else f"file:{path}")
+        assert s["scores_sha256"] == (manifest._sha256(path) if scores_path else None)
+        assert "median_min_days_earlier_model_only" in s["head_to_head"]["3"]

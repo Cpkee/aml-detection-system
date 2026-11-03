@@ -6,11 +6,11 @@ Assumptions and Use" doc.
 
 
 
-## 30 Oct 2026 — Feature selection for the report appendix (notebook 10)
+## 30 Oct 2026 — Feature selection for the report appendix (notebook 12)
 
 No data change, no feature-store change, **no change to the 38 frozen inputs** (decision 28 Oct 2026). Report-appendix
 evidence: does each frozen input earn its place? (Keith Tan)
-- `notebooks/10_feature_selection.ipynb` (`python -m features select [--out D]`, helpers `src/models/feature_selection.py`)
+- `notebooks/12_feature_selection.ipynb` (`python -m features select [--out D]`, helpers `src/models/feature_selection.py`)
   -> `outputs/modelling/feature_selection/`. The tuned model (tuning step 2's `tuned_params.json`), months 0–4, the
   lab's 3 folds: single-feature AUCs, near-duplicate groups (|Spearman| >= 0.8 for every pair, an assumption),
   grouped permutation importance on **weekly recall and catch_rules** (same shuffles, 3 per fold; single inputs,
@@ -31,6 +31,10 @@ evidence: does each frozen input earn its place? (Keith Tan)
     catch_rules 0.446 (no clear change); first catch within 2 weeks 0.942 (−0.016 / −0.057 / 0.000); PR-AUC 0.848.
   - Reading: the 14 weak inputs add nothing to earliness at either budget but carry account-level ranking (PR-AUC);
     the near-copies add early catching. Dropping inputs gains nothing measurable, which supports keeping all 38.
+    The weekly-recall and catch_rules differences above are the size of the tuned model's seed spread (5 seeds, SD
+    0.004–0.008 and 0.005–0.010 per fold; `outputs/modelling/models/v1_full/stability/exp2_seed_spread.csv`), so
+    they are chance-level; only the PR-AUC fall (0.034–0.041 in every fold) is larger. All numbers here are from one
+    Windows machine's copy of `data/v1_full` (the stability notebook's advice: compare runs on one machine).
 - Earlier runs on the untuned model (27 Oct, notebook then numbered 07; trials `drop-weak-v1_full`,
   `drop-weak-and-copies-v1_full` in the ledger) gave the same picture; the 50k copy was not rerun.
 - Code: `feature_lab --drop NAME... [--together]` (families or single inputs left out) and `--params FILE` (LightGBM
@@ -38,6 +42,31 @@ evidence: does each frozen input earn its place? (Keith Tan)
   same shuffles; `run_notebook(..., timeout=)` (12 h for `select`; the notebook saves each finished fold under
   `<data>/features/feature_selection_cache/` and resumes); the ledger writer handles CRLF line ends (Windows);
   `tests/test_hidden_files.py` reads files as UTF-8 (Windows). Tests: `tests/test_feature_selection.py`.
+
+## 30 Oct 2026 — Harness gaps closed (Phase 5, approved by Kee Chee Pheng)
+
+No data change, no model change, no change to any existing result value: result files gain columns only. Re-run of
+the month-5 dry run (`outputs/modelling/results/v1_full/month5_dryrun_v2/`): every column of the committed
+`month5_dryrun_frozen_tuned` comes out identical (launderers.csv byte-identical).
+- **Scores from a file:** `python -m models predict --out D [--model M] --months 5 [--weeks 0-77] [--to PATH]` writes
+  `<out>/scores/<model>_m<months>.parquet` (account_id, weeks_since_open, score; data, git-ignored);
+  `python -m evaluation.score --scores PATH` scores any such file (`score.load_scores` refuses duplicate
+  account-weeks, accounts outside the cohort, weeks other than whole numbers 0-W and missing scores; warns on unscored account-weeks).
+  Month 5 via the file gives byte-identical result CSVs to the model path. Test months still need `--final-test`.
+- **New measures:** `recall_final_label` in `summary_w<W>.csv` (caught / all cohort launderers by the fixed final
+  label: month 5, weeks 0-26: model 0.649, rules 0.165, vs recall 0.808 / 0.205 against mules by week 26);
+  `median_min_days_earlier_model_only` in the head to head (launderers only the model catches: days from its flag to
+  the end of the horizon, "at least this much earlier": 84 days for weeks 0-26, 49 launderers); `tied_at_cut` in
+  `weekly_w<W>.csv` (accounts tied at each week's cut line, decided by account id: none on month 5).
+- **Any-time policy:** reported for horizons up to week 26 only; past week 26 the report marks it not meaningful
+  (the model is trained on weeks 0-26) and no longer calls it an upper bound. Its rows stay in the CSV files. Report
+  wording on this and on the budget (124 alerts vs 119 accounts, month 5, weeks 0-26) taken from draft PR #42.
+- **Final-test guard:** a final run writes `outputs/modelling/results/<data>/final_test/STARTED.json` before it reads
+  anything about months 6-7 and is refused while `STARTED.json` or `LOCK.json` exists (clearing it is a team decision);
+  a missing `--scores` file is refused before `STARTED.json` is written.
+- **Provenance in settings.json:** `score_source` (`model:<name>` or `file:<path>`), `scores_sha256`,
+  `run_manifest_sha256`, `git_commit`, `git_uncommitted_changes`.
+- `python -m models verify` compares only the reference run's columns, so the committed reference still verifies.
 
 ## 29 Oct 2026 — Share one model file between machines (option B)
 

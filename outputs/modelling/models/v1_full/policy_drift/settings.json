@@ -1,0 +1,53 @@
+{
+  "data": "/Users/cheepheng/aml-detection-system/data/v1_full",
+  "run_manifest_sha256": "4ce1c4fb593a8ae5f40e9acb082f1969655095c5a4977dc81f58c9026c62d7ba",
+  "params": {
+    "class_weight": "balanced",
+    "random_state": 42,
+    "deterministic": true,
+    "force_row_wise": true,
+    "verbose": -1,
+    "learning_rate": 0.032735723260064485,
+    "n_estimators": 500,
+    "num_leaves": 15,
+    "min_child_samples": 2000,
+    "colsample_bytree": 0.9047505230698577,
+    "subsample": 0.918855052953664,
+    "reg_alpha": 3.785717387766898e-05,
+    "reg_lambda": 0.00045683792971933475,
+    "subsample_freq": 1
+  },
+  "seeds": [
+    42,
+    1,
+    2
+  ],
+  "quantiles": [
+    0.99,
+    0.995,
+    0.998,
+    0.999,
+    0.9995
+  ],
+  "cap": 2,
+  "noise": {
+    "catch_rules": 0.01,
+    "catch_0.1pct": 0.008,
+    "weekly_recall": 0.008,
+    "caught": 1.1547005383792526
+  },
+  "looks": {
+    "policy_candidates_on_folds_1_2": 10,
+    "policy_candidates_on_fold_3": 2,
+    "app_score_variants": 1,
+    "new_candidates_total": 11,
+    "lightgbm_fits": 11,
+    "seeds": [
+      42,
+      1,
+      2
+    ]
+  },
+  "minutes": 10.8,
+  "lightgbm": "4.7.0"
+}

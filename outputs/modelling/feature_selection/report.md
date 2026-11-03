@@ -2,7 +2,7 @@
 
 Report-appendix work. The input list is frozen (decision 28 Oct 2026); nothing here changes it.
 
-Data `data/v1_full`, training months 0-4, weeks 0-26, 3 folds, seed 42, lightgbm 4.7.0, LightGBM settings `outputs/modelling/models/v1_full/lgbm_tuning_step2/tuned_params.json`. Executed copy: `10_feature_selection.ipynb`. Thresholds (assumptions): near-duplicates |rho| >= 0.8; 'needed' = the measure falls by at least 0.005 (weekly recall) or 0.01 (catch_rules) in all 3 folds when shuffled (3 shuffles per fold).
+Data `data/v1_full`, training months 0-4, weeks 0-26, 3 folds, seed 42, lightgbm 4.7.0, LightGBM settings `outputs/modelling/models/v1_full/lgbm_tuning_step2/tuned_params.json`. Executed copy: `12_feature_selection.ipynb`. Thresholds (assumptions): near-duplicates |rho| >= 0.8; 'needed' = the measure falls by at least 0.005 (weekly recall) or 0.01 (catch_rules) in all 3 folds when shuffled (3 shuffles per fold).
 
 ## Baseline per fold
 

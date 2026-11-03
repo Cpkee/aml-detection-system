@@ -2,7 +2,7 @@
 
 The tuned model (notebooks/06_lgbm_tuning.ipynb, plus the adopted 4-week windows) reads 38 inputs: the 28 store
 features, the 8 adopted 4-week features, weeks_since_open and the application score. This module gives the pieces
-notebooks/10_feature_selection.ipynb uses to narrow them down, all on training months 0-4 only:
+notebooks/12_feature_selection.ipynb uses to narrow them down, all on training months 0-4 only:
 
   FAMILIES             the 38 inputs in 10 groups of the same kind (used for leave-one-group-out trials:
                        `python -m models.feature_lab --drop FAMILY ...`)
