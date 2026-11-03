@@ -6,6 +6,7 @@ It runs on a temporary folder that links to SIM_OUT's files, so SIM_OUT/features
 """
 import json
 import os
+import shutil
 
 import pandas as pd
 import pytest
@@ -24,7 +25,14 @@ def test_preprocess_notebook_runs_and_writes_its_files(tmp_path, monkeypatch):
     data.mkdir()
     for name in os.listdir(OUT):                                # link the data files; features/ stays out
         if os.path.isfile(os.path.join(OUT, name)):
-            os.symlink(os.path.abspath(os.path.join(OUT, name)), data / name)
+            src = os.path.abspath(os.path.join(OUT, name))
+            try:
+                os.symlink(src, data / name)
+            except OSError:                                     # Windows: symlinks need admin or Developer Mode
+                try:
+                    os.link(src, data / name)                   # hard link: same file, no copy (same drive)
+                except OSError:
+                    shutil.copy2(src, data / name)
     monkeypatch.setenv("EDA_DATA", str(data))                   # restored after the test
     monkeypatch.setenv("EDA_REPORT", str(report))
     run_notebook("02_preprocess.ipynb", str(data), str(report))
