@@ -6,6 +6,23 @@ Assumptions and Use" doc.
 
 
 
+## 3 Nov 2026 — GraphSAGE on the payment graph: code and tests only (Keith Tan; proposal, not pre-registered)
+
+No data change, no model change, no result. `src/models/gnn.py` + `tests/test_gnn.py` (8 tests on hand-made graphs).
+- **What:** a 2-layer GraphSAGE (mean aggregator, plain PyTorch) on account-weeks. Links = payments between two
+  accounts of the bank (`features/graph_edges.parquet`) on or before the focal week's cut-off; a neighbour enters as
+  its own latest week with a cut-off no later than that (never later). Neighbours may have opened in any month
+  (decided 3 Nov 2026); only their public inputs are read, never a label. Node inputs = the 38 frozen inputs;
+  fixed settings in `gnn.DEFAULTS` (not tuned). `gnn.method(out)` is the methods comparison's `fit(train, valid)`.
+- **Tests:** neighbour rules equal a plain-Python version; payments after day D change no state with a cut-off on or
+  before D, at either level; preprocessing fitted on training rows only; learns a signal only the neighbours carry
+  (AUC ~0.99 with links, ~0.51 without); same seed gives identical scores; validation labels never read.
+- **Plumbing check on `data/v1` (no labels, random-label timing only):** `python -m features graph --out data/v1`
+  93 s. 76% of focal account-weeks (months 0-4, weeks 0-26) have at least one neighbour (median 3, max 19); a
+  third of neighbour accounts opened in months 5-7. One epoch, one seed, fold-3 size: 75 s, so the full method
+  (4 epochs x 5 seeds x 3 folds) is ~1 h on v1 and ~4-5 h on v1_full.
+- **Next:** runs on the folds only after the methods comparison adds it as a dated amendment; judged on catch_rules.
+
 ## 2 Nov 2026 — Final test on months 6-7 (run once; Kee Chee Pheng, moved forward from 5 Nov)
 
 No data change, no model change. `python -m evaluation.score --out data/v1_full --months 6 7 --final-test` with the
