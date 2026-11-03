@@ -41,6 +41,7 @@ These settings are the proposal's fixed values (`DEFAULTS`); none was tuned on t
     fit = gnn.method("data/v1_full")        # fit(train, valid) -> scores, the comparison's interface
 """
 from __future__ import annotations
+import gc
 import os
 
 import numpy as np
@@ -118,7 +119,8 @@ def build_graph(con, states0: pd.DataFrame, edges: str, accounts: str, fanout=DE
         deg = np.zeros(len(levels[k]))
         first = p.drop_duplicates("state")
         deg[first["state"].to_numpy()] = first["n_nb"].to_numpy()
-        pairs.append(p[["state", "nb"] + LINK].reset_index(drop=True))
+        pairs.append(p[["state", "nb"] + LINK].astype({"state": "int32", "nb": "int32", **{c: "float32" for c in LINK}})
+                     .reset_index(drop=True))
         n_nb.append(deg)
         levels.append(nxt)
     return {"states": levels, "pairs": pairs, "n_nb": n_nb}
@@ -159,37 +161,56 @@ def load_store(out: str, states: pd.DataFrame) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------- preprocessing
+CHUNK = 500_000                                     # rows transformed at a time (memory on v1_full)
+
+
 class Prep:
     """The comparison logistic's transforms, fitted on training rows only: clip / log, standardise, missing -> 0 +
-    flag. The same fitted numbers transform focal rows and neighbour states."""
+    flag. The same fitted numbers transform focal rows and neighbour states. Works column by column in float32 and
+    writes into a given matrix, so v1_full's ~5M-row levels need no float64 copy."""
 
     def fit(self, df: pd.DataFrame) -> "Prep":
-        x = self._raw(df)
-        self.mean = np.nanmean(x, axis=0)
-        sd = np.nanstd(x, axis=0)
-        self.sd = np.where(sd > 0, sd, 1.0)
-        self.mean = np.where(np.isnan(self.mean), 0.0, self.mean)
-        self.flags = [i for i, c in enumerate(INPUTS) if np.isnan(x[:, i]).any()]
+        self.mean, self.sd, self.flags = np.zeros(len(INPUTS)), np.ones(len(INPUTS)), []
+        for i, c in enumerate(INPUTS):
+            x = self._col(df[c].to_numpy(dtype="float32"), c)
+            ok = ~np.isnan(x)
+            if not ok.all():
+                self.flags.append(i)
+            if ok.any():
+                v = x[ok].astype("float64")
+                self.mean[i] = v.mean()
+                sd = v.std()
+                self.sd[i] = sd if sd > 0 else 1.0
         return self
 
     @staticmethod
-    def _raw(df: pd.DataFrame) -> np.ndarray:
-        x = df[INPUTS].to_numpy(dtype="float64", copy=True)
-        for i, c in enumerate(INPUTS):
-            if c in SHARES:
-                x[:, i] = np.clip(x[:, i], 0, 1)
-            elif c in ZSCORE:
-                x[:, i] = np.clip(x[:, i], -10, 10)
-            elif c in LOGGED:
-                x[:, i] = np.log1p(np.clip(x[:, i], 0, None))
+    def _col(x: np.ndarray, c: str) -> np.ndarray:
+        if c in SHARES:
+            return np.clip(x, 0, 1)
+        if c in ZSCORE:
+            return np.clip(x, -10, 10)
+        if c in LOGGED:
+            return np.log1p(np.clip(x, 0, None))
         return x
 
+    def transform_into(self, df: pd.DataFrame, out: np.ndarray, rows: np.ndarray, app: np.ndarray | None = None):
+        """Write df's transformed rows into out[rows, :width]. app: app_score values to use instead of df's column."""
+        for b in range(0, len(df), CHUNK):
+            part, r = df.iloc[b:b + CHUNK], rows[b:b + CHUNK]
+            z = np.empty((len(part), len(INPUTS)), "float32")
+            for i, c in enumerate(INPUTS):
+                x = app[b:b + CHUNK] if (c == "app_score" and app is not None) else part[c].to_numpy(dtype="float32")
+                z[:, i] = self._col(np.asarray(x, dtype="float32"), c)
+            miss = np.isnan(z[:, self.flags])
+            z = (z - self.mean.astype("float32")) / self.sd.astype("float32")
+            z[np.isnan(z)] = 0.0
+            out[r, :len(INPUTS)] = z
+            out[r, len(INPUTS):self.width] = miss
+
     def transform(self, df: pd.DataFrame) -> np.ndarray:
-        x = self._raw(df)
-        miss = np.isnan(x[:, self.flags]).astype("float32")
-        z = (x - self.mean) / self.sd
-        z[np.isnan(z)] = 0.0
-        return np.hstack([z.astype("float32"), miss])
+        out = np.empty((len(df), self.width), "float32")
+        self.transform_into(df, out, np.arange(len(df)))
+        return out
 
     @property
     def width(self) -> int:
@@ -219,18 +240,20 @@ def _torch():
 
 class Tensors:
     """Per level: node inputs (+ log neighbour count, + one all-zero 'unknown' row at the end), and per link level
-    the pairs' offsets, neighbour index (unknown -> the zero row) and link inputs."""
+    the pairs' offsets, neighbour index (unknown -> the zero row) and link inputs.
+
+    x_levels[k]: float32 (n_k + 1, width + 1), filled except the last column; the last row stays zero."""
 
     def __init__(self, x_levels: list[np.ndarray], g: dict):
         torch = _torch()
         self.x, self.off, self.nb, self.link = [], [], [], []
         for k, x in enumerate(x_levels):
-            deg = g["n_nb"][k] if k < len(g["n_nb"]) else np.zeros(len(x))
-            x = np.hstack([x, np.log1p(deg)[:, None].astype("float32")])
-            self.x.append(torch.from_numpy(np.vstack([x, np.zeros((1, x.shape[1]), "float32")])))
+            if k < len(g["n_nb"]):
+                x[:-1, -1] = np.log1p(g["n_nb"][k])
+            self.x.append(torch.from_numpy(x))
         for k, p in enumerate(g["pairs"]):
-            n_next = len(x_levels[k + 1])
-            self.off.append(csr(p["state"].to_numpy(), len(x_levels[k])))
+            n_next = len(x_levels[k + 1]) - 1
+            self.off.append(csr(p["state"].to_numpy(), len(x_levels[k]) - 1))
             self.nb.append(np.where(p["nb"].to_numpy() < 0, n_next, p["nb"].to_numpy()))
             lk = p[LINK].to_numpy(dtype="float32").copy()
             lk[:, 2] = np.log1p(lk[:, 2])                      # weeks since contact, 0-77
@@ -323,10 +346,11 @@ def train_score(t: Tensors, train_ids: np.ndarray, y: np.ndarray, score_ids: np.
 
 
 def fit_score(g: dict, level_inputs: list[pd.DataFrame], train: pd.DataFrame, valid: pd.DataFrame,
-              settings: dict | None = None) -> np.ndarray:
-    """The whole method once the graph exists: g from build_graph on the focal states; level_inputs[k] = INPUTS
-    (app_score included) of level k's states for k >= 1; train / valid = the caller's rows (KEY + INPUTS, train
-    with mule_by_day). Level-0 inputs come from train / valid themselves. Only train's labels are read."""
+              settings: dict | None = None, level_app: list[np.ndarray] | None = None) -> np.ndarray:
+    """The whole method once the graph exists: g from build_graph on the focal states; level_inputs[k] = INPUTS of
+    level k+1's states (app_score from the frame, or from level_app[k] when given); train / valid = the caller's rows
+    (KEY + INPUTS, train with mule_by_day). Level-0 inputs come from train / valid themselves. Only train's labels
+    are read."""
     s = DEFAULTS | (settings or {})
     focal = g["states"][0]
     pos = pd.Series(np.arange(len(focal)), index=pd.MultiIndex.from_frame(focal))
@@ -338,10 +362,15 @@ def fit_score(g: dict, level_inputs: list[pd.DataFrame], train: pd.DataFrame, va
         return i.astype(np.int64)
 
     prep = Prep().fit(train)
-    x0 = np.zeros((len(focal), prep.width), "float32")
     tr, va = ids(train), ids(valid)
-    x0[tr], x0[va] = prep.transform(train), prep.transform(valid)
-    xs = [x0] + [prep.transform(d) if len(d) else np.zeros((0, prep.width), "float32") for d in level_inputs]
+    xs = [np.zeros((len(focal) + 1, prep.width + 1), "float32")]          # + log neighbours column, + zero row
+    prep.transform_into(train, xs[0], tr)
+    prep.transform_into(valid, xs[0], va)
+    for k, d in enumerate(level_inputs):
+        x = np.zeros((len(d) + 1, prep.width + 1), "float32")
+        if len(d):
+            prep.transform_into(d, x, np.arange(len(d)), None if level_app is None else level_app[k])
+        xs.append(x)
     t = Tensors(xs, g)
     _check_unknown_rows(t, s["layers"])
     y = train["mule_by_day"].to_numpy()
@@ -366,8 +395,12 @@ def prepare(out: str, accounts_months=(0, 1, 2, 3, 4), weeks=FOCAL_WEEKS, fanout
     con.close()
     later = g["states"][1:]
     inputs = []
+    keep = ["account_id"] + [c for c in INPUTS if c != "app_score"]
     for st in later:
-        inputs.append(node_inputs(load_store(out, st), st) if len(st) else node_inputs(pd.DataFrame(), st))
+        d = node_inputs(load_store(out, st), st) if len(st) else node_inputs(pd.DataFrame(), st)
+        inputs.append(d[keep].astype({c: "float32" for c in keep[1:]}))
+        del d
+        gc.collect()
     g["month_of"] = acc.set_index("account_id")["open_month"]
     return {"graph": g, "inputs": inputs}
 
@@ -394,6 +427,8 @@ def method(out: str, settings: dict | None = None):
             if not np.nanmax(gap) < 1e-9:
                 raise ValueError("app_score differs from feature_lab.app_scores(seed=app_seed): wrong seed or data")
         g, inputs = cache["prep"]["graph"], cache["prep"]["inputs"]
-        level = [d.assign(app_score=d["account_id"].map(app).astype("float32")) for d in inputs]
-        return fit_score(g, level, train, valid, s)
+        level_app = [d["account_id"].map(app).to_numpy(dtype="float32") for d in inputs]
+        score = fit_score(g, inputs, train, valid, s, level_app)
+        gc.collect()
+        return score
     return fit
