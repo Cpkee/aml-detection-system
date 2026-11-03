@@ -162,17 +162,39 @@ def load_store(out: str, states: pd.DataFrame) -> pd.DataFrame:
 
 # ---------------------------------------------------------------- preprocessing
 CHUNK = 500_000                                     # rows transformed at a time (memory on v1_full)
+APP = INPUTS.index("app_score")
+
+
+def _col(x: np.ndarray, c: str) -> np.ndarray:
+    """The fold-free part of the A4 recipe: shares clipped to [0, 1], self_vs_past to [-10, 10], counts and money
+    log1p (negatives clipped to 0); NaN stays NaN."""
+    if c in SHARES:
+        return np.clip(x, 0, 1)
+    if c in ZSCORE:
+        return np.clip(x, -10, 10)
+    if c in LOGGED:
+        return np.log1p(np.clip(x, 0, None))
+    return x
+
+
+def raw_into(df: pd.DataFrame, out: np.ndarray, rows: np.ndarray, skip=()) -> None:
+    """out[rows] = the clipped / logged INPUTS of df (float32, NaN kept), in chunks; columns in `skip` untouched."""
+    for b in range(0, len(df), CHUNK):
+        part, r = df.iloc[b:b + CHUNK], rows[b:b + CHUNK]
+        for i, c in enumerate(INPUTS):
+            if c not in skip:
+                out[r, i] = _col(part[c].to_numpy(dtype="float32"), c)
 
 
 class Prep:
-    """The comparison logistic's transforms, fitted on training rows only: clip / log, standardise, missing -> 0 +
-    flag. The same fitted numbers transform focal rows and neighbour states. Works column by column in float32 and
-    writes into a given matrix, so v1_full's ~5M-row levels need no float64 copy."""
+    """The fold-fitted part of the A4 recipe, from training rows only: mean and SD per input (after _col) and which
+    inputs get a missing flag. Applied per batch (standardise; missing -> 0 + flag), so no standardised copy of the
+    ~5M-row neighbour levels is ever stored."""
 
     def fit(self, df: pd.DataFrame) -> "Prep":
         self.mean, self.sd, self.flags = np.zeros(len(INPUTS)), np.ones(len(INPUTS)), []
         for i, c in enumerate(INPUTS):
-            x = self._col(df[c].to_numpy(dtype="float32"), c)
+            x = _col(df[c].to_numpy(dtype="float32"), c)
             ok = ~np.isnan(x)
             if not ok.all():
                 self.flags.append(i)
@@ -183,34 +205,24 @@ class Prep:
                 self.sd[i] = sd if sd > 0 else 1.0
         return self
 
-    @staticmethod
-    def _col(x: np.ndarray, c: str) -> np.ndarray:
-        if c in SHARES:
-            return np.clip(x, 0, 1)
-        if c in ZSCORE:
-            return np.clip(x, -10, 10)
-        if c in LOGGED:
-            return np.log1p(np.clip(x, 0, None))
-        return x
-
-    def transform_into(self, df: pd.DataFrame, out: np.ndarray, rows: np.ndarray, app: np.ndarray | None = None):
-        """Write df's transformed rows into out[rows, :width]. app: app_score values to use instead of df's column."""
-        for b in range(0, len(df), CHUNK):
-            part, r = df.iloc[b:b + CHUNK], rows[b:b + CHUNK]
-            z = np.empty((len(part), len(INPUTS)), "float32")
-            for i, c in enumerate(INPUTS):
-                x = app[b:b + CHUNK] if (c == "app_score" and app is not None) else part[c].to_numpy(dtype="float32")
-                z[:, i] = self._col(np.asarray(x, dtype="float32"), c)
-            miss = np.isnan(z[:, self.flags])
-            z = (z - self.mean.astype("float32")) / self.sd.astype("float32")
-            z[np.isnan(z)] = 0.0
-            out[r, :len(INPUTS)] = z
-            out[r, len(INPUTS):self.width] = miss
+    def apply(self, raw):
+        """Standardised inputs + missing flags of raw rows (numpy or torch, float32)."""
+        if isinstance(raw, np.ndarray):
+            miss = np.isnan(raw[:, self.flags]).astype("float32")
+            z = (raw - self.mean.astype("float32")) / self.sd.astype("float32")
+            return np.hstack([np.nan_to_num(z, nan=0.0), miss])
+        torch = _torch()
+        if not hasattr(self, "_t"):
+            self._t = (torch.tensor(self.mean, dtype=torch.float32), torch.tensor(self.sd, dtype=torch.float32),
+                       torch.tensor(self.flags, dtype=torch.long))
+        mean, sd, flags = self._t
+        miss = torch.isnan(raw[:, flags]).float()
+        return torch.cat([torch.nan_to_num((raw - mean) / sd, nan=0.0), miss], dim=1)
 
     def transform(self, df: pd.DataFrame) -> np.ndarray:
-        out = np.empty((len(df), self.width), "float32")
-        self.transform_into(df, out, np.arange(len(df)))
-        return out
+        raw = np.empty((len(df), len(INPUTS)), "float32")
+        raw_into(df, raw, np.arange(len(df)))
+        return self.apply(raw)
 
     @property
     def width(self) -> int:
@@ -232,34 +244,70 @@ def gather(off: np.ndarray, ids: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return start + np.arange(n.sum()), seg
 
 
-# ---------------------------------------------------------------- model
+# ---------------------------------------------------------------- compact graph
 def _torch():
     import torch
     return torch
 
 
-class Tensors:
-    """Per level: node inputs (+ log neighbour count, + one all-zero 'unknown' row at the end), and per link level
-    the pairs' offsets, neighbour index (unknown -> the zero row) and link inputs.
+class Compact:
+    """Everything the model reads that does not depend on the fold, in plain arrays (no account-id strings).
 
-    x_levels[k]: float32 (n_k + 1, width + 1), filled except the last column; the last row stays zero."""
+    Per level k (0 = focal account-weeks): raw[k] float32 (n_k + 1, 38) clipped / logged inputs, NaN kept, the last
+    row an 'unknown neighbour' that is zeroed after standardising; logdeg[k] log(1 + neighbours); codes[k] the
+    account code of each state (for the fold's app_score). Per link level k: off[k] (n_k + 2 offsets: the unknown row
+    has no pairs), nb[k] (index into level k + 1; unknown -> its last row), link[k] the link inputs.
+    Level 0's raw is filled per fold from the caller's rows; key0 / order0 map (account code, week) to a state."""
 
-    def __init__(self, x_levels: list[np.ndarray], g: dict):
+    def __init__(self, g: dict, level_inputs: list[pd.DataFrame], code_of: pd.Series):
         torch = _torch()
-        self.x, self.off, self.nb, self.link = [], [], [], []
-        for k, x in enumerate(x_levels):
+        n = [len(s) for s in g["states"]]
+        s0 = g["states"][0]
+        key = code_of.reindex(s0["account_id"]).to_numpy().astype(np.int64) * 128 + s0["w"].to_numpy()
+        self.order0 = np.argsort(key, kind="stable")
+        self.key0 = key[self.order0]
+        self.code_of = code_of
+        self.n = n
+        self.raw, self.codes, self.logdeg = [None], [None], []
+        for k, d in enumerate(level_inputs, start=1):
+            r = np.full((n[k] + 1, len(INPUTS)), np.nan, "float32")
+            raw_into(d, r, np.arange(len(d)), skip=() if "app_score" in d.columns else ("app_score",))
+            self.raw.append(r)
+            self.codes.append(code_of.reindex(d["account_id"]).to_numpy().astype(np.int32))
+        for k in range(len(n)):
+            ld = np.zeros(n[k] + 1, "float32")
             if k < len(g["n_nb"]):
-                x[:-1, -1] = np.log1p(g["n_nb"][k])
-            self.x.append(torch.from_numpy(x))
+                ld[:-1] = np.log1p(g["n_nb"][k])
+            self.logdeg.append(torch.from_numpy(ld))
+        self.off, self.nb, self.link = [], [], []
         for k, p in enumerate(g["pairs"]):
-            n_next = len(x_levels[k + 1]) - 1
-            self.off.append(csr(p["state"].to_numpy(), len(x_levels[k]) - 1))
-            self.nb.append(np.where(p["nb"].to_numpy() < 0, n_next, p["nb"].to_numpy()))
+            off = csr(p["state"].to_numpy(), n[k])
+            self.off.append(np.append(off, off[-1]))
+            nb = p["nb"].to_numpy().astype(np.int64)
+            self.nb.append(np.where(nb < 0, n[k + 1], nb))
             lk = p[LINK].to_numpy(dtype="float32").copy()
             lk[:, 2] = np.log1p(lk[:, 2])                      # weeks since contact, 0-77
             self.link.append(torch.from_numpy(lk))
 
+    def ids(self, d: pd.DataFrame) -> np.ndarray:
+        """Level-0 state of each row (account_id, weeks_since_open) of d."""
+        code = self.code_of.reindex(d["account_id"]).to_numpy()
+        if np.isnan(code).any():
+            raise ValueError("rows outside the graph's focal states")
+        key = code.astype(np.int64) * 128 + d["weeks_since_open"].to_numpy().astype(np.int64)
+        pos = np.searchsorted(self.key0, key).clip(0, len(self.key0) - 1)
+        if not (self.key0[pos] == key).all():
+            raise ValueError("rows outside the graph's focal states")
+        return self.order0[pos]
 
+    def features(self, prep: Prep, k: int, idx: np.ndarray):
+        torch = _torch()
+        x = prep.apply(torch.from_numpy(self.raw[k][idx]))
+        x[torch.from_numpy(idx == self.n[k])] = 0.0           # unknown neighbour: all zero
+        return torch.cat([x, self.logdeg[k][torch.from_numpy(idx)][:, None]], dim=1)
+
+
+# ---------------------------------------------------------------- model
 class SAGE:
     """GraphSAGE with the mean aggregator and link inputs; `layers` 1 or 2."""
 
@@ -283,21 +331,19 @@ class SAGE:
                 cnt = torch.zeros(n).index_add_(0, seg, torch.ones(len(seg))).clamp(min=1)
                 return torch.relu(self.self_lin[i](h_self) + agg / cnt[:, None])
 
-            def forward(self, t: Tensors, ids: np.ndarray):
-                # nodes needed at each level, from the outermost hop inwards
-                need, hops = [ids], []
+            def forward(self, c: Compact, prep: Prep, ids: np.ndarray):
+                need, hops = [ids], []                  # nodes needed at each level, hop by hop
                 for k in range(self.layers):
-                    rows, seg = gather(t.off[k], need[k])
-                    nb = t.nb[k][rows]
-                    uniq, inv = np.unique(nb, return_inverse=True)
+                    rows, seg = gather(c.off[k], need[k])
+                    uniq, inv = np.unique(c.nb[k][rows], return_inverse=True)
                     hops.append((rows, torch.from_numpy(seg), torch.from_numpy(inv.reshape(-1))))
                     need.append(uniq)
-                h = [t.x[k][torch.from_numpy(need[k])] for k in range(self.layers + 1)]
+                h = [c.features(prep, k, need[k]) for k in range(self.layers + 1)]
                 for i in range(self.layers):              # layer i updates levels 0 .. layers-1-i
                     new = []
                     for k in range(self.layers - i):
                         rows, seg, inv = hops[k]
-                        link = t.link[k][torch.from_numpy(rows)]
+                        link = c.link[k][torch.from_numpy(rows)]
                         new.append(self.drop(self.conv(i, h[k], h[k + 1][inv], link, seg, len(need[k]))))
                     h = new
                 return self.out(h[0]).squeeze(1)
@@ -305,20 +351,13 @@ class SAGE:
         return _SAGE()
 
 
-def _check_unknown_rows(t: Tensors, layers: int):
-    """The zero 'unknown' row of a level has no pairs of its own: give it an empty offset slot."""
-    for k in range(min(layers, len(t.off))):
-        if len(t.off[k]) == t.x[k].shape[0]:              # n + 1 offsets for n real rows: add one for the zero row
-            t.off[k] = np.append(t.off[k], t.off[k][-1])
-
-
-def train_score(t: Tensors, train_ids: np.ndarray, y: np.ndarray, score_ids: np.ndarray, d_in: int,
+def train_score(c: Compact, prep: Prep, train_ids: np.ndarray, y: np.ndarray, score_ids: np.ndarray,
                 settings: dict, seed: int) -> np.ndarray:
     """Fit one GraphSAGE on level-0 nodes train_ids (labels y) and return probabilities for score_ids."""
     torch = _torch()
     torch.manual_seed(seed)
     torch.use_deterministic_algorithms(True)
-    model = SAGE(d_in + 1, settings["layers"], settings["hidden"], settings["dropout"])
+    model = SAGE(prep.width + 1, settings["layers"], settings["hidden"], settings["dropout"])
     opt = torch.optim.Adam(model.parameters(), lr=settings["lr"], weight_decay=settings["weight_decay"])
     n, n_pos = len(y), int(y.sum())
     if n_pos == 0 or n_pos == n:
@@ -331,7 +370,7 @@ def train_score(t: Tensors, train_ids: np.ndarray, y: np.ndarray, score_ids: np.
         order = rng.permutation(n)
         for b in range(0, n, settings["batch"]):
             i = order[b:b + settings["batch"]]
-            logit = model(t, train_ids[i])
+            logit = model(c, prep, train_ids[i])
             loss = (torch.nn.functional.binary_cross_entropy_with_logits(logit, yt[i], reduction="none")
                     * wt[i]).sum() / wt[i].sum()
             opt.zero_grad()
@@ -341,68 +380,84 @@ def train_score(t: Tensors, train_ids: np.ndarray, y: np.ndarray, score_ids: np.
     out = np.empty(len(score_ids))
     with torch.no_grad():
         for b in range(0, len(score_ids), 8192):
-            out[b:b + 8192] = torch.sigmoid(model(t, score_ids[b:b + 8192])).numpy()
+            out[b:b + 8192] = torch.sigmoid(model(c, prep, score_ids[b:b + 8192])).numpy()
     return out
 
 
-def fit_score(g: dict, level_inputs: list[pd.DataFrame], train: pd.DataFrame, valid: pd.DataFrame,
-              settings: dict | None = None, level_app: list[np.ndarray] | None = None) -> np.ndarray:
-    """The whole method once the graph exists: g from build_graph on the focal states; level_inputs[k] = INPUTS of
-    level k+1's states (app_score from the frame, or from level_app[k] when given); train / valid = the caller's rows
-    (KEY + INPUTS, train with mule_by_day). Level-0 inputs come from train / valid themselves. Only train's labels
-    are read."""
+def fit_compact(c: Compact, train: pd.DataFrame, valid: pd.DataFrame, settings: dict | None = None,
+                app_by_code: np.ndarray | None = None, log=None) -> np.ndarray:
+    """Fit on train's rows (labels mule_by_day), score valid's rows, seeds averaged. app_by_code: the fold's
+    app_score per account code, written into the neighbour levels (level 0 takes the caller's column)."""
     s = DEFAULTS | (settings or {})
-    focal = g["states"][0]
-    pos = pd.Series(np.arange(len(focal)), index=pd.MultiIndex.from_frame(focal))
-
-    def ids(d):
-        i = pos.reindex(pd.MultiIndex.from_arrays([d["account_id"], d["weeks_since_open"]])).to_numpy()
-        if np.isnan(i).any():
-            raise ValueError("rows outside the graph's focal states")
-        return i.astype(np.int64)
-
     prep = Prep().fit(train)
-    tr, va = ids(train), ids(valid)
-    xs = [np.zeros((len(focal) + 1, prep.width + 1), "float32")]          # + log neighbours column, + zero row
-    prep.transform_into(train, xs[0], tr)
-    prep.transform_into(valid, xs[0], va)
-    for k, d in enumerate(level_inputs):
-        x = np.zeros((len(d) + 1, prep.width + 1), "float32")
-        if len(d):
-            prep.transform_into(d, x, np.arange(len(d)), None if level_app is None else level_app[k])
-        xs.append(x)
-    t = Tensors(xs, g)
-    _check_unknown_rows(t, s["layers"])
+    tr, va = c.ids(train), c.ids(valid)
+    c.raw[0] = np.full((c.n[0] + 1, len(INPUTS)), np.nan, "float32")
+    raw_into(train, c.raw[0], tr)
+    raw_into(valid, c.raw[0], va)
+    if app_by_code is not None:
+        for k in range(1, len(c.raw)):
+            c.raw[k][:-1, APP] = app_by_code[c.codes[k]]
     y = train["mule_by_day"].to_numpy()
     score = np.zeros(len(valid))
     for seed in s["seeds"]:
-        score += train_score(t, tr, y, va, prep.width, s, seed)
+        score += train_score(c, prep, tr, y, va, s, seed)
+        if log:
+            log(f"seed {seed} done")
+    c.raw[0] = None
     return score / len(s["seeds"])
 
 
+def fit_score(g: dict, level_inputs: list[pd.DataFrame], train: pd.DataFrame, valid: pd.DataFrame,
+              settings: dict | None = None) -> np.ndarray:
+    """fit_compact on a graph from build_graph: level_inputs[k] = INPUTS (app_score included) of level k+1's
+    states; train / valid = the caller's rows (KEY + INPUTS, train with mule_by_day). Only train's labels are read."""
+    ids = pd.Index(pd.concat([s["account_id"] for s in g["states"]] + [train["account_id"], valid["account_id"]])
+                   .unique()).sort_values()
+    c = Compact(g, level_inputs, pd.Series(np.arange(len(ids), dtype=np.int32), index=ids))
+    return fit_compact(c, train, valid, settings)
+
+
 # ---------------------------------------------------------------- the comparison's interface
-def prepare(out: str, accounts_months=(0, 1, 2, 3, 4), weeks=FOCAL_WEEKS, fanout=DEFAULTS["fanout"]) -> dict:
-    """Graph of every focal account-week (accounts opened in `accounts_months`, `weeks`) and the activity inputs of
-    every neighbour state. Public inputs only; independent of the fold, so built once."""
+def _rss() -> str:
+    try:
+        import psutil
+        return f"{psutil.Process().memory_info().rss / 2**30:.1f} GB"
+    except ImportError:
+        return "?"
+
+
+def _log(msg: str) -> None:
+    print(f"  G1 {msg} (memory {_rss()})", flush=True)
+
+
+def prepare(out: str, accounts_months=(0, 1, 2, 3, 4), weeks=FOCAL_WEEKS, fanout=DEFAULTS["fanout"]) -> Compact:
+    """Compact graph of every focal account-week (accounts opened in `accounts_months`, `weeks`) with the activity
+    inputs of every neighbour state. Public inputs only; independent of the fold, so built once."""
     graph.check(out)
     con = amldata.public(out)
-    acc = con.execute("SELECT account_id, open_month FROM accounts").df()
+    acc = con.execute("SELECT account_id, open_month FROM accounts ORDER BY account_id").df()
+    code_of = pd.Series(np.arange(len(acc), dtype=np.int32), index=acc["account_id"].to_numpy())
     focal = acc.loc[acc.open_month.isin(accounts_months), ["account_id"]].merge(
         pd.DataFrame({"w": range(weeks[0], weeks[1] + 1)}), how="cross").sort_values(["account_id", "w"])
     con.execute("PRAGMA memory_limit='6GB'")
     edges = f"read_parquet('{graph.edges(out).replace(os.sep, '/')}')"
     g = build_graph(con, focal, edges, "(SELECT account_id, open_day FROM accounts)", fanout)
     con.close()
-    later = g["states"][1:]
-    inputs = []
+    del focal
+    _log("graph built: " + ", ".join(f"level {k} {len(s):,}" for k, s in enumerate(g["states"])))
     keep = ["account_id"] + [c for c in INPUTS if c != "app_score"]
-    for st in later:
+    inputs = []
+    for st in g["states"][1:]:
         d = node_inputs(load_store(out, st), st) if len(st) else node_inputs(pd.DataFrame(), st)
-        inputs.append(d[keep].astype({c: "float32" for c in keep[1:]}))
+        inputs.append(d[keep])
         del d
         gc.collect()
-    g["month_of"] = acc.set_index("account_id")["open_month"]
-    return {"graph": g, "inputs": inputs}
+    c = Compact(g, inputs, code_of)
+    c.month_of = acc["open_month"].to_numpy()
+    del g, inputs
+    gc.collect()
+    _log("neighbour inputs ready")
+    return c
 
 
 def method(out: str, settings: dict | None = None):
@@ -414,10 +469,11 @@ def method(out: str, settings: dict | None = None):
     cache = {}
 
     def fit(train: pd.DataFrame, valid: pd.DataFrame) -> np.ndarray:
-        if "prep" not in cache:
-            cache["prep"] = prepare(out, fanout=s["fanout"][:s["layers"]])
-            months = sorted(cache["prep"]["graph"]["month_of"].unique().tolist())
-            cache["app"] = app_scores(out, s["app_seed"], other_months=months)
+        if "c" not in cache:
+            cache["c"] = prepare(out, fanout=s["fanout"][:s["layers"]])
+            cache["app"] = app_scores(out, s["app_seed"], other_months=sorted(set(cache["c"].month_of.tolist())))
+            _log("application scores ready")
+        c = cache["c"]
         f = [i for i, (tm, _) in enumerate(base.FOLDS, start=1) if set(tm) == set(train.open_month.unique())]
         if len(f) != 1:
             raise ValueError("training months do not match a fold of lgbm_baseline.FOLDS")
@@ -426,9 +482,9 @@ def method(out: str, settings: dict | None = None):
             gap = np.abs(d["account_id"].map(app).to_numpy() - d["app_score"].to_numpy())
             if not np.nanmax(gap) < 1e-9:
                 raise ValueError("app_score differs from feature_lab.app_scores(seed=app_seed): wrong seed or data")
-        g, inputs = cache["prep"]["graph"], cache["prep"]["inputs"]
-        level_app = [d["account_id"].map(app).to_numpy(dtype="float32") for d in inputs]
-        score = fit_score(g, inputs, train, valid, s, level_app)
+        app_by_code = app.reindex(c.code_of.index).to_numpy(dtype="float32")
+        _log(f"fold {f[0]}: training ({len(train):,} rows, {len(s['seeds'])} seeds)")
+        score = fit_compact(c, train, valid, s, app_by_code, log=lambda m: _log(f"fold {f[0]}: {m}"))
         gc.collect()
         return score
     return fit
