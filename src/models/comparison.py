@@ -31,6 +31,7 @@ from evaluation import hybrid
 from features import candidates
 from features.weekly import FEATURES as WEEKLY
 from models import feature_lab as fl
+from models import gnn
 from models import lgbm_baseline as base
 from models import stability
 
@@ -103,7 +104,8 @@ def methods(out: str) -> dict:
             "A2_raw_app": lgbm(ACTIVITY + app_columns(out), tuned),
             "A3_app_only": app_only,
             "A4_logistic": logistic,
-            "A4b_logistic": lambda train, valid: logistic(train, valid, drop=("out_1h_share_4wk",))}
+            "A4b_logistic": lambda train, valid: logistic(train, valid, drop=("out_1h_share_4wk",)),
+            "G1_graphsage": gnn.method(out)}           # amendment 4 Nov 2026 (PLAN.md); builds nothing until fit
 
 
 # ---------------------------------------------------------------- measures
