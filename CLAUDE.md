@@ -105,6 +105,10 @@ manifest, store untouched) and `graph_nb` (neighbours' scores from a two-stage m
 `<out>/features/graph_nb/`); `--scratch DIR` for development runs that skip the ledger. Report-appendix work under the
 freeze: v1_full results (catch_rules: rules 0.141, frozen model 0.457; `roll4` holds at the rules' budget, `app_split` and the
 graph groups no clear gain) agree with the frozen 38 inputs; measured refit noise 0.012 (catch_rules), 0.006 (weekly recall).
+GNN proposal (3 Nov 2026, Keith Tan; code + tests only, not pre-registered): `src/models/gnn.py` is a 2-layer GraphSAGE
+(plain PyTorch) on account-weeks linked by payments between accounts of the bank (`python -m features graph` first), up to
+each week's cut-off; neighbours from any month, never their labels; the 38 inputs; fixed `gnn.DEFAULTS`. `gnn.method(out)`
+gives the comparison's `fit(train, valid)`. No fold run until the methods comparison adds it as a dated amendment.
 Phase 5 (28 Oct 2026): `python -m models train [--out D --params FILE]` fits the frozen model on months 0-4 ->
 `data/<run>/models/frozen/`; `python -m evaluation.score [--months 5]` runs the fixed-cohort harness at the rules' weekly
 budget -> `outputs/modelling/results/<run>/month5_dryrun/`; test months only with `--final-test`, once (lock file).
