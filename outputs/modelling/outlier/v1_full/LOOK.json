@@ -1,0 +1,29 @@
+{
+  "done": "2026-10-31 19:04",
+  "scores": {
+    "frozen_tuned": {
+      "path": "data/v1_full/scores/outlier_look/frozen_tuned_m5.parquet",
+      "sha256": "87c1e49150b6c8b7eb830e44720820dc061bbc25138ac191b979ace25ec424c8"
+    },
+    "truth_macos": {
+      "path": "data/v1_full/scores/outlier_look/truth_macos_m5.parquet",
+      "sha256": "0ffb867e50b1d2e527a9052dae7865bb4b3568f3db348c1232e4b415e2f4d28c"
+    },
+    "bank_label": {
+      "path": "data/v1_full/scores/outlier_look/bank_label_m5.parquet",
+      "sha256": "46d99768cb052572a2c74cb7406ba9449c1290769f5f0be069b481286b861520"
+    },
+    "rarity": {
+      "path": "data/v1_full/scores/outlier_look/outlier_rarity_m5.parquet",
+      "sha256": "888044b05174416e31b7fb2ddf20a6a88315587f5202268f446e73500aed185a"
+    },
+    "rarity_sum": {
+      "path": "data/v1_full/scores/outlier_look/outlier_rarity_sum_m5.parquet",
+      "sha256": "7b405b30978edd6da81e017e0ab3cb36195d4f354f5b9773bdb009c5cfaf84ea"
+    },
+    "iforest": {
+      "path": "data/v1_full/scores/outlier_look/outlier_iforest_m5.parquet",
+      "sha256": "64a4c09e59a0040c5d8801a7795a51479f83c12a219cefca4df203bca06897a1"
+    }
+  }
+}

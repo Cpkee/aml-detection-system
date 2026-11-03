@@ -1,0 +1,189 @@
+{
+  "outlier": {
+    "inputs": [
+      "passthrough_wk",
+      "out_1h_share_wk",
+      "out_24h_share_wk",
+      "med_in_out_minutes_wk",
+      "n_payers_wk",
+      "n_payees_wk",
+      "new_payer_share_wk",
+      "self_vs_past_money_in",
+      "self_vs_past_payers",
+      "self_vs_past_rows",
+      "peer_ratio_money_in",
+      "internal_out_share_cum",
+      "cash_in_share_cum",
+      "abroad_out_share_cum",
+      "high_risk_out_share_cum",
+      "out_1h_share_4wk",
+      "out_24h_share_4wk",
+      "passthrough_4wk",
+      "n_payers_4wk"
+    ],
+    "bands": [
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        6,
+        6
+      ],
+      [
+        7,
+        7
+      ],
+      [
+        8,
+        8
+      ],
+      [
+        9,
+        9
+      ],
+      [
+        10,
+        10
+      ],
+      [
+        11,
+        11
+      ],
+      [
+        12,
+        12
+      ],
+      [
+        13,
+        13
+      ],
+      [
+        14,
+        14
+      ],
+      [
+        15,
+        15
+      ],
+      [
+        16,
+        16
+      ],
+      [
+        17,
+        17
+      ],
+      [
+        18,
+        18
+      ],
+      [
+        19,
+        19
+      ],
+      [
+        20,
+        20
+      ],
+      [
+        21,
+        21
+      ],
+      [
+        22,
+        22
+      ],
+      [
+        23,
+        23
+      ],
+      [
+        24,
+        24
+      ],
+      [
+        25,
+        25
+      ],
+      [
+        26,
+        26
+      ]
+    ],
+    "low_is_suspicious": [
+      "med_in_out_minutes_wk"
+    ],
+    "train_months": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "weeks": [
+      0,
+      26
+    ],
+    "top_k": 3,
+    "iforest": {
+      "n_estimators": 300,
+      "max_samples": 256,
+      "random_state": 42
+    },
+    "methods": [
+      "rarity",
+      "rarity_sum",
+      "iforest"
+    ],
+    "missing": "rarity 0, rank 0.5"
+  },
+  "months": [
+    5
+  ],
+  "weeks": [
+    0,
+    26
+  ],
+  "n_boot": 1000,
+  "n_alarms": 20,
+  "models": {
+    "frozen_tuned": {
+      "lgbm.txt": "93ab86a188ad0d9628333199e0be1579a1b8ae519986256ff4c290d5a9bd7bbb",
+      "app_logreg.json": "cc94b7a276515bc17df3f6d5eb5b05f5fc6177a60849a46e1ec6b149915d24eb",
+      "manifest.json": "6c07f6fa011eee43c29953ebb178387994db2f675ecb68299cc1ecd1471dc091"
+    },
+    "truth_macos": {
+      "lgbm.txt": "3ed0548910fe6b9202d9a5b0da0739b1ae10d8961f6b941ddec4a22e21446dfd",
+      "app_logreg.json": "7a4db280b52ff14e2018782684a29e344fc0ca983b54826cb75a484fcfd581c8",
+      "manifest.json": "9b8a063cbd939fb73b6d0408b3cbb297f251746bbf7d6de017e0344a1656ca02"
+    },
+    "bank_label": {
+      "lgbm.txt": "29f351c2d07eb07503a47c5ce77259435614e80a6738abc4968bb24eea7ea071",
+      "app_logreg.json": "8d697dbbea0b6d3c0eff8b7c7b532f013d6e5aca2a5e7ad9a32a9e82c756f594",
+      "manifest.json": "ab539fb676c1d131fafdd1d1f526b5ab8571d48b57a47e4752a5de0b8ed94827"
+    }
+  },
+  "frozen": "2026-10-31 18:24",
+  "git_commit": "2d0f91f648f330eaf935e103d2cb8ad6784c7534"
+}

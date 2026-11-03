@@ -65,7 +65,7 @@ def main(argv=None):
     c.add_argument("--report", default=None,
                    help="report folder (default outputs/modelling/features, or .../features/<data folder name>)")
 
-    s = sub.add_parser("select", help="feature selection steps 1-3: execute notebooks/12_feature_selection.ipynb -> "
+    s = sub.add_parser("select", help="feature selection steps 1-3: execute notebooks/13_feature_selection.ipynb -> "
                                       "<report>/report.md (inventory, near-duplicates, permutation importance)")
     s.add_argument("--out", default="data/v1_full", help="data folder with a built store and preprocess files")
     s.add_argument("--report", default=None, help="report folder (default outputs/modelling/feature_selection, "
@@ -90,7 +90,7 @@ def main(argv=None):
         run_notebook("03_feature_store.ipynb", a.out, a.report, report_root="outputs/modelling/features")
     elif a.cmd == "select":
         # the permutation cell runs for hours on v1_full with the tuned settings (it saves each finished fold)
-        run_notebook("12_feature_selection.ipynb", a.out, a.report, report_root="outputs/modelling/feature_selection",
+        run_notebook("13_feature_selection.ipynb", a.out, a.report, report_root="outputs/modelling/feature_selection",
                      timeout=12 * 3600)
     else:
         raise SystemExit(f"`{a.cmd}` is not built yet (see the modelling plan)")

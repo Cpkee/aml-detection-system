@@ -2,7 +2,7 @@
 
     PYTHONPATH=src python -m evaluation.score --out data/v1_full                 # dry run: cohort = month 5, model of record
     PYTHONPATH=src python -m evaluation.score --out data/v1_full --months 6 7 --final-test   # once, 5 Nov 2026
-    PYTHONPATH=src python -m evaluation.score --out data/v1_full --scores data/v1_full/scores/frozen_tuned_m5.parquet
+    PYTHONPATH=src python -m evaluation.score --out data/v1_full --scores data/v1_full/scores/frozen_tuned_avg5_m5.parquet
 
 The comparison agreed on 8 Oct 2026 (CLAUDE.md, "Fixed cohort"): every account opened in the cohort months, a clock
 that counts weeks since each account opened, and in week w of their lives the model may flag as many accounts as the
@@ -29,6 +29,7 @@ Measures, over weeks 0-W (W = 26 main, 77 appendix):
               trained on weeks 0-26 only, so past week 26 its running-total features leave the training range and
               late scores are not comparable across weeks
   by type     caught per hidden type (fake / witting / unwitting); per week: accounts still open, mules, starts
+  by month    caught and flags per opening month, against each month's share of accounts and mules (calendar drift)
 
 Test months 6-7 need --final-test and are scored once: before anything about them is read the run writes
 outputs/modelling/results/<data>/final_test/STARTED.json, and on success LOCK.json; a final run is refused while
@@ -230,6 +231,27 @@ def by_age(truth: pd.DataFrame, flags: dict[str, pd.Series], w_hi: int) -> pd.Da
     return pd.DataFrame(rows)
 
 
+def by_month(truth: pd.DataFrame, flags: dict[str, pd.Series], w_hi: int) -> pd.DataFrame:
+    """Per policy and opening month: accounts, mules, caught, flags, and each month's share of the cohort's accounts,
+    mules and flags. The calendar-drift check (notebook 11, 29 Oct 2026): the test cohort's months are ranked together
+    and month 7's application scores run lower, so a month whose share of flags is far below its share of mules is
+    being under-ranked. Agreed 31 Oct 2026, before the final test."""
+    t = truth.set_index("account_id")
+    mule = mule_at(truth, w_hi).to_numpy()
+    rows = []
+    for name, f in flags.items():
+        hit = t.index.isin(f[f <= w_hi].index)
+        for month in sorted(t["open_month"].unique()):
+            inm = (t["open_month"] == month).to_numpy()
+            m = inm & mule
+            rows.append({"policy": name, "open_month": int(month), "accounts": int(inm.sum()), "mules": int(m.sum()),
+                         "caught": int((hit & m).sum()), "recall": (hit & m).sum() / max(m.sum(), 1),
+                         "flagged": int((hit & inm).sum()), "precision": (hit & m).sum() / max((hit & inm).sum(), 1),
+                         "share_accounts": inm.sum() / len(t), "share_mules": m.sum() / max(mule.sum(), 1),
+                         "share_flags": (hit & inm).sum() / max(hit.sum(), 1)})
+    return pd.DataFrame(rows)
+
+
 def head_to_head(truth: pd.DataFrame, model: pd.Series, rules: pd.Series, w_hi: int) -> dict:
     """Launderers caught by both / model only / rules only / either, and the model's lead over the rules."""
     mules = truth["account_id"][mule_at(truth, w_hi)]
@@ -258,7 +280,7 @@ def evaluate_horizon(truth: pd.DataFrame, live: pd.DataFrame, k: dict[int, int],
     weekly["budget"] = weekly["week"].map(kh).fillna(0).astype(int)
     weekly["tied_at_cut"] = weekly["week"].map(ties).fillna(0).astype(int)
     return {"flags": flags, "summary": summary, "weekly": weekly, "by_age": by_age(truth, flags, w_hi),
-            "h2h": head_to_head(truth, flags["model"], flags["rules"], w_hi), "budget": int(sum(kh.values()))}
+            "by_month": by_month(truth, flags, w_hi), "h2h": head_to_head(truth, flags["model"], flags["rules"], w_hi), "budget": int(sum(kh.values()))}
 
 
 def run(out: str, months, horizons: list[int], name: str, model_name: str = "frozen",
@@ -313,6 +335,7 @@ def run(out: str, months, horizons: list[int], name: str, model_name: str = "fro
         r["summary"].to_csv(os.path.join(report, f"summary_w{h}.csv"), index=False)
         r["weekly"].to_csv(os.path.join(report, f"weekly_w{h}.csv"), index=False)
         r["by_age"].to_csv(os.path.join(report, f"by_age_w{h}.csv"), index=False)
+        r["by_month"].to_csv(os.path.join(report, f"by_month_w{h}.csv"), index=False)
         launderers[f"model_flag_week_w{h}"] = r["flags"]["model"].reindex(lt.index)
         launderers[f"model_anytime_flag_week_w{h}"] = r["flags"]["model_anytime"].reindex(lt.index)
     launderers.reset_index().to_csv(os.path.join(report, "launderers.csv"), index=False)
@@ -362,9 +385,11 @@ def write_report(report, settings, res, test):
                                         else (f"{v:.0f}" if isinstance(v, (int, float)) and v == v else str(v))))
         w = r["weekly"][r["weekly"].week.isin([0, 2, 4, 8, 12, 17, 26, 52, 77])].round(3)
         age = r["by_age"].round(4)
+        month = r["by_month"].round(4)
         if late:
             w = w.drop(columns=["flagged_model_anytime", "catch_model_anytime"])
             age = age[age["policy"] != "model_anytime"]
+            month = month[month["policy"] != "model_anytime"]
         tie = r["weekly"]["tied_at_cut"]
         lines += [f"## Weeks 0-{h}{' (main)' if h == 26 else ''}: launderers who are mules by the end of week {h}", "",
                   s.to_markdown(), "",
@@ -375,6 +400,8 @@ def write_report(report, settings, res, test):
                   pd.Series(r["h2h"]).to_frame("value").to_markdown(floatfmt=".1f"), "",
                   "### By age band (recall; false_positive_rate = share of normal accounts flagged)", "",
                   age.to_markdown(index=False), "",
+                  "### By opening month (calendar drift: share_flags far below share_mules = month under-ranked)", "",
+                  month.to_markdown(index=False), "",
                   "### By week since opening", "", w.to_markdown(index=False), ""]
     lines += ["- recall / precision: against mule accounts by the end of the horizon (fake accounts from opening, real "
               "customers from their start). recall_final_label / precision_final_label: against launderers at any "
@@ -397,8 +424,8 @@ def main(argv=None):
     ap.add_argument("--months", nargs="+", type=int, default=[5], help="cohort opening months (default 5, dry run)")
     ap.add_argument("--horizons", nargs="+", type=int, default=[26, 77],
                     help="last week of each horizon since opening (default 26 = main, 77 = appendix)")
-    ap.add_argument("--model", default="frozen_tuned",
-                    help="model name (default frozen_tuned, the shared model of record committed in git)")
+    ap.add_argument("--model", default="frozen_tuned_avg5",
+                    help="model name (default frozen_tuned_avg5, the shared model of record committed in git)")
     ap.add_argument("--name", default=None, help="report folder name (default month<M>_dryrun_w<W>)")
     ap.add_argument("--scores", default=None,
                     help="score this file (parquet/csv: account_id, weeks_since_open, score) instead of --model")
