@@ -1,0 +1,6 @@
+pre-written result,holds,evidence
+M3/M4 > M0,False,"rarity +0 (-11 to +10), iforest +0 (-10 to +10) vs the rules"
+M3/M4 = M0 or below,True,neither interval excludes 0
+M2 close to M1b,False,M2 54 vs M1b 63: -9 (-16 to -2); keeps 86% of M1b's catches
+M2 far below M1b,judgment,"a clear loss of 9, but +38 vs the rules"
+M3/M4 catch hidden mules that M2 misses,True,"5 never-confirmed mules (of 8 missed by M2), with two methods' flags = twice the budget"

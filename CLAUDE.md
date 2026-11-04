@@ -91,8 +91,8 @@ the account-level measure does not reward. It catches fewer real mules in the ac
 Stability + 1:20 undersampling (`notebooks/10_stability_undersampling.ipynb`, helpers `src/models/stability.py`, 29 Oct
 2026, draft PR, this Mac's v1_full copy, months 0-4): the lab baseline is reproducible on one machine (two runs identical;
 equals 26 Oct); 0.4086 / 0.4023 / 0.4123 came from three machines and data copies (an app-score nudge of 1e-6 moves it as
-much). Tuned seed SD of `catch_0.1pct` 0.006-0.008 > 0.005, so the pre-registered rule recommends a 5-seed average (team
-decision pending); tuning's lead beats seed spread on weekly recall only. 1:20 whole-account undersampling: same
+much). Tuned seed SD of `catch_0.1pct` 0.006-0.008 > 0.005, so the pre-registered rule recommends a 5-seed average (adopted:
+`frozen_tuned_avg5`, below); tuning's lead beats seed spread on weekly recall only. 1:20 whole-account undersampling: same
 earliness, weekly recall -0.007, PR-AUC -0.020, 2-4x faster; class weights stay. -> `outputs/modelling/models/v1_full/stability/`.
 Feature lab (`python -m models.feature_lab`, `src/features/candidates.py`, ledger `outputs/modelling/feature_lab/ledger.csv`,
 26-27 Oct 2026): candidate groups judged on the tuned model; `roll4` (8 four-week-window features) adopted 26 Oct, computed
@@ -112,7 +112,7 @@ Dry run, month 5 of v1_full, weeks 0-26: model 62 of 78 mules caught vs rules 16
 laundering starts (the budget is ~5 flags a week).
 29 Oct: `python -m models calibrate` (month 5, isotonic, out-of-fold check), `train --inputs activity` + `python -m evaluation.compare` (onboarding value: month 5 frozen 65 vs activity-only 61 of 78; seed 43 56 vs 56), age-band breakdown, machine recorded. Tuned model differs by machine (63 Windows vs 65 Mac): machine of record undecided; local runs `_macos`.
 Option B (29 Oct): train once, share the model files (`lgbm.txt`, `app_logreg.json`, `manifest.json`, later `calibration.json`) in `data/<run>/models/<name>/`; scoring a file is identical across machines. `python -m features fingerprint` compares data by content; `python -m models verify --model M --reference RUN` accepts an older shared model once by reproducing a committed run.
-**Model of record: `frozen_tuned`, committed in `outputs/modelling/models/v1_full/frozen_tuned/`** (lgbm.txt, app_logreg.json, manifest, verified.json, calibration.json); found there first by `models.train.load`, never retrained (`train` refuses the name). Do not retrain it: score with `python -m evaluation.score` (default model). Retraining on another machine gives slightly different trees.
+**Model of record: `frozen_tuned_avg5` (decision 30 Oct 2026, confirmed 2 Nov, Kee Chee Pheng), committed in `outputs/modelling/models/v1_full/frozen_tuned_avg5/`** (lgbm_seed1-5.txt, app_logreg.json, manifest, calibration.json): the tuned settings fitted with LightGBM random_state 1-5 on the same rows and the same application score (seed 42), score = mean of the 5 probabilities (`train --tree-seeds 1 2 3 4 5`, `train.MODEL_OF_RECORD`). Why: notebook 10's pre-registered rule (seed SD of `catch_0.1pct` 0.006-0.008 > 0.005); trained on this Mac. Found there first by `models.train.load`, never retrained (`train` refuses the name). Do not retrain it: score with `python -m evaluation.score` (default model). Retraining on another machine gives slightly different trees. The previous model of record `frozen_tuned` (Li Ann, seed 42, 28 Oct) stays committed for comparison.
 30 Oct 2026 (harness gaps): `python -m models predict --out D [--model M] --months 5 [--weeks 0-77] [--to PATH]` writes
 `<out>/scores/<model>_m<months>.parquet` (account_id, weeks_since_open, score); `python -m evaluation.score --scores PATH`
 scores any such file (checked by `score.load_scores`; byte-identical results to the model path on month 5). New
@@ -136,10 +136,13 @@ outlier --method rarity|rarity_sum|iforest`, `src/models/outlier.py`); settings 
 30 Oct (plan, "Review of the judgment calls"); M2 `bank_label` = the frozen recipe
 trained on bank-confirmed mules only (`models train --label bank`, `train.bank_confirmed` from `open_by_day`); M1b
 `truth_macos` = the frozen recipe retrained on this Mac, M2's yardstick. `python -m evaluation.hidden_mules --scores
-NAME=PATH ...` -> caught for bank-confirmed vs never confirmed, by type and pattern, top false alarms, bootstrap. One
-look on month 5 (6 Nov), after `settings.json` is committed; settings never change after a look:
+NAME=PATH ...` -> caught for bank-confirmed vs never confirmed, by type and pattern, top false alarms, bootstrap.
 `python -m evaluation.outlier_look freeze | check | look` (look refuses unless the committed frozen settings equal the
-code and model files, and runs once).
+code and model files, and runs once). D4 (31 Oct): no autoencoder. Frozen 31 Oct (PR #49); **the one look ran 31 Oct
+2026** (planned 6 Nov; PR #50; spent: never re-run, settings never change). Month 5, 78 mules, 124 flags: rules 16,
+M1 63, M1b 63, M2 54, M3 16, M3s 39, M4 16; never-confirmed (62): rules 3, M1 50, M2 42. Write-up:
+`notebooks/12_outlier_detection.ipynb` (reads only the committed look outputs) -> `outputs/modelling/outlier/v1_full/
+report.md`; draft appendix text `outputs/modelling/outlier/APPENDIX.md`. On this Mac run commands with `venv/bin/python`.
 Sensitivity runs (rules frozen, 244k, one `test` value each): `python -m sim.sensitivity --list | --run [--only NAME]
 | --summarise` -> `data/sensitivity/<name>/` (large files deleted) and `outputs/sensitivity/summary.csv`.
 Single steps: `accounts`, `normal --batches 3-3`, `laundering`, `rules`, `finalize`. Use `--out` for another

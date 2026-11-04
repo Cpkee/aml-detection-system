@@ -6,6 +6,48 @@ Assumptions and Use" doc.
 
 
 
+## 2 Nov 2026 — Final test on months 6-7 (run once; Kee Chee Pheng, moved forward from 5 Nov)
+
+No data change, no model change. `python -m evaluation.score --out data/v1_full --months 6 7 --final-test` with the
+model of record `frozen_tuned_avg5` at commit 9e748c8 (no uncommitted changes) -> `outputs/modelling/results/v1_full/
+final_test/` (`LOCK.json` written: never re-run; clearing it is a team decision). Cohort 50,061 accounts.
+- **Weeks 0-26** (163 mules by week 26): model 120 caught vs rules 50 (recall 0.736 vs 0.307; precision 0.429 vs
+  0.189; 280 model flags vs 264 rule alerts); by the final label 0.667 vs 0.278. Both 43, model only 77, rules only 7,
+  neither 36; when both catch a mule the model is first 26 times, the rules 13 (median 2 days earlier); model-only
+  catches at least 91 days earlier (median). 2 model flags before laundering started. By type: fake 109/147 vs
+  46/147, witting 8/11 vs 3/11, unwitting 3/5 vs 1/5.
+- **By opening month:** model recall month 6 0.774, month 7 0.686 (rules 0.323 / 0.286); month 7 holds 43% of the
+  mules and 37% of model flags: the drift notebook 11 warned of, smaller than feared.
+- **Weeks 0-77** (180 mules, appendix): model 138 vs rules 59 (0.767 vs 0.328).
+
+## 2 Nov 2026 — Model of record: 5-seed average `frozen_tuned_avg5` (decided 30 Oct, confirmed 2 Nov, Kee Chee Pheng)
+
+No data change. New model of record; `frozen_tuned` and its results stay committed for comparison.
+- **Why:** notebook 10's pre-registered rule (average 5 seeds if the seed SD of `catch_0.1pct` > 0.005 in any fold;
+  it was 0.006-0.008 in all 3). The tuned settings sample 92% of rows and 90% of inputs per tree, so a single seed's
+  flags at the rules' small budget depend partly on chance.
+- **What:** the tuned settings (tuning step 2) fitted with LightGBM `random_state` 1-5 on the same rows and the same
+  application score (out-of-fold split seed 42, as notebook 10 measured); score = mean of the 5 probabilities.
+  `python -m models train --name frozen_tuned_avg5 --params .../tuned_params.json --tree-seeds 1 2 3 4 5` (110 s,
+  this Mac). Files `lgbm_seed1-5.txt`, `app_logreg.json`, `manifest.json` (`tree_files`, `tree_seeds`,
+  `app_score_seed`), `calibration.json` (isotonic, refitted on month 5: out-of-fold Brier 0.00180) in
+  `outputs/modelling/models/v1_full/frozen_tuned_avg5/`. `train.MODEL_OF_RECORD` is now the default of `predict`,
+  `calibrate` and `evaluation.score`.
+- **Code:** `models.train.load` returns a list of boosters and `predict` averages them; a single-model folder
+  (`lgbm.txt`) works as before: `frozen_tuned` re-scored on month 5 with the new code reproduces every result file of
+  `month5_dryrun_v2`. `load` refuses a folder whose LightGBM files differ from the manifest's. Test:
+  `test_seed_average_is_the_mean_of_its_seeds`.
+- **Month 5 dry run** (`results/v1_full/month5_dryrun_frozen_tuned_avg5/`), weeks 0-26: model 65 of 78 mules caught
+  (recall 0.833, precision 0.524) vs rules 16 (frozen_tuned: 63, 0.508); no flag before laundering starts; weeks
+  0-77: 79 of 97 (frozen_tuned 76). Seed spread (`results/v1_full/month5_seed_spread/`): each seed alone catches 63-65
+  of 78, so 1-2 mules between single-seed runs is chance.
+- **Committed 2 Nov** (built 30 Oct on an older `main`, merged with today's `main`: bank label, by-month table,
+  outlier appendix). Checks before the final test, this Mac, same data copy (`run_manifest.json` 4ce1c4fb...):
+  retraining with the merged code (`--params .../frozen_tuned/manifest.json --tree-seeds 1 2 3 4 5`, 86 s) gives the
+  5 tree files and `app_logreg.json` byte-identical to the committed ones; re-fitting the calibration gives the same
+  `calibration.json`; the month-5 dry run with today's harness (`results/v1_full/month5_dryrun_avg5_v2/`, adds
+  `by_month_w<W>.csv`) gives every other result file identical to `month5_dryrun_frozen_tuned_avg5`.
+
 ## 31 Oct 2026 — Harness: by-opening-month table; final-test rehearsal on data/v1 (Emmy Li)
 
 No data change, no model change, no change to any existing result value.
