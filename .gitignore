@@ -6,3 +6,8 @@ __pycache__/
 .pytest_cache/
 venv/
 .DS_Store
+
+# personal Claude Code skills (mattpocock/skills, engineering): local use only, never committed.
+# Team skills stay tracked: un-ignore each one below.
+.claude/skills/*
+!.claude/skills/feature-round/
