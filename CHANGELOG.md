@@ -6,11 +6,25 @@ Assumptions and Use" doc.
 
 
 
+## 2 Nov 2026 — Counted re-tests of the test months (decision by Kee Chee Pheng)
+
+No data change, no model change, no change to any result. The test months may be re-used to judge well-justified
+improvements, stated as a limitation in the report; the first final test stays the headline.
+- `python -m evaluation.score --months 6 7 --final-test --model M --retest "REASON"` scores into a new folder
+  `results/<data>/final_test_r<N>/` (never `final_test/`). Before anything about months 6-7 is read it appends a row
+  to `results/<data>/final_test_looks.csv` (look, folder, started, score_source, git_commit, reason), so a crashed or
+  unhelpful look still counts. Refused before the first final test is locked, without a reason, or with uncommitted
+  code. The report and `settings.json` (`retest_reason`) mark the run as a re-test.
+- Rules (CLAUDE.md, Phase 5): the change and its months 0-5 evidence are written and committed before the look; one
+  look per change; never choose among changes by their months 6-7 scores; report every look.
+- `results/v1_full/final_test_looks.csv` starts with look 1 = the final test below. Test:
+  `test_retest_is_counted_before_any_read_and_never_overwrites`.
+
 ## 2 Nov 2026 — Final test on months 6-7 (run once; Kee Chee Pheng, moved forward from 5 Nov)
 
 No data change, no model change. `python -m evaluation.score --out data/v1_full --months 6 7 --final-test` with the
 model of record `frozen_tuned_avg5` at commit 9e748c8 (no uncommitted changes) -> `outputs/modelling/results/v1_full/
-final_test/` (`LOCK.json` written: never re-run; clearing it is a team decision). Cohort 50,061 accounts.
+final_test/` (`LOCK.json` written: never re-run; later looks are counted re-tests, entry above). Cohort 50,061 accounts.
 - **Weeks 0-26** (163 mules by week 26): model 120 caught vs rules 50 (recall 0.736 vs 0.307; precision 0.429 vs
   0.189; 280 model flags vs 264 rule alerts); by the final label 0.667 vs 0.278. Both 43, model only 77, rules only 7,
   neither 36; when both catch a mule the model is first 26 times, the rules 13 (median 2 days earlier); model-only

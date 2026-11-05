@@ -3,7 +3,8 @@
 Hand-made cohorts, no data needed: flags are permanent and follow the weekly budget, closed accounts leave the pool,
 ties go to the lower account id, later scores never change earlier flags, the any-time policy spends exactly its
 total, a scores file is checked and gives the same results as the model, and the measures match a hand count. Guards:
-test months need --final-test and are scored once (STARTED.json before any read); settings.json records provenance.
+test months need --final-test and are scored once (STARTED.json before any read); a re-use is a counted re-test in its
+own folder; settings.json records provenance.
 On data/v1 (skipped without its store): a model trains, reloads and refuses to score its own training months.
 """
 import json
@@ -386,8 +387,45 @@ def test_started_file_blocks_a_second_final_run_before_any_read(tmp_path, monkey
     with pytest.raises(RuntimeError):                                    # first run: crashes at its first read ...
         sc.run("data/v1_full", [6, 7], [26], "x", final_test=True)
     assert started.exists()                                              # ... but STARTED.json was written before it
-    with pytest.raises(SystemExit, match="team decision"):               # second run: refused, nothing read
+    with pytest.raises(SystemExit, match="re-test"):                     # second run: refused, nothing read
         sc.run("data/v1_full", [6, 7], [26], "x", final_test=True)
+
+
+def test_retest_is_counted_before_any_read_and_never_overwrites(tmp_path, monkeypatch):
+    """Re-using the test months (decision 2 Nov 2026): only after the first final test is locked, only with a reason
+    and committed code; each look gets a new folder and a ledger row before anything about months 6-7 is read."""
+    monkeypatch.setattr(sc, "RESULTS", str(tmp_path))
+
+    def no_read(*a, **k):
+        raise RuntimeError("hidden data read")
+    monkeypatch.setattr(sc.amldata, "evaluation", no_read)
+    git = {"status": "", "rev-parse": "abc123"}
+    monkeypatch.setattr(sc.manifest, "_git", lambda *a: git[a[0]])
+    run = lambda reason: sc.run("data/v1_full", [6, 7], [26], "x", final_test=True, retest=reason)
+    with pytest.raises(SystemExit, match="locked"):                      # no first final test yet
+        run("why")
+    first = tmp_path / "v1_full" / "final_test"
+    first.mkdir(parents=True)
+    (first / "STARTED.json").write_text(json.dumps({"started": "2026-11-02 02:22"}))
+    (first / "LOCK.json").write_text(json.dumps({"score_source": "model:m", "git_commit": "c0"}))
+    with pytest.raises(SystemExit, match="reason"):
+        run("  ")
+    with pytest.raises(SystemExit, match="only for test months"):
+        sc.run("data/v1_full", [5], [26], "x", retest="why")
+    git["status"] = " M src/models/train.py"
+    with pytest.raises(SystemExit, match="commit"):
+        run("why")
+    git["status"] = ""
+    for n in (2, 3):
+        with pytest.raises(RuntimeError):                                # crashes at its first read ...
+            run(f"change {n}")
+        assert (tmp_path / "v1_full" / f"final_test_r{n}" / "STARTED.json").exists()
+    ledger = pd.read_csv(tmp_path / "v1_full" / sc.LOOKS, dtype={"git_commit": str})    # ... but every look counts
+    assert ledger["look"].tolist() == [1, 2, 3]
+    assert ledger["folder"].tolist() == ["final_test", "final_test_r2", "final_test_r3"]
+    assert ledger["git_commit"].tolist() == ["c0", "abc123", "abc123"]
+    assert ledger["reason"].tolist()[1:] == ["change 2", "change 3"]
+    assert sorted(os.listdir(first)) == ["LOCK.json", "STARTED.json"]   # the first final test is never touched
 
 
 def test_settings_record_provenance(tmp_path, monkeypatch):
