@@ -15,6 +15,8 @@ their `run_manifest.json` where needed, each gets its own feature store, cleaned
 (`python -m evaluation.robustness`); results in `outputs/modelling/robustness/report.md` and `summary.csv`.
 - Run 1 `seed__44` (no rebuild; 10/10 checks, alerts as in its summary): model 114 vs rules 35 of 145 mules, lead
   0.54 (95% 0.47-0.62) vs headline 0.43 -> chance band 0.31-0.55.
+- Run 2 `in_window_mix__1` (rebuilt: 10/10 checks, summary identical): model 99 vs rules 30 of 124 mules, lead
+  0.56 (95% 0.46-0.66): holds.
 
 ## 2 Nov 2026 — Counted re-tests of the test months (decision by Kee Chee Pheng)
 

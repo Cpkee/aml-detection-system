@@ -26,3 +26,20 @@ What this means: with nothing changed but the random seed, the lead moved by 0.1
 moved (0.74 -> 0.79); most of the change is the rules catching fewer (0.31 -> 0.24). The band is therefore wide, and
 only a scenario that cuts the lead below 0.31 will read as *shrinks* or *fails*. This is stated, not changed: the
 rule was fixed before the run.
+
+## Run 2: `in_window_mix__1` (53% fakes instead of 73%), 5 Nov 2026
+
+Rebuilt from its `run_manifest.json` (same `--set`, seed and BAF file): 10 of 10 checks pass, and every number in
+its committed `summary.json` is identical (3,587 alerts, 173 closures). Store, cleaned tables and `robust_avg5` as in
+run 1 (4.45M account-weeks, 6,248 mule weeks vs 8,497 in seed 44: fewer fakes means fewer mule weeks from opening).
+
+| Data | Mules | Model caught | Rules caught | Lead | 95% interval | Precision model / rules | Verdict |
+|:--|--:|--:|--:|--:|:--|:--|:--|
+| in_window_mix__1 | 124 | 99 | 30 | 0.56 | 0.46–0.66 | 0.38 / 0.12 | **holds** |
+
+By type (model / rules): fakes 81 / 24 of 103, witting 9 / 4 of 11, unwitting 9 / 2 of 10. Median days from start:
+7 / 9. Weeks 0–77: model 136, rules 43 of 164 (real customers 48 / 15 of 61).
+
+What this means: with a quarter fewer fakes the lead does not shrink. The model still catches about 4 in 5 fakes, and
+it also catches most real-customer mules (18 of 21 by week 26), where the rules catch 6. So the advantage does not
+rest only on recognising fake accounts at opening. Caution: 21 real-customer mules is a small number.
