@@ -1,8 +1,9 @@
-# Fake-mix stress test: plan (draft 5 Nov 2026, to be agreed before any run)
+# Fake-mix stress test: plan (agreed 5 Nov 2026, before any run)
 
 Owner: Kee Chee Pheng (took over from Teammate 4, 5 Nov 2026). Report section: robustness and limitations.
 Every setting below is fixed **before** any stress dataset is rebuilt or scored, so the result cannot be tuned to
-look good. Status: **draft, not yet agreed.**
+look good. Status: **agreed 5 Nov 2026 by Kee Chee Pheng (owner), including S1 and S2, before any stress dataset was
+rebuilt or scored.** Settings and readings never change after a run starts; any later change is a dated amendment.
 
 ## Why
 
@@ -27,7 +28,7 @@ Everything else equals the main data: seed 42, 244k accounts, 0.3% launderers, t
 
 ## The model (decision needed: S1)
 
-- **S1, retrain the recipe on each stress dataset** (proposed): the frozen recipe of the model of record
+- **S1, retrain the recipe on each stress dataset** (agreed 5 Nov 2026): the frozen recipe of the model of record
   `frozen_tuned_avg5`, fitted on each dataset's own months 0-4: preprocessing fitted per dataset (decision 10 Oct
   2026), the 38 frozen inputs, tuning step 2's settings (`lgbm_tuning_step2/tuned_params.json`), application score
   seed 42, LightGBM seeds 1-5 averaged. Name `stress_avg5`. No re-tuning, no new inputs. This follows CLAUDE.md
@@ -44,7 +45,7 @@ caught, recall, precision, caught by type, head to head, by age band, by opening
 **Uncertainty:** a paired bootstrap of the model-minus-rules recall difference, resampling the test-month mules
 (1,000 resamples, seed 0), from each run's `launderers.csv` (computed after the run, same code for all datasets).
 
-**Chance yardstick (S2, proposed):** the same pipeline on `seed__43` (same settings as the main data, seed 43; 185
+**Chance yardstick (S2, agreed 5 Nov 2026):** the same pipeline on `seed__43` (same settings as the main data, seed 43; 185
 test-month launderers; rules 33.5% caught, 93.2% false alarms; its large files were kept; its store was built
 28 Oct for the `roll4` check, possibly on another team member's machine, so it may need rebuilding locally). It shows how much the result moves from a different random draw alone, so a stress-test
 change is only read as real if it is clearly larger than the seed 43 change.
@@ -74,7 +75,8 @@ catching their burst sooner or more often, not earlier.
 
 ## Steps
 
-1. Team agrees S1, S2 and the readings above; this file is committed with "agreed" and the date.
+1. ~~Team agrees S1, S2 and the readings above; this file is committed with "agreed" and the date.~~ Done 5 Nov
+   2026 (Kee Chee Pheng).
 2. Rebuild `in_window_mix__1` and `__2`; `sim.checks` must pass and match `summary.json` (`__1`: 3,587 alerts,
    211 true; `__2`: 3,587 alerts, 227 true). A mismatch stops the test until explained.
 3. Per dataset: weekly store, preprocessing, `models train --name stress_avg5`, month 5 dry run, test months once.
