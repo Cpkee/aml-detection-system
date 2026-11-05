@@ -6,6 +6,16 @@ Assumptions and Use" doc.
 
 
 
+## 5 Nov 2026 — Robustness checks (plan approved by Kee Chee Pheng, `outputs/modelling/robustness/PLAN.md`)
+
+No change to the simulator, settings, v1_full or the model of record. Seven sensitivity datasets are rebuilt from
+their `run_manifest.json` where needed, each gets its own feature store, cleaned tables and a `robust_avg5` model
+(recipe of `frozen_tuned_avg5`, trained on its own months 0-4), and its months 6-7 are scored once
+(`results/<name>/final_test/`, locked). Lead = (model caught - rules caught) / mules, weeks 0-26
+(`python -m evaluation.robustness`); results in `outputs/modelling/robustness/report.md` and `summary.csv`.
+- Run 1 `seed__44` (no rebuild; 10/10 checks, alerts as in its summary): model 114 vs rules 35 of 145 mules, lead
+  0.54 (95% 0.47-0.62) vs headline 0.43 -> chance band 0.31-0.55.
+
 ## 2 Nov 2026 — Counted re-tests of the test months (decision by Kee Chee Pheng)
 
 No data change, no model change, no change to any result. The test months may be re-used to judge well-justified
