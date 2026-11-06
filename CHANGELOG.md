@@ -17,6 +17,9 @@ their `run_manifest.json` where needed, each gets its own feature store, cleaned
   0.54 (95% 0.47-0.62) vs headline 0.43 -> chance band 0.31-0.55.
 - Run 2 `in_window_mix__1` (rebuilt: 10/10 checks, summary identical): model 99 vs rules 30 of 124 mules, lead
   0.56 (95% 0.46-0.66): holds.
+- Runs 3-7 (6 Nov; rebuilt, 10/10 checks, summaries identical), lead (95%): repeated bursts 0.46 (0.37-0.54) holds;
+  fakes start 150-210 days 0.37 (0.30-0.45) holds; fakes start 15-45 days 0.39 (0.31-0.49) holds; GBP 1,500 transfers
+  0.17 (0.10-0.24) shrinks (rules 120 of 163); young fake ages 0.50 (0.42-0.58) holds. No scenario fails.
 
 ## 2 Nov 2026 — Counted re-tests of the test months (decision by Kee Chee Pheng)
 

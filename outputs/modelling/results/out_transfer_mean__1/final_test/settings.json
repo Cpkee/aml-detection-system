@@ -1,0 +1,65 @@
+{
+  "data": "data/sensitivity/out_transfer_mean__1",
+  "cohort_months": [
+    6,
+    7
+  ],
+  "horizons": [
+    26,
+    77
+  ],
+  "model": "robust_avg5",
+  "model_params_source": "file",
+  "model_git_commit": "56cfa2a227cf076499654c1d6b943fc8fe2ffe8e",
+  "model_machine": {
+    "os": "macOS-26.5.1-arm64-arm-64bit",
+    "processor": "arm",
+    "cpu_count": 15,
+    "python": "3.12.15"
+  },
+  "machine": {
+    "os": "macOS-26.5.1-arm64-arm-64bit",
+    "processor": "arm",
+    "cpu_count": 15,
+    "python": "3.12.15"
+  },
+  "cohort_accounts": 50061,
+  "launderers": 180,
+  "budget_per_horizon": {
+    "26": 354,
+    "77": 808
+  },
+  "score_source": "model:robust_avg5",
+  "scores_sha256": null,
+  "run_manifest_sha256": "068ee6768e7d9b74fe17c45271ac27f91e480eb9802acd04f2409a212d430de9",
+  "git_commit": "56cfa2a227cf076499654c1d6b943fc8fe2ffe8e",
+  "git_uncommitted_changes": true,
+  "retest_reason": null,
+  "seconds": 23,
+  "head_to_head": {
+    "26": {
+      "mules": 163,
+      "both": 118,
+      "model_only": 30,
+      "rules_only": 2,
+      "either": 150,
+      "neither": 13,
+      "median_days_model_earlier_when_both": 3.0,
+      "model_first_when_both": 77,
+      "rules_first_when_both": 32,
+      "median_min_days_earlier_model_only": 91.0
+    },
+    "77": {
+      "mules": 180,
+      "both": 131,
+      "model_only": 28,
+      "rules_only": 4,
+      "either": 163,
+      "neither": 17,
+      "median_days_model_earlier_when_both": 2.0,
+      "model_first_when_both": 83,
+      "rules_first_when_both": 39,
+      "median_min_days_earlier_model_only": 448.0
+    }
+  }
+}
