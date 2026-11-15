@@ -65,11 +65,14 @@ Beside the verdicts (model / rules, weeks 0–26 unless stated):
 - **Run 3, repeated bursts.** The rules double their catch (50 -> 75), the model rises too (120 -> 150); fakes 137 /
   71 of 147. Median days from start 9 / 17. Weeks 0–77: 172 / 135 of 180.
 - **Run 4, late fakes.** Many fakes start laundering after week 26, so fewer are caught inside the horizon (78 / 24
-  of 147). The lead is the lowest of the "holds" (0.37), interval 0.30–0.45 touching the band floor. 13 model flags
+  of 147). The lead is the lowest of the "holds" (0.37). Its interval, 0.30–0.45, reaches just below the band floor
+  (0.31), so this is a borderline "holds": the verdict follows the plan's rule (the lead itself, 0.37, is inside
+  the band). 13 model flags
   fall before laundering starts (fakes found from application and early activity; they count as mules from opening).
   Weeks 0–77: 154 / 56 of 180, so the model catches them once they start.
 - **Run 5, early fakes.** Little history before the burst: fakes 110 / 51; witting 5 / 1 of 11. Median days from
-  start 11 / 7: the only run where the rules' median catch is faster.
+  start 11 / 7: the only run where the rules' median catch is faster. Also borderline: lead 0.39 inside the band, interval
+  0.31–0.49 with its lower end (0.307) just below the floor (0.314).
 - **Run 6, £1,500 transfers (shrinks).** Larger transfers trip the rules' amount thresholds: rules 120 of 163 (0.74).
   The model still catches more (148, 0.91) and is still ahead (interval above 0), but the lead falls to 0.17 and the
   precision gap closes (0.42 vs 0.36). Median days from start 4 / 6.
@@ -85,6 +88,17 @@ Beside the verdicts (model / rules, weeks 0–26 unless stated):
   over-flags normal 50+ accounts (6.1, above the rules' 4.4); with young fakes the excess moves to under-30s (3.4).
   It is below the rules in every band in run 7. The model learns the fakes' age profile, so whichever age group fakes
   come from carries more false alarms: a fairness point for the report.
+
+## Note on the run records (added 15 Nov 2026)
+
+Each run's `settings.json` and model manifest record `git_uncommitted_changes: true` (the headline run on v1_full
+records false). The flag looks at tracked files only. The one known cause is an uncommitted edit to
+`notebooks/10_stability_undersampling.ipynb` made on 4 Nov, before the runs (a blank line and a cleared cell
+counter; no code under `src/`); report files being written between runs may also have set it. The flag cannot say
+which file it was, so this is stated here, and the locked runs are not re-run.
+
+Borderline verdicts: runs 4 and 5 "hold" by the plan's rule (lead inside the band), but both intervals reach just
+below the band floor of 0.31. Read them as "no clear change", not as evidence that the lead is untouched.
 
 ## Summary
 
