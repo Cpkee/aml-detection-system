@@ -147,9 +147,10 @@ mules, weeks 0-26, paired bootstrap over the mules; chance band = headline 0.43 
 `fake_start_days__2` (0.37, borderline: interval reaches below the band), `fake_start_days__1` (0.39, borderline),
 `fake_age_rule__1` (0.50); **shrinks** for `out_transfer_mean__1` (GBP 1,500 transfers: rules 120 of 163, lead 0.17,
 0.10-0.24); none fails. Run 7: the model's false alarms follow the fakes' ages (v1_full 50+: 6.1 per 1,000 normal accounts
-vs the rules' 4.4; with young fakes the excess moves to under-30s). Open: the draft fake-mix stress plan
-(`outputs/modelling/stress/PLAN.md`, not agreed) also plans `in_window_mix__1`, which run 2 has already scored and locked;
-amend that plan before using it.
+vs the rules' 4.4; with young fakes the excess moves to under-30s). **Fake-mix stress plan closed
+(decision 16 Nov 2026, Kee Chee Pheng):** `outputs/modelling/stress/PLAN.md` was a draft that never ran; its Stress 1
+(`in_window_mix__1`) is robustness run 2, reported under the robustness plan's rule. `in_window_mix__2` and `seed__43`
+are not run (plan, Amendment 1).
 **Outlier appendix (30 Oct 2026, Kee Chee Pheng; plan `outputs/modelling/outlier/PLAN.md`, team doc
 https://claude.ai/artifact/MVKuDNLsRt74YdfLkygXZg):** can label-free detectors beat the rules, and do they find the 543
 mules the bank never confirmed (189 of 732 confirmed)? Decided: month 5 only, never 6-7 (D1); bank label = closed by
@@ -258,7 +259,7 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
 **Status 15 Nov 2026:** final test done 2 Nov (headline: model 120 vs rules 50 of 163 mules); robustness checks done
 5-6 Nov (PR #57 open, see above); methods comparison under way (`outputs/modelling/comparison/PLAN.md`; group A and F2 run
 on the training folds, PR #55). **Report deadline: 22 Nov 2026** (Kee Chee Pheng, 2 Nov; replaces the 11 / 12 Nov dates
-below). Left: merge PR #57, settle the stress-plan overlap, close PR #39 and the unmerged branches, write the report.
+below). Left: merge PR #57, ~~settle the stress-plan overlap~~ (closed 16 Nov), close PR #39 and the unmerged branches, write the report.
 **Status 27 Oct 2026** (team plan: doc tab "Team plan: final 3 weeks"): Phases 0–3 done; Phase 4 baselines, tuning step 1
 and feature adoption (`roll4`) done. Feature engineering is closing: `self4` not adopted (28 Oct; the agent worktree's lab code,
 phase split, `--baseline store` and trial outputs were merged 27 Oct), so the model inputs stay store + `roll4`; feature list

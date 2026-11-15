@@ -2,7 +2,8 @@
 
 Owner: Kee Chee Pheng (took over from Teammate 4, 5 Nov 2026). Report section: robustness and limitations.
 Every setting below is fixed **before** any stress dataset is rebuilt or scored, so the result cannot be tuned to
-look good. Status: **draft, not yet agreed.**
+look good. Status: **closed 16 Nov 2026, never run as written**: answered by robustness run 2 (see Amendment 1 at
+the end). The text below is the 5 Nov draft, kept unchanged as a record.
 
 ## Why
 
@@ -80,3 +81,40 @@ catching their burst sooner or more often, not earlier.
 3. Per dataset: weekly store, preprocessing, `models train --name stress_avg5`, month 5 dry run, test months once.
 4. Seed 43: preprocessing (if missing), `models train --name stress_avg5`, month 5 dry run, test months once.
 5. Bootstrap the gaps; write the result into this folder and the report's robustness section.
+
+## Amendment 1 (drafted 15 Nov 2026; **option A agreed 16 Nov 2026, Kee Chee Pheng**)
+
+**What happened.** This plan was still a draft when the robustness checks ran (`outputs/modelling/robustness/PLAN.md`,
+approved 5 Nov 2026 and committed before any run). Robustness run 2 is this plan's Stress 1: `in_window_mix__1` was
+rebuilt from its `run_manifest.json` (10 of 10 checks, `summary.json` identical), the recipe of `frozen_tuned_avg5`
+was trained on its months 0-4, and its months 6-7 were scored once on 5 Nov
+(`outputs/modelling/results/in_window_mix__1/final_test/`, locked). It cannot be scored again under this plan.
+
+**Result (robustness report, run 2), weeks 0-26:** model 99 vs rules 30 of 124 mules, lead 0.56 (95% interval
+0.46-0.66); headline lead 0.43. Verdict under the robustness plan's rule: **holds**. Real-customer mules: model 18
+vs rules 6 of 21.
+
+**How that run differs from this plan** (stated, not corrected):
+
+| This plan | What ran (robustness run 2) |
+|---|---|
+| Chance yardstick `seed__43` (S2) | `seed__44`; band = headline 0.43 +/- 0.12 = 0.31 to 0.55 |
+| Month 5 dry run before the test months | no dry run; test months scored directly, once |
+| Model name `stress_avg5` | `robust_avg5`: same recipe (LightGBM settings equal to `frozen_tuned_avg5`, seeds 1-5, application score seed 42) |
+| Reading: gap "within the seed 43 range" | holds / shrinks / fails by the robustness plan's rule |
+| Both `in_window_mix__1` and `__2` | `in_window_mix__1` only |
+
+The measure is the same in both plans (model recall minus rules recall on the test-month mules, paired bootstrap,
+1,000 resamples, seed 0).
+
+**Decision (16 Nov 2026, Kee Chee Pheng): option A.** The two options were:
+
+- **A (chosen): close this plan as answered by robustness run 2.** The fake-share question is reported from the
+  robustness report, under that plan's rule. `in_window_mix__2` (56% fakes) and `seed__43` are not run: 56% lies
+  between 53% (holds, 0.56) and 73% (headline), so it is unlikely to add information. This plan stays in the repo
+  as a draft that was never agreed, with this amendment.
+- **B (not chosen): also run `in_window_mix__2`,** as an eighth robustness run under the robustness plan's rule (a dated
+  amendment to that plan first, before the run), ~30 min. Gives a second fake-mix point; does not change run 2.
+
+No result of run 2 is re-read or re-judged under this plan's readings, and the report says the stress
+test was carried out as robustness run 2.

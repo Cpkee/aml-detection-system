@@ -6,6 +6,13 @@ Assumptions and Use" doc.
 
 
 
+## 16 Nov 2026 — Fake-mix stress plan closed (no run)
+
+No data, model or result change. The draft plan `outputs/modelling/stress/PLAN.md` (5 Nov, never agreed, never run)
+overlapped robustness run 2, which had already scored `in_window_mix__1` once (model 99 vs rules 30 of 124 mules,
+lead 0.56, holds). Decision (Kee Chee Pheng, 16 Nov): the plan is closed as answered by that run; `in_window_mix__2`
+and `seed__43` are not run. The differences between the two plans are listed in the plan's Amendment 1.
+
 ## 16 Nov 2026 — Budget check: rule alerts vs distinct accounts (month 5 only)
 
 No data, model, harness or result change. The harness's weekly budget counts rule alerts; the rules can alert one
