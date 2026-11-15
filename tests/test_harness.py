@@ -439,3 +439,12 @@ def test_settings_record_provenance(tmp_path, monkeypatch):
         assert s["score_source"] == ("model:frozen" if scores_path is None else f"file:{path}")
         assert s["scores_sha256"] == (manifest._sha256(path) if scores_path else None)
         assert "median_min_days_earlier_model_only" in s["head_to_head"]["3"]
+
+
+def test_distinct_budget_counts_first_alerts_only():
+    """evaluation.budget_check: an account's first alert week counts once; alerts after the horizon do not."""
+    from evaluation import budget_check
+    truth = pd.DataFrame({"account_id": ["A1", "A2", "A3", "A4"], "open_day": [0, 0, 7, 0],
+                          "first_alert_day": [3, 10, 17, np.nan]})      # weeks 0, 1, 1, never
+    assert budget_check.distinct_budget(truth, 2) == {0: 1, 1: 2, 2: 0}
+    assert budget_check.distinct_budget(truth, 0) == {0: 1}

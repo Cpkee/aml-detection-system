@@ -6,6 +6,38 @@ Assumptions and Use" doc.
 
 
 
+## 16 Nov 2026 — Fake-mix stress plan closed (no run)
+
+No data, model or result change. The draft plan `outputs/modelling/stress/PLAN.md` (5 Nov, never agreed, never run)
+overlapped robustness run 2, which had already scored `in_window_mix__1` once (model 99 vs rules 30 of 124 mules,
+lead 0.56, holds). Decision (Kee Chee Pheng, 16 Nov): the plan is closed as answered by that run; `in_window_mix__2`
+and `seed__43` are not run. The differences between the two plans are listed in the plan's Amendment 1.
+
+## 16 Nov 2026 — Budget check: rule alerts vs distinct accounts (month 5 only)
+
+No data, model, harness or result change. The harness's weekly budget counts rule alerts; the rules can alert one
+account more than once, so the model flags a few more distinct accounts than the rules (month 5, weeks 0-26: 124 vs
+119; final test: 280 vs 264). New `python -m evaluation.budget_check` scores month 5 again with the budget capped at
+the accounts the rules alerted for the first time each week -> `outputs/modelling/results/v1_full/budget_check_m5/`.
+Result: the model catches the same mules under both budgets (65 of 78, weeks 0-26; 79 of 97, weeks 0-77); precision
+0.524 -> 0.546, weekly catch mean 0.384 -> 0.379. Test months not read (the script refuses them); the committed
+harness and the headline are unchanged. For the report: one sentence in the evaluation section.
+
+## 5 Nov 2026 — Robustness checks (plan approved by Kee Chee Pheng, `outputs/modelling/robustness/PLAN.md`)
+
+No change to the simulator, settings, v1_full or the model of record. Seven sensitivity datasets are rebuilt from
+their `run_manifest.json` where needed, each gets its own feature store, cleaned tables and a `robust_avg5` model
+(recipe of `frozen_tuned_avg5`, trained on its own months 0-4), and its months 6-7 are scored once
+(`results/<name>/final_test/`, locked). Lead = (model caught - rules caught) / mules, weeks 0-26
+(`python -m evaluation.robustness`); results in `outputs/modelling/robustness/report.md` and `summary.csv`.
+- Run 1 `seed__44` (no rebuild; 10/10 checks, alerts as in its summary): model 114 vs rules 35 of 145 mules, lead
+  0.54 (95% 0.47-0.62) vs headline 0.43 -> chance band 0.31-0.55.
+- Run 2 `in_window_mix__1` (rebuilt: 10/10 checks, summary identical): model 99 vs rules 30 of 124 mules, lead
+  0.56 (95% 0.46-0.66): holds.
+- Runs 3-7 (6 Nov; rebuilt, 10/10 checks, summaries identical), lead (95%): repeated bursts 0.46 (0.37-0.54) holds;
+  fakes start 150-210 days 0.37 (0.30-0.45) holds; fakes start 15-45 days 0.39 (0.31-0.49) holds; GBP 1,500 transfers
+  0.17 (0.10-0.24) shrinks (rules 120 of 163); young fake ages 0.50 (0.42-0.58) holds. No scenario fails.
+
 ## 2 Nov 2026 — Counted re-tests of the test months (decision by Kee Chee Pheng)
 
 No data change, no model change, no change to any result. The test months may be re-used to judge well-justified

@@ -136,6 +136,21 @@ score_source, git_commit, reason; look 1 = the first final test). Rules: the cha
 among several changes by their months 6-7 scores, every look is reported (also crashed or unhelpful ones), the first
 result stays the headline; `final_test/` is never touched. Optional confirmation of a large gain: a fresh dataset
 (e.g. seed 45, same settings), scored once.
+**Robustness checks (plan approved 5 Nov 2026, Kee Chee Pheng; `outputs/modelling/robustness/PLAN.md`, committed before
+any run; results `report.md` + `summary.csv`, PR #57):** if one simulator guess were wrong, does the model still beat the
+rules? 7 sensitivity datasets (`data/sensitivity/<name>/`, rebuilt from their `run_manifest.json`), each with its own
+store, cleaned tables and a `robust_avg5` model (the recipe of `frozen_tuned_avg5` on its own months 0-4, nothing tuned),
+its months 6-7 scored once and locked (`results/<name>/final_test/`; never re-run). Lead = (model caught - rules caught) /
+mules, weeks 0-26, paired bootstrap over the mules; chance band = headline 0.43 +/- the gap to `seed__44` (0.54) = 0.31 to
+0.55. `python -m evaluation.robustness` (no arguments = the plan's 7 runs -> `summary.csv`; a subset is printed, not saved;
+`tests/test_robustness.py`). Results: holds for `in_window_mix__1` (53% fakes, 0.56), `bursts_per_launderer__1` (0.46),
+`fake_start_days__2` (0.37, borderline: interval reaches below the band), `fake_start_days__1` (0.39, borderline),
+`fake_age_rule__1` (0.50); **shrinks** for `out_transfer_mean__1` (GBP 1,500 transfers: rules 120 of 163, lead 0.17,
+0.10-0.24); none fails. Run 7: the model's false alarms follow the fakes' ages (v1_full 50+: 6.1 per 1,000 normal accounts
+vs the rules' 4.4; with young fakes the excess moves to under-30s). **Fake-mix stress plan closed
+(decision 16 Nov 2026, Kee Chee Pheng):** `outputs/modelling/stress/PLAN.md` was a draft that never ran; its Stress 1
+(`in_window_mix__1`) is robustness run 2, reported under the robustness plan's rule. `in_window_mix__2` and `seed__43`
+are not run (plan, Amendment 1).
 **Outlier appendix (30 Oct 2026, Kee Chee Pheng; plan `outputs/modelling/outlier/PLAN.md`, team doc
 https://claude.ai/artifact/MVKuDNLsRt74YdfLkygXZg):** can label-free detectors beat the rules, and do they find the 543
 mules the bank never confirmed (189 of 732 confirmed)? Decided: month 5 only, never 6-7 (D1); bank label = closed by
@@ -241,13 +256,17 @@ Change a setting for one run with `--set key=value` (repeatable, value read as Y
 - Branch per change, PR into `main`. Never commit `data/`. Run checks + pytest before committing.
 
 ## Next tasks
+**Status 15 Nov 2026:** final test done 2 Nov (headline: model 120 vs rules 50 of 163 mules); robustness checks done
+5-6 Nov (PR #57 open, see above); methods comparison under way (`outputs/modelling/comparison/PLAN.md`; group A and F2 run
+on the training folds, PR #55). **Report deadline: 22 Nov 2026** (Kee Chee Pheng, 2 Nov; replaces the 11 / 12 Nov dates
+below). Left: merge PR #57, ~~settle the stress-plan overlap~~ (closed 16 Nov), close PR #39 and the unmerged branches, write the report.
 **Status 27 Oct 2026** (team plan: doc tab "Team plan: final 3 weeks"): Phases 0–3 done; Phase 4 baselines, tuning step 1
 and feature adoption (`roll4`) done. Feature engineering is closing: `self4` not adopted (28 Oct; the agent worktree's lab code,
 phase split, `--baseline store` and trial outputs were merged 27 Oct), so the model inputs stay store + `roll4`; feature list
 frozen 28 Oct (see the Modelling commands above). Gate 28 Oct: tuning
 grid done (Li Ann, with `adopted=True`), ~~harness dry run on month 5 (Emmy Li)~~ done 28 Oct (`evaluation.score`), stress-test datasets and Variant II / IV
 stores built (teammate 4; then re-check `roll4` there). ~~4 Nov: models calibrated on month 5 and frozen. 5 Nov: test
-months 6–7 scored once~~ done 2 Nov (`frozen_tuned_avg5`; later looks only as counted re-tests, see Phase 5 above). 11 Nov report final, 12 Nov submit (date to confirm). Caution: the lab and the tuning measure use
+months 6–7 scored once~~ done 2 Nov (`frozen_tuned_avg5`; later looks only as counted re-tests, see Phase 5 above). ~~11 Nov report final, 12 Nov submit~~ report deadline 22 Nov 2026 (changed 2 Nov). Caution: the lab and the tuning measure use
 each week's top 1% (~300–500 accounts a week); the rules flag ~7–9 cohort accounts a week in weeks 0–12 (111 of 50,061),
 about 60x fewer, so only the Phase 5 harness at the rules' budget shows whether the features help.
 1. ~~`--set key=value` override~~ done 7 Oct 2026 (with run manifest).
