@@ -6,6 +6,20 @@ Assumptions and Use" doc.
 
 
 
+## 16 Nov 2026 — Methods comparison, group B: B1 XGBoost and B2 CatBoost on the 3 training folds
+
+No data, simulator, setting, feature store or model-of-record change; months 0-4 only (month 5 and months 6-7 not
+read). `requirements.txt` gains xgboost 3.4.1 and catboost 1.2.10 (team decision, Kee Chee Pheng 16 Nov). Plan
+amendment committed before any fit (`outputs/modelling/comparison/PLAN.md`, 16 Nov, commit 839bed6): same rows,
+label, folds, 38 inputs and app score as `ref`; balanced row weights; 40-trial random search each on top-1% weekly
+recall (seed 42, trial 0 = defaults, no early stopping); final fit seeds 1-5 averaged. Code `models.comparison --tune`,
+run 16 Nov 02:56-05:32 on this Mac (commit b33d763). Winners: XGBoost trial 34 (weekly recall 0.423; 100 trees,
+15 leaves, both the smallest values searched), CatBoost trial 38 (0.402). `catch_rules` per fold at the rules'
+budget, `ref` 0.473 / 0.450 / 0.440: B1 0.466 / 0.460 / 0.427 (caught 179 of 210, `ref` 180), B2 0.397 / 0.423 /
+0.396 (163 of 210). Win rule not applied: it is pooled with month 5 under Holm, at the comparison gate. Outputs:
+`outputs/modelling/comparison/v1_full/folds.csv`, `first_flags.csv`, `tuning/<method>_trials.csv` + `_best.json`;
+scores in `data/v1_full/comparison/` (not committed).
+
 ## 16 Nov 2026 — Fake-mix stress plan closed (no run)
 
 No data, model or result change. The draft plan `outputs/modelling/stress/PLAN.md` (5 Nov, never agreed, never run)
