@@ -6,6 +6,16 @@ Assumptions and Use" doc.
 
 
 
+## 16 Nov 2026 — Budget check: rule alerts vs distinct accounts (month 5 only)
+
+No data, model, harness or result change. The harness's weekly budget counts rule alerts; the rules can alert one
+account more than once, so the model flags a few more distinct accounts than the rules (month 5, weeks 0-26: 124 vs
+119; final test: 280 vs 264). New `python -m evaluation.budget_check` scores month 5 again with the budget capped at
+the accounts the rules alerted for the first time each week -> `outputs/modelling/results/v1_full/budget_check_m5/`.
+Result: the model catches the same mules under both budgets (65 of 78, weeks 0-26; 79 of 97, weeks 0-77); precision
+0.524 -> 0.546, weekly catch mean 0.384 -> 0.379. Test months not read (the script refuses them); the committed
+harness and the headline are unchanged. For the report: one sentence in the evaluation section.
+
 ## 5 Nov 2026 — Robustness checks (plan approved by Kee Chee Pheng, `outputs/modelling/robustness/PLAN.md`)
 
 No change to the simulator, settings, v1_full or the model of record. Seven sensitivity datasets are rebuilt from
