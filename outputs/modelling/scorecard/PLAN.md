@@ -1,7 +1,7 @@
 # Rule scorecard: a stronger rule benchmark (plan, drafted 18 Nov 2026)
 
 **Status: scenarios and starting values accepted 18 Nov 2026 (Kee Chee Pheng); committed before any labelled run.
-Nothing with labels has been run.** Report-appendix work only. It changes nothing in
+Step 2 (scale, months 0–4) run 18 Nov 2026; month 5 not yet scored.** Report-appendix work only. It changes nothing in
 the simulator, the six rules, the data, the feature store, the frozen feature list or the model of record, and it
 never reads test months 6–7. The headline result (final test, 2 Nov 2026) stays as it is.
 
@@ -54,7 +54,7 @@ ranking decides who is flagged.
 2. **Choosing the scale (months 0–4 only).** Five scales: 0.5, 0.71, 1.0, 1.41, 2.0. For each, write the scores and
    run the harness on months 0–4, weeks 0–26. Keep the scale that catches the most mules; if two tie, the one
    nearer 1.0. This gives the scorecard its best chance, as the six rules had when they were tuned on labels.
-3. **Freeze.** The chosen scale is written into this plan and committed.
+3. **Freeze.** The chosen scale is written into this plan and committed. Done 18 Nov 2026: scale 1.0 (below).
 4. **One run on month 5.** Weeks 0–26. Reported whatever it shows.
 
 ```bash
@@ -63,9 +63,26 @@ PYTHONPATH=src python -m models scorecard --out data/v1_full --months 0 1 2 3 4 
 PYTHONPATH=src python -m evaluation.score --out data/v1_full --months 0 1 2 3 4 --horizons 26 --scores data/v1_full/scores/scorecard_tune_S.parquet --name scorecard_tune_S
 
 # step 4, once
-PYTHONPATH=src python -m models scorecard --out data/v1_full --months 5 --scale <frozen>
+PYTHONPATH=src python -m models scorecard --out data/v1_full --months 5 --scale 1.0
 PYTHONPATH=src python -m evaluation.score --out data/v1_full --months 5 --horizons 26 --scores data/v1_full/scores/scorecard_m5.parquet --name month5_scorecard
 ```
+
+## Step 2 result: scale frozen at 1.0 (18 Nov 2026)
+
+Months 0–4 (164,819 accounts, 361 mules by week 26), weeks 0–26, budget 828 flags; the six rules catch 109.
+Results: `outputs/modelling/results/v1_full/scorecard_tune_<scale>/`.
+
+| Scale | Mules caught of 361 | Precision | Fake | Witting | Unwitting | Weeks with ties at the cut (tied accounts) |
+|---|---|---|---|---|---|---|
+| 0.5 | 119 | 0.144 | 105/320 | 5/16 | 9/25 | 21 (595) |
+| 0.71 | 143 | 0.173 | 126/320 | 6/16 | 11/25 | 8 (81) |
+| **1.0** | **178** | 0.215 | 157/320 | 6/16 | 15/25 | 6 (32) |
+| 1.41 | 155 | 0.187 | 138/320 | 6/16 | 11/25 | 15 (94) |
+| 2.0 | 164 | 0.198 | 148/320 | 4/16 | 12/25 | 23 (too few accounts fire: the rest of the budget is filled by account id) |
+
+**Frozen: scale 1.0** (the starting values, unchanged), by the rule in step 2. On these training months the
+scorecard catches 178 against the rules' 109. This is the tuning result, chosen on these same months, so it is
+not the answer to the question; month 5 is. The model of record is not shown here: it was trained on these months.
 
 ## What is reported
 
