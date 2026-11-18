@@ -1,7 +1,7 @@
 # Rule scorecard: a stronger rule benchmark (plan, drafted 18 Nov 2026)
 
 **Status: scenarios and starting values accepted 18 Nov 2026 (Kee Chee Pheng); committed before any labelled run.
-Step 2 (scale, months 0–4) run 18 Nov 2026; month 5 not yet scored.** Report-appendix work only. It changes nothing in
+Step 2 (scale, months 0–4) run 18 Nov 2026; month 5 scored once 18 Nov 2026 (result below).** Report-appendix work only. It changes nothing in
 the simulator, the six rules, the data, the feature store, the frozen feature list or the model of record, and it
 never reads test months 6–7. The headline result (final test, 2 Nov 2026) stays as it is.
 
@@ -55,7 +55,7 @@ ranking decides who is flagged.
    run the harness on months 0–4, weeks 0–26. Keep the scale that catches the most mules; if two tie, the one
    nearer 1.0. This gives the scorecard its best chance, as the six rules had when they were tuned on labels.
 3. **Freeze.** The chosen scale is written into this plan and committed. Done 18 Nov 2026: scale 1.0 (below).
-4. **One run on month 5.** Weeks 0–26. Reported whatever it shows.
+4. **One run on month 5.** Weeks 0–26. Reported whatever it shows. Done 18 Nov 2026 (below).
 
 ```bash
 # step 2, once per scale S
@@ -83,6 +83,33 @@ Results: `outputs/modelling/results/v1_full/scorecard_tune_<scale>/`.
 **Frozen: scale 1.0** (the starting values, unchanged), by the rule in step 2. On these training months the
 scorecard catches 178 against the rules' 109. This is the tuning result, chosen on these same months, so it is
 not the answer to the question; month 5 is. The model of record is not shown here: it was trained on these months.
+
+## Result: month 5, run once (18 Nov 2026)
+
+Month 5 (29,120 accounts, 78 mules by week 26), weeks 0–26, the rules' weekly budget, scale 1.0 as frozen.
+Results: `outputs/modelling/results/v1_full/month5_scorecard/` (the harness labels the scorecard `model` there).
+The model of record's numbers are from `month5_dryrun_frozen_tuned_avg5/`, same cohort and budget.
+
+| | Six rules | Scorecard | Model of record |
+|---|---|---|---|
+| Flagged | 119 | 124 | 124 |
+| Mules caught of 78 | 16 | **34** | 65 |
+| Precision | 0.13 | 0.27 | 0.52 |
+| Fake caught of 70 | 13 | 30 | 61 |
+| Witting caught of 5 | 3 | 2 | 3 |
+| Unwitting caught of 3 | 0 | 2 | 1 |
+| Median days from start to first flag | 8.5 | 9.5 | 9 |
+| Flagged before laundering starts | 0 | 0 | 0 |
+
+- **Reading (second row of the table decided above):** better rules help, and the model still leads. Three
+  hand-written scenarios double the rules' catch (16 to 34); the model catches about twice as many again (65).
+- **Overlap:** 31 of the scorecard's 34 are also caught by the model; 3 are caught by the scorecard only; 34 by the
+  model only; 10 by neither. Where both catch a mule, they flag it in the same week 20 times, the model earlier 8
+  times, the scorecard earlier 3 times.
+- **Scorecard or rules together** catch 37 of 78.
+- **Ties:** 5 of 27 weeks, 13 tied accounts in all, so account-id tie-breaking barely matters here.
+- **Not earlier:** like the model, the scorecard flags nothing before laundering starts.
+- This run is spent: the scenarios, thresholds and scale do not change after it.
 
 ## What is reported
 

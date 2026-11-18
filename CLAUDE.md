@@ -168,6 +168,12 @@ code and model files, and runs once). D4 (31 Oct): no autoencoder. Frozen 31 Oct
 M1 63, M1b 63, M2 54, M3 16, M3s 39, M4 16; never-confirmed (62): rules 3, M1 50, M2 42. Write-up:
 `notebooks/12_outlier_detection.ipynb` (reads only the committed look outputs) -> `outputs/modelling/outlier/v1_full/
 report.md`; draft appendix text `outputs/modelling/outlier/APPENDIX.md`. On this Mac run commands with `venv/bin/python`.
+**Rule scorecard appendix (18 Nov 2026, Kee Chee Pheng; plan and results `outputs/modelling/scorecard/PLAN.md`):** would a
+stronger rule set close the gap? Three hand-written scenarios on the store (fast forwarding, new payers, pass-through;
+starting values are assumptions), scored as points at the rules' budget (`python -m models scorecard`,
+`src/models/rule_scorecard.py`; refuses months 6-7). Scale chosen on months 0-4 (1.0: 178 vs rules 109 of 361), then
+month 5 scored **once** (spent; settings never change): rules 16, scorecard 34, model of record 65 of 78. Written with
+hindsight (the model leans on forwarding speed), so generous to the rules; stated as a limitation.
 Sensitivity runs (rules frozen, 244k, one `test` value each): `python -m sim.sensitivity --list | --run [--only NAME]
 | --summarise` -> `data/sensitivity/<name>/` (large files deleted) and `outputs/sensitivity/summary.csv`.
 Single steps: `accounts`, `normal --batches 3-3`, `laundering`, `rules`, `finalize`. Use `--out` for another
