@@ -151,6 +151,19 @@ vs the rules' 4.4; with young fakes the excess moves to under-30s). **Fake-mix s
 (decision 16 Nov 2026, Kee Chee Pheng):** `outputs/modelling/stress/PLAN.md` was a draft that never ran; its Stress 1
 (`in_window_mix__1`) is robustness run 2, reported under the robustness plan's rule. `in_window_mix__2` and `seed__43`
 are not run (plan, Amendment 1).
+**Closing plan items 1-4 (19 Nov 2026; `outputs/modelling/closing/PLAN.md`, only committed final-test outputs read):**
+(1) McNemar on the same mules (`robustness.mcnemar`): v1_full both 43, model only 77, rules only 7, neither 36, chi2
+56.68, exact p 5.1e-16; significant in all 7 robustness runs (smallest `out_transfer_mean__1`, 30 vs 2, p 2.5e-07); mules
+only, says nothing about false alarms. (2) Fairness (`robustness.fpr_ratio`, rate = normal flagged / (accounts - mules
+by week 26) as `score.by_age`): lowest / highest false-positive rate over 3 age bands model 0.31 vs rules 0.94 (under 50
+vs 50+: 0.43 vs 0.96); fewer false alarms (160 vs 214) but 50+ flagged ~3x as often as under-30; a cost of the model,
+nothing tuned. Both printed by `python -m evaluation.robustness`, `summary.csv` unchanged. (3) The model of record's
+importance is `frozen_tuned_avg5/importance.csv` (rebuilds exactly from the 5 seed files): `app_score` 50.7%, store
+24.5%, `roll4` 22.1%; PR #39's table is the lab's untuned 3-fold baseline (Spearman 0.96), branch
+`frozen-importance-update` brings it up to date with `main`, unmerged. Scoring month 5 weeks 0-26 (786,240
+account-weeks) takes a median 5.6 s on an Apple M5 Pro (~140,000 account-weeks/s; machine busy). (4) Inputs vs
+simulator assumptions table, ordered by gain share: forwarding speed (14.6%) untested for the model (item 5), money
+amounts (12.9%) the one tested group whose lead shrinks (0.17).
 **Outlier appendix (30 Oct 2026, Kee Chee Pheng; plan `outputs/modelling/outlier/PLAN.md`, team doc
 https://claude.ai/artifact/MVKuDNLsRt74YdfLkygXZg):** can label-free detectors beat the rules, and do they find the 543
 mules the bank never confirmed (189 of 732 confirmed)? Decided: month 5 only, never 6-7 (D1); bank label = closed by

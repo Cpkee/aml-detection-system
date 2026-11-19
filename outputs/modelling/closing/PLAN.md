@@ -1,6 +1,6 @@
 # Closing the modelling plan: implementation plan (drafted 19 Nov 2026)
 
-**Status: draft for the team. Nothing below has been run.** The modelling plan (decision-record doc, tab
+**Status (19 Nov 2026): items 1–4 done, results under each heading; items 5–7 wait on the team's decisions below.** The modelling plan (decision-record doc, tab
 "Modelling plan", 9 Oct 2026) promised some things that are not in the repo yet. This file says, for each one, what
 to build, what it reads, how long it takes and how the result will be read. Report deadline: 22 Nov 2026.
 
@@ -183,8 +183,8 @@ each group of the model's 38 inputs, which simulator setting makes that input us
 setting is, and whether a robustness run changed the setting. Sources:
 
 - Importance: `outputs/modelling/models/v1_full/frozen_tuned_avg5/importance.csv` (gain share per input, written by
-  `models train` for the model of record). **The order of the rows rests on this file.** Item 3 is checking that it
-  belongs to `frozen_tuned_avg5`; if it does not, the shares and the order must be redone.
+  `models train` for the model of record). **The order of the rows rests on this file.** Item 3 confirmed it
+  belongs to `frozen_tuned_avg5`: it rebuilds exactly from the 5 committed seed files.
 - Results: `outputs/modelling/robustness/summary.csv` and `report.md` (lead = (model caught − rules caught) / mules,
   weeks 0–26, months 6–7 of each dataset; chance band 0.31–0.55; v1_full lead 0.43, 0.35–0.52).
 - Evidence: the `source` and `strength` of each setting in `configs/sim.yaml` as corrected by the source check of
@@ -304,4 +304,5 @@ example. Add one line at its top pointing here.
 
 1. Item 5: is the patient-launderer test value acceptable as an assumption? (Blocks item 5.)
 2. Items 6 and 7: do them, or state them as not done?
-3. Item 3: re-run importance on `frozen_tuned_avg5` if PR #39 used `frozen_tuned`?
+3. ~~Item 3: re-run importance on `frozen_tuned_avg5` if PR #39 used `frozen_tuned`?~~ Not needed (19 Nov): the
+   model of record's own importance is committed and rebuilds from its files; PR #39 is the lab baseline, a cross-check.
