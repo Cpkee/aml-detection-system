@@ -67,6 +67,58 @@ Suggested order: 19 Nov items 1–4; 20 Nov item 5 (then 6 if time); 21 Nov repo
   build time is already known (~4 min for 19.0M account-weeks).
 - **Report wording:** two of the three criteria the plan cites from lecture 1 (the third is fairness, item 2).
 
+**Result (19 Nov 2026; model files and month 5 only, no labels read, months 6-7 not read):**
+
+- **Which model each importance table is for.**
+  - `outputs/modelling/models/v1_full/frozen_tuned_avg5/importance.csv` is for the **model of record**. It was
+    written by `models.train.train` when the model was trained (commit 8e45df0): the mean split gain of the 5 LightGBM
+    seeds and each input's share of the total. It rebuilds from the 5 committed `lgbm_seed1-5.txt` files alone:
+    loading each with `lightgbm.Booster` and averaging `feature_importance("gain")` gives the committed table (largest
+    relative difference 2e-16, same order). No re-run is needed.
+  - PR #39's `frozen_importance/importance.csv` is for **neither** `frozen_tuned` nor `frozen_tuned_avg5`. It is
+    the feature lab's baseline: the same 38 inputs with the lab's untuned LightGBM settings, seed 42, refitted on
+    the 3 temporal folds, averaged over the folds. The brief's assumption that it was written for `frozen_tuned` was
+    wrong. It stays a cross-check: it agrees closely with the model of record (Spearman 0.96 over the 38 inputs;
+    `app_score` 51% in both; top 5 80% in both; top 10 89% vs 90%).
+  - Branch `frozen-importance-update` (local, not pushed) is PR #39 with `main` merged in. It is not merged into
+    `main`, because that is a team decision.
+- **Top 10 inputs of the model of record** (share of split gain; the rank in PR #39's table is in brackets):
+
+  | rank | input | share | PR #39 |
+  |---|---|---|---|
+  | 1 | `app_score` | 0.507 | 0.510 (1) |
+  | 2 | `out_1h_share_4wk` | 0.127 | 0.115 (2) |
+  | 3 | `n_payers_cum` | 0.074 | 0.067 (4) |
+  | 4 | `internal_out_share_cum` | 0.046 | 0.041 (5) |
+  | 5 | `money_in_4wk` | 0.046 | 0.067 (3) |
+  | 6 | `weeks_since_open` | 0.027 | 0.019 (8) |
+  | 7 | `money_out_cum` | 0.023 | 0.019 (7) |
+  | 8 | `money_in_cum` | 0.020 | 0.022 (6) |
+  | 9 | `n_rows_cum` | 0.016 | 0.017 (9) |
+  | 10 | `money_out_4wk` | 0.016 | 0.012 (12) |
+
+  Group shares for the model of record: application score 50.7%, the 28 store features 24.5%, the 8 four-week windows
+  22.1%, `weeks_since_open` 2.7%. The top 5 carry 80%, the top 10 90%. PR #39's top 10 has `n_rows_4wk` in place of
+  `money_out_4wk`. Gain share shows what the trees lean on, not what the model could do without: inputs that measure
+  the same thing share the credit.
+- **Scoring time.** I ran `python -m models predict --out data/v1_full --months 5 --weeks 0-26 --to <scratch>`
+  (`frozen_tuned_avg5`) three times: 6.79 / 5.19 / 5.60 s wall time, so the **median is 5.60 s**. Each run scored
+  786,240 account-weeks (29,120 accounts x 27 weeks), which is **about 140,000 account-weeks per second**. Peak memory
+  was 1.6-2.0 GB. The three outputs are identical, and they equal the existing
+  `data/v1_full/scores/frozen_tuned_avg5_m5.parquet` restricted to weeks 0-26 (largest difference 0). The time
+  covers loading the 5 models and the application model, reading the feature store and cleaned table, adding the
+  four-week windows and predicting. It does not include building the feature store (~4 min for 19.0M
+  account-weeks). Machine: Apple M5 Pro (arm64), 15 cores (5 performance + 10 efficiency), 24 GB RAM, macOS 26.5.1.
+  Other jobs were running at the same time (load average 11-13), so these times are on the slow side.
+- **For the report:**
+  - *Interpretability:* "The model is a LightGBM ensemble whose split-gain importance can be read directly from the
+    saved model files. Half of the credit goes to the application score, and most of the rest goes to a handful of
+    readable activity measures: how fast money leaves after it arrives, how many different people pay in, and how
+    much money moves through the account in four weeks."
+  - *Scoring time:* "Scoring a whole month's intake for its first 27 weeks (29,120 accounts, 786,240 account-weeks)
+    takes about 6 seconds on a laptop (Apple M5 Pro), about 140,000 account-weeks a second. Weekly scoring is
+    therefore cheap next to building the weekly features."
+
 ## 4. Which inputs rest on which simulator assumptions
 
 Writing only. One table for the report's limitations section, filled from the robustness report
