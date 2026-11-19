@@ -169,4 +169,32 @@ than the rules do in every band; its uneven spread comes mostly from almost neve
 test cohort is half 50+ (16% on v1_full), and here the rules' false alarms also rise with age. Variant IV is left out
 (its store is not built).
 
-**`forward_delay_shares__1`:** not yet run.
+**`forward_delay_shares__1`, 19 Nov 2026 (patient launderers).** `laundering.forward_delay_shares` = {under 15 min
+0.05, 15–60 min 0.10, 1–24 h 0.35, over 24 h 0.50} (main run 0.28 / 0.25 / 0.32 / 0.15), an unsourced assumption
+approved 19 Nov 2026 (Kee Chee Pheng), set with `--set` only. 244,000 accounts, seed 42, rules frozen at 1.516, built
+from commit c4e47d8; all 10 `sim.checks` pass. Rules over all months: 3,572 alerts, 94.4% false alarms, 27% of 732
+launderers alerted, median 8 days (v1_full 3,614, 93.4%, 32%, 9). `robust_avg5` trained on its months 0–4 (4.45M
+account-weeks, 8,569 mule weeks), months 6–7 scored once (`results/forward_delay_shares__1/final_test/`, locked).
+
+| Run | Mules | Model | Rules | Lead | 95% interval | Precision model / rules | Verdict |
+|:--|--:|--:|--:|--:|:--|:--|:--|
+| `forward_delay_shares__1` | 163 | 117 | 38 | 0.48 | 0.40–0.56 | 0.44 / 0.15 | **holds** |
+
+Beside the verdict (model / rules, weeks 0–26): fakes 107 / 34 of 147, witting 8 / 4 of 11, unwitting 2 / 0 of 5.
+Median days from start 9 / 8. McNemar: model only 80, rules only 1 (exact p 6.8e-23). Weeks 0–77: 126 / 45 of 180.
+False-positive rate by age:
+
+| Policy | Under 30 | 30–49 | 50+ | Ratio, 3 bands | Ratio, 2 groups | v1_full ratios |
+|:--|--:|--:|--:|--:|--:|:--|
+| Model | 0.22% | 0.27% | 0.54% | 0.41 | 0.47 | 0.31 / 0.43 |
+| Rules | 0.42% | 0.43% | 0.44% | 0.94 | 0.96 | 0.94 / 0.96 |
+
+**The advance expectation ("probably shrinks") did not hold.** The model did lose its speed signal: the five
+forwarding-speed inputs fell from 14.4% of its gain on v1_full (`frozen_tuned_avg5`) to 4.8% (`out_1h_share_4wk`
+12.7% -> 2.2%), and it leaned more on other activity (rows in the last 4 weeks, share paid inside the bank, payers).
+It still caught nearly as many mules (117 vs 120). The rules lost more (38 vs 50 in the cohort; 200 vs 240 true
+alerts over all months), likely because the pass-through rule R4 (168 of the 200 true alerts) needs 80% of a week's
+money in to leave in the same week, and patient launderers often pay out the next week (R4 alone was not compared
+with v1_full). Reported, as planned, as a dependence on forwarding speed: in this simulation slow forwarding costs
+the rules more than the model, so the lead holds. The normal customers are the same as in v1_full, so the rules flag
+the same normal accounts. The value has no source, so this says nothing about real launderers' timing.

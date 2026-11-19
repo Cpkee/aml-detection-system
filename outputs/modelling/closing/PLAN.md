@@ -267,6 +267,46 @@ on SAML-D shapes and our own choices and were tested for the rules only.
   against the chance band 0.31–0.55. A "shrinks" or "fails" is reported as a dependence on forwarding speed.
 - **Expectation, stated in advance:** the rules do not use forwarding speed inside a week, so they should lose
   little; the model should lose more. A smaller lead is the likely outcome.
+- **Result (done 19 Nov 2026; robustness plan, Amendment 2).** `data/sensitivity/forward_delay_shares__1` was built
+  from commit c4e47d8 with the three `--set` values (244,000 accounts, seed 42, rules frozen at 1.516; 7 min 43 s).
+  All 10 `sim.checks` pass. Store, cleaned tables (fitted on its own months 0–4) and `robust_avg5` (the settings of
+  `frozen_tuned`, LightGBM seeds 1–5, nothing tuned; 4.45M account-weeks, 89 s) were built, then its months 6–7
+  were scored once (28 s; `outputs/modelling/results/forward_delay_shares__1/final_test/`, locked).
+
+  *The rules, whole dataset (all months).* They lose more than expected.
+
+  | Data | Alerts | False alarms | Launderers alerted | Median days to catch |
+  |---|---|---|---|---|
+  | v1_full | 3,614 | 93.4% | 237 of 732 (32%) | 9 |
+  | Patient launderers | 3,572 | 94.4% | 199 of 732 (27%) | 8 |
+
+  *Lead (the robustness rule).* Weeks 0–26, test cohort, the rules' weekly budget. The verdict is **holds**.
+
+  | Data | Mules | Model caught | Rules caught | Lead | 95% interval | Precision model / rules | Verdict |
+  |---|---|---|---|---|---|---|---|
+  | v1_full (headline) | 163 | 120 | 50 | 0.43 | 0.35–0.52 | 0.43 / 0.19 | – |
+  | Patient launderers | 163 | 117 | 38 | 0.48 | 0.40–0.56 | 0.44 / 0.15 | **holds** |
+
+  The lead (0.48) is inside the chance band (0.31–0.55). McNemar: both 37, model only 80, rules only 1, neither 45;
+  chi-square 75.11, exact p 6.8e-23. By type (model / rules): fakes 107 / 34 of 147, witting 8 / 4 of 11,
+  unwitting 2 / 0 of 5. Weeks 0–77: model 126, rules 45 of 180.
+
+  What this means:
+  - **The expectation did not hold.** We expected a smaller lead. The lead is slightly larger (0.48 vs 0.43), well
+    inside the chance band.
+  - **The model lost its speed signal, as expected.** The five forwarding-speed inputs carried 14.4% of the model's
+    gain on v1_full and 4.8% here. The 1-hour share over 4 weeks fell from 12.7% (2nd input) to 2.2% (8th). The
+    model leaned more on other activity: rows in the last 4 weeks, the share paid to other accounts at the bank,
+    and the number of payers. It still caught nearly as many mules (117 vs 120).
+  - **The rules lost more.** In the test cohort they caught 38 mules instead of 50; over all months, true alerts fell
+    from 240 to 200. The likely reason: the pass-through rule (R4, 168 of the 200 true alerts here) needs 80% of a
+    week's money in to leave in the same week, and patient launderers often pay out the next week. We did not
+    compare R4 alone with v1_full (no committed per-rule count for v1_full).
+  - **So the lead depends on forwarding speed, but not the way we guessed.** Slow forwarding hurts the rules more
+    than the model here. This rests on an unsourced assumption, so it is a statement about the simulation only.
+  - **False alarms by age.** Normal customers are the same as in v1_full, so the rules flag exactly the same normal
+    accounts (ratios 0.94 and 0.96, as in item 2). The model's ratios are 0.41 (3 bands) and 0.47 (under 50 vs 50+),
+    against 0.31 and 0.43 on v1_full. It still flags 50+ normal customers most (0.54% vs 0.22% for under-30s).
 
 ## 6. Fairness on Variant II (optional)
 
@@ -382,7 +422,8 @@ example. Add one line at its top pointing here.
 
 ## Decisions for the team
 
-1. Item 5: is the patient-launderer test value acceptable as an assumption? (Blocks item 5.)
+1. ~~Item 5: is the patient-launderer test value acceptable as an assumption? (Blocks item 5.)~~ Yes: approved as an
+   assumption 19 Nov 2026, Kee Chee Pheng.
 2. ~~Items 6 and 7: do them, or state them as not done?~~ Items 6 and 7: do them (19 Nov 2026, Kee Chee Pheng).
 3. ~~Item 3: re-run importance on `frozen_tuned_avg5` if PR #39 used `frozen_tuned`?~~ Not needed (19 Nov): the
    model of record's own importance is committed and rebuilds from its files; PR #39 is the lab baseline, a cross-check.
