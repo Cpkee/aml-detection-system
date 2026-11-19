@@ -1,0 +1,39 @@
+{
+  "scored": "2026-11-02 02:22",
+  "data": "data/v1_full",
+  "cohort_months": [
+    6,
+    7
+  ],
+  "horizons": [
+    26,
+    77
+  ],
+  "model": "frozen_tuned_avg5",
+  "model_params_source": "file",
+  "model_git_commit": "bc707f30c22dd8f662c5b83584f5e54c85dc7819",
+  "model_machine": {
+    "os": "macOS-26.5.1-arm64-arm-64bit",
+    "processor": "arm",
+    "cpu_count": 15,
+    "python": "3.12.15"
+  },
+  "machine": {
+    "os": "macOS-26.5.1-arm64-arm-64bit",
+    "processor": "arm",
+    "cpu_count": 15,
+    "python": "3.12.15"
+  },
+  "cohort_accounts": 50061,
+  "launderers": 180,
+  "budget_per_horizon": {
+    "26": 280,
+    "77": 725
+  },
+  "score_source": "model:frozen_tuned_avg5",
+  "scores_sha256": null,
+  "run_manifest_sha256": "4ce1c4fb593a8ae5f40e9acb082f1969655095c5a4977dc81f58c9026c62d7ba",
+  "git_commit": "9e748c851ffb5d2082e8d68217247b3b57c1daf9",
+  "git_uncommitted_changes": false,
+  "seconds": 24
+}

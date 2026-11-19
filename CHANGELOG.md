@@ -6,6 +6,110 @@ Assumptions and Use" doc.
 
 
 
+## 16 Nov 2026 — Fake-mix stress plan closed (no run)
+
+No data, model or result change. The draft plan `outputs/modelling/stress/PLAN.md` (5 Nov, never agreed, never run)
+overlapped robustness run 2, which had already scored `in_window_mix__1` once (model 99 vs rules 30 of 124 mules,
+lead 0.56, holds). Decision (Kee Chee Pheng, 16 Nov): the plan is closed as answered by that run; `in_window_mix__2`
+and `seed__43` are not run. The differences between the two plans are listed in the plan's Amendment 1.
+
+## 16 Nov 2026 — Budget check: rule alerts vs distinct accounts (month 5 only)
+
+No data, model, harness or result change. The harness's weekly budget counts rule alerts; the rules can alert one
+account more than once, so the model flags a few more distinct accounts than the rules (month 5, weeks 0-26: 124 vs
+119; final test: 280 vs 264). New `python -m evaluation.budget_check` scores month 5 again with the budget capped at
+the accounts the rules alerted for the first time each week -> `outputs/modelling/results/v1_full/budget_check_m5/`.
+Result: the model catches the same mules under both budgets (65 of 78, weeks 0-26; 79 of 97, weeks 0-77); precision
+0.524 -> 0.546, weekly catch mean 0.384 -> 0.379. Test months not read (the script refuses them); the committed
+harness and the headline are unchanged. For the report: one sentence in the evaluation section.
+
+## 5 Nov 2026 — Robustness checks (plan approved by Kee Chee Pheng, `outputs/modelling/robustness/PLAN.md`)
+
+No change to the simulator, settings, v1_full or the model of record. Seven sensitivity datasets are rebuilt from
+their `run_manifest.json` where needed, each gets its own feature store, cleaned tables and a `robust_avg5` model
+(recipe of `frozen_tuned_avg5`, trained on its own months 0-4), and its months 6-7 are scored once
+(`results/<name>/final_test/`, locked). Lead = (model caught - rules caught) / mules, weeks 0-26
+(`python -m evaluation.robustness`); results in `outputs/modelling/robustness/report.md` and `summary.csv`.
+- Run 1 `seed__44` (no rebuild; 10/10 checks, alerts as in its summary): model 114 vs rules 35 of 145 mules, lead
+  0.54 (95% 0.47-0.62) vs headline 0.43 -> chance band 0.31-0.55.
+- Run 2 `in_window_mix__1` (rebuilt: 10/10 checks, summary identical): model 99 vs rules 30 of 124 mules, lead
+  0.56 (95% 0.46-0.66): holds.
+- Runs 3-7 (6 Nov; rebuilt, 10/10 checks, summaries identical), lead (95%): repeated bursts 0.46 (0.37-0.54) holds;
+  fakes start 150-210 days 0.37 (0.30-0.45) holds; fakes start 15-45 days 0.39 (0.31-0.49) holds; GBP 1,500 transfers
+  0.17 (0.10-0.24) shrinks (rules 120 of 163); young fake ages 0.50 (0.42-0.58) holds. No scenario fails.
+
+## 2 Nov 2026 — Counted re-tests of the test months (decision by Kee Chee Pheng)
+
+No data change, no model change, no change to any result. The test months may be re-used to judge well-justified
+improvements, stated as a limitation in the report; the first final test stays the headline.
+- `python -m evaluation.score --months 6 7 --final-test --model M --retest "REASON"` scores into a new folder
+  `results/<data>/final_test_r<N>/` (never `final_test/`). Before anything about months 6-7 is read it appends a row
+  to `results/<data>/final_test_looks.csv` (look, folder, started, score_source, git_commit, reason), so a crashed or
+  unhelpful look still counts. Refused before the first final test is locked, without a reason, or with uncommitted
+  code. The report and `settings.json` (`retest_reason`) mark the run as a re-test.
+- Rules (CLAUDE.md, Phase 5): the change and its months 0-5 evidence are written and committed before the look; one
+  look per change; never choose among changes by their months 6-7 scores; report every look.
+- `results/v1_full/final_test_looks.csv` starts with look 1 = the final test below. Test:
+  `test_retest_is_counted_before_any_read_and_never_overwrites`.
+
+## 2 Nov 2026 — Final test on months 6-7 (run once; Kee Chee Pheng, moved forward from 5 Nov)
+
+No data change, no model change. `python -m evaluation.score --out data/v1_full --months 6 7 --final-test` with the
+model of record `frozen_tuned_avg5` at commit 9e748c8 (no uncommitted changes) -> `outputs/modelling/results/v1_full/
+final_test/` (`LOCK.json` written: never re-run; later looks are counted re-tests, entry above). Cohort 50,061 accounts.
+- **Weeks 0-26** (163 mules by week 26): model 120 caught vs rules 50 (recall 0.736 vs 0.307; precision 0.429 vs
+  0.189; 280 model flags vs 264 rule alerts); by the final label 0.667 vs 0.278. Both 43, model only 77, rules only 7,
+  neither 36; when both catch a mule the model is first 26 times, the rules 13 (median 2 days earlier); model-only
+  catches at least 91 days earlier (median). 2 model flags before laundering started. By type: fake 109/147 vs
+  46/147, witting 8/11 vs 3/11, unwitting 3/5 vs 1/5.
+- **By opening month:** model recall month 6 0.774, month 7 0.686 (rules 0.323 / 0.286); month 7 holds 43% of the
+  mules and 37% of model flags: the drift notebook 11 warned of, smaller than feared.
+- **Weeks 0-77** (180 mules, appendix): model 138 vs rules 59 (0.767 vs 0.328).
+
+## 2 Nov 2026 — Model of record: 5-seed average `frozen_tuned_avg5` (decided 30 Oct, confirmed 2 Nov, Kee Chee Pheng)
+
+No data change. New model of record; `frozen_tuned` and its results stay committed for comparison.
+- **Why:** notebook 10's pre-registered rule (average 5 seeds if the seed SD of `catch_0.1pct` > 0.005 in any fold;
+  it was 0.006-0.008 in all 3). The tuned settings sample 92% of rows and 90% of inputs per tree, so a single seed's
+  flags at the rules' small budget depend partly on chance.
+- **What:** the tuned settings (tuning step 2) fitted with LightGBM `random_state` 1-5 on the same rows and the same
+  application score (out-of-fold split seed 42, as notebook 10 measured); score = mean of the 5 probabilities.
+  `python -m models train --name frozen_tuned_avg5 --params .../tuned_params.json --tree-seeds 1 2 3 4 5` (110 s,
+  this Mac). Files `lgbm_seed1-5.txt`, `app_logreg.json`, `manifest.json` (`tree_files`, `tree_seeds`,
+  `app_score_seed`), `calibration.json` (isotonic, refitted on month 5: out-of-fold Brier 0.00180) in
+  `outputs/modelling/models/v1_full/frozen_tuned_avg5/`. `train.MODEL_OF_RECORD` is now the default of `predict`,
+  `calibrate` and `evaluation.score`.
+- **Code:** `models.train.load` returns a list of boosters and `predict` averages them; a single-model folder
+  (`lgbm.txt`) works as before: `frozen_tuned` re-scored on month 5 with the new code reproduces every result file of
+  `month5_dryrun_v2`. `load` refuses a folder whose LightGBM files differ from the manifest's. Test:
+  `test_seed_average_is_the_mean_of_its_seeds`.
+- **Month 5 dry run** (`results/v1_full/month5_dryrun_frozen_tuned_avg5/`), weeks 0-26: model 65 of 78 mules caught
+  (recall 0.833, precision 0.524) vs rules 16 (frozen_tuned: 63, 0.508); no flag before laundering starts; weeks
+  0-77: 79 of 97 (frozen_tuned 76). Seed spread (`results/v1_full/month5_seed_spread/`): each seed alone catches 63-65
+  of 78, so 1-2 mules between single-seed runs is chance.
+- **Committed 2 Nov** (built 30 Oct on an older `main`, merged with today's `main`: bank label, by-month table,
+  outlier appendix). Checks before the final test, this Mac, same data copy (`run_manifest.json` 4ce1c4fb...):
+  retraining with the merged code (`--params .../frozen_tuned/manifest.json --tree-seeds 1 2 3 4 5`, 86 s) gives the
+  5 tree files and `app_logreg.json` byte-identical to the committed ones; re-fitting the calibration gives the same
+  `calibration.json`; the month-5 dry run with today's harness (`results/v1_full/month5_dryrun_avg5_v2/`, adds
+  `by_month_w<W>.csv`) gives every other result file identical to `month5_dryrun_frozen_tuned_avg5`.
+
+## 31 Oct 2026 — Harness: by-opening-month table; final-test rehearsal on data/v1 (Emmy Li)
+
+No data change, no model change, no change to any existing result value.
+- **By opening month:** `evaluation.score` writes `by_month_w<W>.csv` and a report section (per policy and opening
+  month: accounts, mules, caught, recall, flags, precision, and each month's share of the cohort's accounts, mules and
+  flags). Added before the final test because notebook 11 found month-7 accounts get too few top application scores
+  when ranked with month 6 (`velocity_*` drift); a month whose share of flags is far below its share of mules is being
+  under-ranked. Month 5 of v1_full re-run: the 7 existing result files are identical to `month5_dryrun_v2`.
+- **Rehearsal of the final test** on `data/v1` (50k, not the main data; v1_full untouched): a stand-in model
+  `rehearsal_tuned` trained on v1 months 0-4 with `frozen_tuned`'s settings (`models train --params
+  .../frozen_tuned/manifest.json`), then the 5 Nov command `evaluation.score --months 6 7 --final-test` on it.
+  It ran end to end in 5 s (1.2 GB): `STARTED.json` before the read, `LOCK.json` after, all files including
+  `by_month`; a second run, by model or by `--scores` file, is refused. Records: `outputs/modelling/results/v1/final_test/`,
+  `outputs/modelling/models/v1/rehearsal_tuned/`. Numbers there are a code check only (22 mules), not a result.
+  For 5 Nov: commit first (`settings.json` records `git_uncommitted_changes`).
+
 ## 30 Oct 2026 — Harness gaps closed (Phase 5, approved by Kee Chee Pheng)
 
 No data change, no model change, no change to any existing result value: result files gain columns only. Re-run of

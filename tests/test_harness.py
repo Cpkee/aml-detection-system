@@ -3,7 +3,8 @@
 Hand-made cohorts, no data needed: flags are permanent and follow the weekly budget, closed accounts leave the pool,
 ties go to the lower account id, later scores never change earlier flags, the any-time policy spends exactly its
 total, a scores file is checked and gives the same results as the model, and the measures match a hand count. Guards:
-test months need --final-test and are scored once (STARTED.json before any read); settings.json records provenance.
+test months need --final-test and are scored once (STARTED.json before any read); a re-use is a counted re-test in its
+own folder; settings.json records provenance.
 On data/v1 (skipped without its store): a model trains, reloads and refuses to score its own training months.
 """
 import json
@@ -106,14 +107,41 @@ def test_model_trains_reloads_and_refuses_its_training_months(tmp_path):
     try:
         m = train.train(DATA, name, report_root=str(tmp_path))
         assert m["n_inputs"] == 38 and m["inputs"] == train.INPUTS
-        booster, app, man = train.load(DATA, name)
-        assert booster.num_feature() == 38 and len(app["coef"]) == len(app["columns"])
+        boosters, app, man = train.load(DATA, name)
+        assert len(boosters) == 1 and boosters[0].num_feature() == 38 and len(app["coef"]) == len(app["columns"])
         with pytest.raises(ValueError):
             sc.score_cohort(DATA, [4], (0, 2), name)
         s = sc.score_cohort(DATA, [5], (0, 2), name)
         assert s["score"].between(0, 1).all() and set(s["weeks_since_open"]) == {0, 1, 2}
     finally:
         shutil.rmtree(train.model_dir(DATA, name), ignore_errors=True)
+
+
+@needs_store
+def test_seed_average_is_the_mean_of_its_seeds(tmp_path):
+    """A seed average (decision 30 Oct 2026) scores the mean of its seeds' probabilities, each seed's model equals a
+    single model trained with that seed, and every seed shares one application score."""
+    from models import train
+    params = {"n_estimators": 20, "subsample": 0.8, "subsample_freq": 1, "colsample_bytree": 0.8}
+    names = {"avg": "pytest_avg", 1: "pytest_seed1", 2: "pytest_seed2"}
+    try:
+        m = train.train(DATA, names["avg"], params, report_root=str(tmp_path), tree_seeds=[1, 2])
+        assert m["tree_files"] == ["lgbm_seed1.txt", "lgbm_seed2.txt"] and m["app_score_seed"] == 42
+        assert "random_state" not in m["lightgbm_params"]
+        for s in (1, 2):
+            train.train(DATA, names[s], {**params, "random_state": s}, report_root=str(tmp_path))
+        score = {k: sc.score_cohort(DATA, [5], (0, 2), n)["score"].to_numpy() for k, n in names.items()}
+        assert not np.array_equal(score[1], score[2])                       # the seeds differ...
+        assert np.allclose(score["avg"], (score[1] + score[2]) / 2, rtol=0, atol=1e-12)    # ...and are averaged
+        app = [json.load(open(os.path.join(train.model_dir(DATA, n), "app_logreg.json"))) for n in names.values()]
+        assert app[0] == app[1] == app[2]
+        folder = train.model_dir(DATA, names["avg"])
+        os.remove(os.path.join(folder, "lgbm_seed2.txt"))
+        with pytest.raises(ValueError):                                    # a missing seed file is refused
+            train.load(DATA, names["avg"])
+    finally:
+        for n in names.values():
+            shutil.rmtree(train.model_dir(DATA, n), ignore_errors=True)
 
 
 def test_by_age_counts_recall_and_false_positives():
@@ -124,6 +152,18 @@ def test_by_age_counts_recall_and_false_positives():
     assert (t.loc["under 30", "mules"], t.loc["under 30", "caught"], t.loc["under 30", "normal_flagged"]) == (1, 1, 2)
     assert t.loc["under 30", "false_positive_rate"] == 1.0 and t.loc["50+", "recall"] == 0.0
     assert t.loc["50+", "false_positive_rate"] == 0.0 and t["accounts"].sum() == len(TRUTH)
+
+
+def test_by_month_splits_catches_and_flag_shares():
+    truth = TRUTH.assign(open_month=[6, 6, 7, 7, 7, 7])                      # C, F in month 6; N1-N3, R in month 7
+    live = sc.open_rows(_scores(), truth)
+    flags = {"model": sc.permanent_flags(live, {0: 1, 1: 1, 2: 2})}            # N1, N2, R, F
+    t = sc.by_month(truth, flags, 3).set_index("open_month")
+    # month 6: mules C (missed, closed) and F (caught), 1 flag; month 7: mule R (caught), 3 flags (N1, N2, R)
+    assert (t.loc[6, "mules"], t.loc[6, "caught"], t.loc[6, "flagged"]) == (2, 1, 1)
+    assert (t.loc[7, "mules"], t.loc[7, "caught"], t.loc[7, "flagged"]) == (1, 1, 3)
+    assert t.loc[6, "share_mules"] == 2 / 3 and t.loc[7, "share_flags"] == 0.75
+    assert t["share_accounts"].sum() == 1 and t["accounts"].sum() == len(truth)
 
 
 def test_calibration_keeps_order_and_matches_rates():
@@ -347,8 +387,45 @@ def test_started_file_blocks_a_second_final_run_before_any_read(tmp_path, monkey
     with pytest.raises(RuntimeError):                                    # first run: crashes at its first read ...
         sc.run("data/v1_full", [6, 7], [26], "x", final_test=True)
     assert started.exists()                                              # ... but STARTED.json was written before it
-    with pytest.raises(SystemExit, match="team decision"):               # second run: refused, nothing read
+    with pytest.raises(SystemExit, match="re-test"):                     # second run: refused, nothing read
         sc.run("data/v1_full", [6, 7], [26], "x", final_test=True)
+
+
+def test_retest_is_counted_before_any_read_and_never_overwrites(tmp_path, monkeypatch):
+    """Re-using the test months (decision 2 Nov 2026): only after the first final test is locked, only with a reason
+    and committed code; each look gets a new folder and a ledger row before anything about months 6-7 is read."""
+    monkeypatch.setattr(sc, "RESULTS", str(tmp_path))
+
+    def no_read(*a, **k):
+        raise RuntimeError("hidden data read")
+    monkeypatch.setattr(sc.amldata, "evaluation", no_read)
+    git = {"status": "", "rev-parse": "abc123"}
+    monkeypatch.setattr(sc.manifest, "_git", lambda *a: git[a[0]])
+    run = lambda reason: sc.run("data/v1_full", [6, 7], [26], "x", final_test=True, retest=reason)
+    with pytest.raises(SystemExit, match="locked"):                      # no first final test yet
+        run("why")
+    first = tmp_path / "v1_full" / "final_test"
+    first.mkdir(parents=True)
+    (first / "STARTED.json").write_text(json.dumps({"started": "2026-11-02 02:22"}))
+    (first / "LOCK.json").write_text(json.dumps({"score_source": "model:m", "git_commit": "c0"}))
+    with pytest.raises(SystemExit, match="reason"):
+        run("  ")
+    with pytest.raises(SystemExit, match="only for test months"):
+        sc.run("data/v1_full", [5], [26], "x", retest="why")
+    git["status"] = " M src/models/train.py"
+    with pytest.raises(SystemExit, match="commit"):
+        run("why")
+    git["status"] = ""
+    for n in (2, 3):
+        with pytest.raises(RuntimeError):                                # crashes at its first read ...
+            run(f"change {n}")
+        assert (tmp_path / "v1_full" / f"final_test_r{n}" / "STARTED.json").exists()
+    ledger = pd.read_csv(tmp_path / "v1_full" / sc.LOOKS, dtype={"git_commit": str})    # ... but every look counts
+    assert ledger["look"].tolist() == [1, 2, 3]
+    assert ledger["folder"].tolist() == ["final_test", "final_test_r2", "final_test_r3"]
+    assert ledger["git_commit"].tolist() == ["c0", "abc123", "abc123"]
+    assert ledger["reason"].tolist()[1:] == ["change 2", "change 3"]
+    assert sorted(os.listdir(first)) == ["LOCK.json", "STARTED.json"]   # the first final test is never touched
 
 
 def test_settings_record_provenance(tmp_path, monkeypatch):
@@ -362,3 +439,12 @@ def test_settings_record_provenance(tmp_path, monkeypatch):
         assert s["score_source"] == ("model:frozen" if scores_path is None else f"file:{path}")
         assert s["scores_sha256"] == (manifest._sha256(path) if scores_path else None)
         assert "median_min_days_earlier_model_only" in s["head_to_head"]["3"]
+
+
+def test_distinct_budget_counts_first_alerts_only():
+    """evaluation.budget_check: an account's first alert week counts once; alerts after the horizon do not."""
+    from evaluation import budget_check
+    truth = pd.DataFrame({"account_id": ["A1", "A2", "A3", "A4"], "open_day": [0, 0, 7, 0],
+                          "first_alert_day": [3, 10, 17, np.nan]})      # weeks 0, 1, 1, never
+    assert budget_check.distinct_budget(truth, 2) == {0: 1, 1: 2, 2: 0}
+    assert budget_check.distinct_budget(truth, 0) == {0: 1}

@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from models import logreg, train
+from models import logreg, stability
 
 
 def _table(n=4000, seed=0):
@@ -24,7 +24,7 @@ def _table(n=4000, seed=0):
 
 
 def test_every_frozen_input_has_one_kind():
-    assert len(logreg.INPUTS) == 38 and logreg.INPUTS == train.INPUTS
+    assert len(logreg.INPUTS) == 38 and logreg.INPUTS == stability.INPUTS
     assert set(logreg.KIND) == set(logreg.INPUTS)
     assert logreg.KIND["out_1h_share_4wk"] == "share" and logreg.KIND["money_in_4wk"] == "log"
     assert logreg.KIND["app_score"] == "std" and logreg.KIND["self_vs_past_rows"] == "z"
@@ -99,10 +99,3 @@ def test_from_dict_refuses_mismatched_columns():
     d["columns"] = d["columns"][:-1]
     with pytest.raises(ValueError):
         logreg.MuleLogit.from_dict(d)
-
-
-def test_model_kind_by_file(tmp_path):
-    assert train.model_kind(str(tmp_path)) is None
-    (tmp_path / "logreg.json").write_text("{}")
-    assert train.model_kind(str(tmp_path)) == "logreg"
-    assert train.model_files(str(tmp_path))[0] == "logreg.json"

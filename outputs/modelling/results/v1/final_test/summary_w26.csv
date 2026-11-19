@@ -1,0 +1,4 @@
+policy,flagged,mules,caught,recall,recall_final_label,precision,false_alarm_share,precision_final_label,median_days_from_start,flagged_before_start,caught_fake,median_days_from_start_fake,caught_witting,median_days_from_start_witting,caught_unwitting,median_days_from_start_unwitting,catch_mean
+model,53,22,16,0.7272727272727273,0.5,0.3018867924528302,0.6981132075471699,0.3018867924528302,9.0,0,15/20,10.0,1/1,6.0,0/1,,0.3901555234888567
+rules,52,22,7,0.3181818181818182,0.21875,0.1346153846153846,0.8653846153846154,0.1346153846153846,5.0,0,6/20,5.5,1/1,0.0,0/1,,0.17115600448933782
+model_anytime,53,22,17,0.7727272727272727,0.53125,0.32075471698113206,0.679245283018868,0.32075471698113206,6.0,0,16/20,6.0,1/1,6.0,0/1,,0.42236652236652245

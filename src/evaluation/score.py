@@ -1,8 +1,10 @@
 """Phase 5 harness: the frozen model against the bank's rules on a fixed cohort, at the rules' own weekly budget.
 
     PYTHONPATH=src python -m evaluation.score --out data/v1_full                 # dry run: cohort = month 5, model of record
-    PYTHONPATH=src python -m evaluation.score --out data/v1_full --months 6 7 --final-test   # once, 5 Nov 2026
-    PYTHONPATH=src python -m evaluation.score --out data/v1_full --scores data/v1_full/scores/frozen_tuned_m5.parquet
+    PYTHONPATH=src python -m evaluation.score --out data/v1_full --months 6 7 --final-test   # once (ran 2 Nov 2026)
+    PYTHONPATH=src python -m evaluation.score --out data/v1_full --months 6 7 --final-test --model M \
+        --retest "what changed and why it should help, with the months 0-5 evidence"            # a counted re-use
+    PYTHONPATH=src python -m evaluation.score --out data/v1_full --scores data/v1_full/scores/frozen_tuned_avg5_m5.parquet
 
 The comparison agreed on 8 Oct 2026 (CLAUDE.md, "Fixed cohort"): every account opened in the cohort months, a clock
 that counts weeks since each account opened, and in week w of their lives the model may flag as many accounts as the
@@ -29,10 +31,17 @@ Measures, over weeks 0-W (W = 26 main, 77 appendix):
               trained on weeks 0-26 only, so past week 26 its running-total features leave the training range and
               late scores are not comparable across weeks
   by type     caught per hidden type (fake / witting / unwitting); per week: accounts still open, mules, starts
+  by month    caught and flags per opening month, against each month's share of accounts and mules (calendar drift)
 
 Test months 6-7 need --final-test and are scored once: before anything about them is read the run writes
 outputs/modelling/results/<data>/final_test/STARTED.json, and on success LOCK.json; a final run is refused while
-either exists (even after a crash: clearing it is a team decision). settings.json records where the scores came from
+either exists (even after a crash: clearing it is a team decision).
+Re-using the test months (decision 2 Nov 2026, Kee Chee Pheng; a limitation stated in the report): after the first
+final test is locked, `--retest REASON` scores months 6-7 again into a new folder final_test_r<N> (N = 2, 3, ...),
+never into final_test/. Before anything about months 6-7 is read it appends a row to <data>/final_test_looks.csv
+(look, folder, started, score_source, git_commit, reason): every look counts, also one that crashes or does not help.
+A re-test needs committed code and a written reason (the change and its months 0-5 evidence, decided before looking);
+the first result stays the headline. settings.json records where the scores came from
 (score_source, scores_sha256 for a file), the data run (run_manifest_sha256) and the code (git_commit). This file is
 scoring code, so it may read hidden tables (amldata.evaluation); nothing it reads goes back into a model.
 """
@@ -51,6 +60,8 @@ from evaluation import budget as rules_budget
 from features import manifest
 
 RESULTS = "outputs/modelling/results"
+LOOKS = "final_test_looks.csv"
+LOOK_COLUMNS = ["look", "folder", "started", "score_source", "git_commit", "reason"]
 TRAINED_WEEKS = 26            # models.train.WEEKS: the model is trained on weeks 0-26 since opening
 PROFILES = ("fake", "witting", "unwitting")
 AGE_BANDS = {"under 30": (0, 29), "30-49": (30, 49), "50+": (50, 200)}    # BAF customer_age is in decades
@@ -230,6 +241,27 @@ def by_age(truth: pd.DataFrame, flags: dict[str, pd.Series], w_hi: int) -> pd.Da
     return pd.DataFrame(rows)
 
 
+def by_month(truth: pd.DataFrame, flags: dict[str, pd.Series], w_hi: int) -> pd.DataFrame:
+    """Per policy and opening month: accounts, mules, caught, flags, and each month's share of the cohort's accounts,
+    mules and flags. The calendar-drift check (notebook 11, 29 Oct 2026): the test cohort's months are ranked together
+    and month 7's application scores run lower, so a month whose share of flags is far below its share of mules is
+    being under-ranked. Agreed 31 Oct 2026, before the final test."""
+    t = truth.set_index("account_id")
+    mule = mule_at(truth, w_hi).to_numpy()
+    rows = []
+    for name, f in flags.items():
+        hit = t.index.isin(f[f <= w_hi].index)
+        for month in sorted(t["open_month"].unique()):
+            inm = (t["open_month"] == month).to_numpy()
+            m = inm & mule
+            rows.append({"policy": name, "open_month": int(month), "accounts": int(inm.sum()), "mules": int(m.sum()),
+                         "caught": int((hit & m).sum()), "recall": (hit & m).sum() / max(m.sum(), 1),
+                         "flagged": int((hit & inm).sum()), "precision": (hit & m).sum() / max((hit & inm).sum(), 1),
+                         "share_accounts": inm.sum() / len(t), "share_mules": m.sum() / max(mule.sum(), 1),
+                         "share_flags": (hit & inm).sum() / max(hit.sum(), 1)})
+    return pd.DataFrame(rows)
+
+
 def head_to_head(truth: pd.DataFrame, model: pd.Series, rules: pd.Series, w_hi: int) -> dict:
     """Launderers caught by both / model only / rules only / either, and the model's lead over the rules."""
     mules = truth["account_id"][mule_at(truth, w_hi)]
@@ -258,14 +290,47 @@ def evaluate_horizon(truth: pd.DataFrame, live: pd.DataFrame, k: dict[int, int],
     weekly["budget"] = weekly["week"].map(kh).fillna(0).astype(int)
     weekly["tied_at_cut"] = weekly["week"].map(ties).fillna(0).astype(int)
     return {"flags": flags, "summary": summary, "weekly": weekly, "by_age": by_age(truth, flags, w_hi),
-            "h2h": head_to_head(truth, flags["model"], flags["rules"], w_hi), "budget": int(sum(kh.values()))}
+            "by_month": by_month(truth, flags, w_hi), "h2h": head_to_head(truth, flags["model"], flags["rules"], w_hi), "budget": int(sum(kh.values()))}
+
+
+def looks(data: str) -> pd.DataFrame:
+    """The ledger of looks at the test months: look 1 is the first final test (from its LOCK.json), then one row per
+    re-test, appended before the re-test reads anything."""
+    path = os.path.join(RESULTS, data, LOOKS)
+    if os.path.exists(path):
+        return pd.read_csv(path, dtype={"git_commit": str})
+    first = json.load(open(os.path.join(RESULTS, data, "final_test", "LOCK.json")))
+    started = json.load(open(os.path.join(RESULTS, data, "final_test", "STARTED.json")))["started"]
+    return pd.DataFrame([{"look": 1, "folder": "final_test", "started": started, "score_source": first["score_source"],
+                          "git_commit": first["git_commit"], "reason": "the planned final test (the headline result)"}],
+                        columns=LOOK_COLUMNS)
+
+
+def start_retest(data: str, source: str, reason: str | None) -> str:
+    """Checks a re-test may run, records it as a look and returns its new report folder (final_test_r<N>)."""
+    if not (reason or "").strip():
+        raise SystemExit("--retest needs a reason: the change and why it should help, from months 0-5 evidence")
+    if not os.path.exists(os.path.join(RESULTS, data, "final_test", "LOCK.json")):
+        raise SystemExit("a re-test is only for after the first final test is locked: run --final-test alone first")
+    if manifest._git("status", "--porcelain", "--untracked-files=no"):
+        raise SystemExit("a re-test runs from committed code (commit the change first, so the look records it)")
+    ledger = looks(data)
+    n = int(ledger["look"].max()) + 1
+    folder = f"final_test_r{n}"
+    report = os.path.join(RESULTS, data, folder)
+    os.makedirs(report)                                       # a new folder: an earlier look is never overwritten
+    row = {"look": n, "folder": folder, "started": time.strftime("%Y-%m-%d %H:%M"), "score_source": source,
+           "git_commit": manifest._git("rev-parse", "HEAD"), "reason": reason.strip()}
+    pd.concat([ledger, pd.DataFrame([row])], ignore_index=True).to_csv(os.path.join(RESULTS, data, LOOKS), index=False)
+    return report
 
 
 def run(out: str, months, horizons: list[int], name: str, model_name: str = "frozen",
         final_test: bool = False, check_data: bool = True, results: str | None = None,
-        scores_path: str | None = None) -> str:
+        scores_path: str | None = None, retest: str | None = None) -> str:
     """check_data=False and results=<folder> only for `python -m models verify` (rescoring a reference run).
-    scores_path: score a file (load_scores) instead of the model `model_name`."""
+    scores_path: score a file (load_scores) instead of the model `model_name`. retest: the reason for a counted
+    re-use of the test months (after the first final test is locked)."""
     t0 = time.time()
     months = tuple(int(m) for m in months)
     test = bool(set(months) & set(amldata.TEST_MONTHS))
@@ -277,17 +342,22 @@ def run(out: str, months, horizons: list[int], name: str, model_name: str = "fro
     root = results or RESULTS
     if test and (not check_data or results):
         raise SystemExit("the final test runs with every check and into the committed results folder")
-    lock = os.path.join(RESULTS, data, "final_test", "LOCK.json")
-    started = os.path.join(RESULTS, data, "final_test", "STARTED.json")
-    for f in (lock, started):
-        if test and os.path.exists(f):
-            raise SystemExit(f"the test months were already scored or a final run started ({f}); they are scored "
-                             "once. Clearing this file is a team decision, recorded in CHANGELOG.md")
-    report = os.path.join(root, data, "final_test" if test else name)
-    os.makedirs(report, exist_ok=True)
+    if retest is not None and not test:
+        raise SystemExit("--retest is only for test months 6-7, with --final-test")
     if scores_path and not os.path.isfile(scores_path):     # before STARTED.json: a typo must not use up the final run
         raise SystemExit(f"scores file {scores_path} not found")
     source = f"file:{scores_path}" if scores_path else f"model:{model_name}"
+    if retest is not None:
+        report = start_retest(data, source, retest)
+    else:
+        for f in ("LOCK.json", "STARTED.json"):
+            if test and os.path.exists(os.path.join(RESULTS, data, "final_test", f)):
+                raise SystemExit(f"the test months were already scored or a final run started (final_test/{f}); a "
+                                 "further look is a counted re-test: --retest REASON (CHANGELOG.md, 2 Nov 2026)")
+        report = os.path.join(root, data, "final_test" if test else name)
+        os.makedirs(report, exist_ok=True)
+    lock = os.path.join(report, "LOCK.json")
+    started = os.path.join(report, "STARTED.json")
     if test:                                                 # written before anything about months 6-7 is read
         with open(started, "w") as f:
             json.dump({"started": time.strftime("%Y-%m-%d %H:%M"), "cohort_months": list(months),
@@ -313,6 +383,7 @@ def run(out: str, months, horizons: list[int], name: str, model_name: str = "fro
         r["summary"].to_csv(os.path.join(report, f"summary_w{h}.csv"), index=False)
         r["weekly"].to_csv(os.path.join(report, f"weekly_w{h}.csv"), index=False)
         r["by_age"].to_csv(os.path.join(report, f"by_age_w{h}.csv"), index=False)
+        r["by_month"].to_csv(os.path.join(report, f"by_month_w{h}.csv"), index=False)
         launderers[f"model_flag_week_w{h}"] = r["flags"]["model"].reindex(lt.index)
         launderers[f"model_anytime_flag_week_w{h}"] = r["flags"]["model_anytime"].reindex(lt.index)
     launderers.reset_index().to_csv(os.path.join(report, "launderers.csv"), index=False)
@@ -328,7 +399,7 @@ def run(out: str, months, horizons: list[int], name: str, model_name: str = "fro
                 "run_manifest_sha256": manifest._sha256(os.path.join(out, "run_manifest.json")),
                 "git_commit": manifest._git("rev-parse", "HEAD"),
                 "git_uncommitted_changes": bool(manifest._git("status", "--porcelain", "--untracked-files=no")),
-                "seconds": round(time.time() - t0)}
+                "retest_reason": retest, "seconds": round(time.time() - t0)}
     with open(os.path.join(report, "settings.json"), "w") as f:
         json.dump({**settings, "head_to_head": {str(h): r["h2h"] for h, r in res.items()}}, f, indent=2)
     write_report(report, settings, res, test)
@@ -342,8 +413,12 @@ def write_report(report, settings, res, test):
     show = ["flagged", "caught", "mules", "recall", "recall_final_label", "precision", "false_alarm_share",
             "precision_final_label",
             "catch_mean", "median_days_from_start", "flagged_before_start"] + [f"caught_{p}" for p in PROFILES]
-    title = "final test" if test else "dry run"
+    retest = settings.get("retest_reason")
+    title = "final test, re-test (test months re-used)" if retest else "final test" if test else "dry run"
     lines = [f"# Harness, {title}: cohort opened in month(s) {', '.join(map(str, settings['cohort_months']))}", "",
+             *([f"**Re-test of the test months.** Reason, recorded before the run: {retest}", "",
+                f"Every look is counted in `{LOOKS}`. This result is optimistic: the test months were seen before, so "
+                "the first final test (`final_test/`) stays the headline.", ""] if retest else []),
              f"Settings: `{json.dumps(settings)}`", "",
              "Model vs rules on the same accounts. Each week since opening the model may flag as many accounts as the "
              "rules raised alerts on this cohort that week; a flag is permanent. `model_anytime`: a secondary policy, "
@@ -362,9 +437,11 @@ def write_report(report, settings, res, test):
                                         else (f"{v:.0f}" if isinstance(v, (int, float)) and v == v else str(v))))
         w = r["weekly"][r["weekly"].week.isin([0, 2, 4, 8, 12, 17, 26, 52, 77])].round(3)
         age = r["by_age"].round(4)
+        month = r["by_month"].round(4)
         if late:
             w = w.drop(columns=["flagged_model_anytime", "catch_model_anytime"])
             age = age[age["policy"] != "model_anytime"]
+            month = month[month["policy"] != "model_anytime"]
         tie = r["weekly"]["tied_at_cut"]
         lines += [f"## Weeks 0-{h}{' (main)' if h == 26 else ''}: launderers who are mules by the end of week {h}", "",
                   s.to_markdown(), "",
@@ -375,6 +452,8 @@ def write_report(report, settings, res, test):
                   pd.Series(r["h2h"]).to_frame("value").to_markdown(floatfmt=".1f"), "",
                   "### By age band (recall; false_positive_rate = share of normal accounts flagged)", "",
                   age.to_markdown(index=False), "",
+                  "### By opening month (calendar drift: share_flags far below share_mules = month under-ranked)", "",
+                  month.to_markdown(index=False), "",
                   "### By week since opening", "", w.to_markdown(index=False), ""]
     lines += ["- recall / precision: against mule accounts by the end of the horizon (fake accounts from opening, real "
               "customers from their start). recall_final_label / precision_final_label: against launderers at any "
@@ -397,15 +476,18 @@ def main(argv=None):
     ap.add_argument("--months", nargs="+", type=int, default=[5], help="cohort opening months (default 5, dry run)")
     ap.add_argument("--horizons", nargs="+", type=int, default=[26, 77],
                     help="last week of each horizon since opening (default 26 = main, 77 = appendix)")
-    ap.add_argument("--model", default="frozen_tuned",
-                    help="model name (default frozen_tuned, the shared model of record committed in git)")
+    ap.add_argument("--model", default="frozen_tuned_avg5",
+                    help="model name (default frozen_tuned_avg5, the shared model of record committed in git)")
     ap.add_argument("--name", default=None, help="report folder name (default month<M>_dryrun_w<W>)")
     ap.add_argument("--scores", default=None,
                     help="score this file (parquet/csv: account_id, weeks_since_open, score) instead of --model")
     ap.add_argument("--final-test", action="store_true", help="score test months 6-7, once")
+    ap.add_argument("--retest", default=None, metavar="REASON",
+                    help="with --final-test after the first one is locked: a counted re-use of the test months into "
+                         "final_test_r<N>; REASON = the change and its months 0-5 evidence")
     a = ap.parse_args(argv)
     name = a.name or f"month{''.join(map(str, a.months))}_dryrun"
-    report = run(a.out, a.months, a.horizons, name, a.model, a.final_test, scores_path=a.scores)
+    report = run(a.out, a.months, a.horizons, name, a.model, a.final_test, scores_path=a.scores, retest=a.retest)
     print(open(os.path.join(report, "report.md")).read())
     print(f"-> {report}")
 

@@ -1,0 +1,8 @@
+{
+  "started": "2026-11-02 02:22",
+  "cohort_months": [
+    6,
+    7
+  ],
+  "score_source": "model:frozen_tuned_avg5"
+}
