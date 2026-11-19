@@ -325,6 +325,50 @@ on SAML-D shapes and our own choices and were tested for the rules only.
 - **Left out:** investigator cost in pounds. There is no sourced cost per alert, and all policies flag the same
   number of accounts by design, so it would add an invented number and no information.
 
+**Result (19 Nov 2026, branch `closing-item7`).** `python -m evaluation.cost --out data/v1_full` ->
+`outputs/modelling/results/v1_full/month5_cost/` (`summary.csv`, `by_type.csv`, `per_mule.csv`, `settings.json` with
+the sha256 of the 4 committed inputs, the data's `run_manifest.json` and the git commit; tests `tests/test_cost.py`).
+Month-5 cohort, weeks 0-26, the 78 mules of the harness. All laundering money these mules paid out by the end of
+week 26 (the ceiling): **GBP 310,207**.
+
+| Policy | Mules caught (of 78) | Money paid out before the first flag | Share of the ceiling gone | Share prevented |
+|---|---|---|---|---|
+| Rules | 16 | GBP 284,193 | 91.6% | 8.4% |
+| Rule scorecard | 34 | GBP 263,191 | 84.8% | 15.2% |
+| Model of record (`frozen_tuned_avg5`) | 65 | GBP 208,129 | 67.1% | 32.9% |
+
+Money stopped compared with the rules (paired bootstrap over the 78 mules, 10,000 draws, 95% interval): model
+GBP 76,063 (47,723 to 106,933); scorecard GBP 21,002 (-4,503 to 47,674, so not clearly more than the rules).
+
+- **Most money leaves before any flag.** Even for the mules a policy catches, most of their money is already gone at
+  the flag: 64% for the model's 65 (22 of them had paid out everything), 71% for the rules' 16, 73% for the scorecard's
+  34. No policy flags any mule before its first laundering payment out. Most of the model's gain comes from catching
+  mules at all (its 13 missed mules lose GBP 23,994; the rules' 62 missed mules lose GBP 219,771), not from flagging
+  them early in the burst.
+- **By type:** fakes (70 mules, GBP 288,214) prevented rules 8.5%, scorecard 15.8%, model 34.1%; witting (5, GBP
+  16,012) 9.6% / 9.7% / 23.7%; unwitting (3, GBP 5,981) 0% for every policy (all their money leaves before any
+  flag). Real-customer mules are 8 of 78, so these splits are small.
+
+Definitions, in plain words:
+- *Paid out:* a transaction out of the mule's account (transfer, cash withdrawal or cross-border payment) that the
+  hidden label marks as laundering. These are the same rows as each launderer's `laundered_out` total.
+- *First flag:* taken from each run's committed `launderers.csv` (rules: `rules_first_alert_week`; model and scorecard:
+  `model_flag_week_w26`), dated as the harness dates it: a rules flag on its first alert day (read from the hidden
+  alerts, checked against the file's week), a weekly model flag at the end of its week, the day its score exists. Both
+  see every transaction up to and including that day, so payments **on the flag day count as gone**; the flag is
+  assumed to stop every later payment (the bank's 3-30 day review is ignored for every policy alike, so all three
+  shares prevented are best cases).
+- *Never flagged by the end of week 26:* everything the mule paid out up to the end of week 26 counts as gone.
+- *Closed accounts:* the bank closes an account only after a rule alert, and the simulator removes everything after
+  closure. As in the harness, a model can no longer flag a closed account; for such a mule the money paid out before
+  closure counts as gone. This happens for 2 mules under the model and 1 under the scorecard; the money they would
+  have paid out had the rules not closed them does not exist in the data, which slightly flatters the model and
+  scorecard.
+
+Limits: month 5 only (78 mules), so this is a dry-run figure, not a test-month result; months 6-7 would be another
+counted look. Investigator cost is left out (no sourced cost per alert; all policies use the same weekly budget).
+Amounts are the simulator's (anchored to RUSI's GBP 532), so the pounds compare policies, not real losses.
+
 ## 8. Not done: stated as limits
 
 | Plan item | Why not | Where it is said |
