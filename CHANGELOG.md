@@ -16,6 +16,7 @@ Assumptions and Use" doc.
   (locked). The folder is kept whole, like the 7 robustness runs (the amendment said large files would be deleted).
 - `data/variant_II`: no data change; `robust_avg5` trained on its months 0-4 and months 6-7 scored once (locked).
 - No change to v1_full, the main data or the model of record.
+
 ## 19 Nov 2026 — Methods comparison: G1_graphsage and A4c_logistic_inter on the training folds (Keith Tan)
 
 No change to the data, the store, the feature list or the model of record. Two rivals added to
