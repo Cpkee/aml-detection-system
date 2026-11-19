@@ -116,7 +116,11 @@ graph groups no clear gain) agree with the frozen 38 inputs; measured refit nois
 GNN proposal (3 Nov 2026, Keith Tan; code + tests only, not pre-registered): `src/models/gnn.py` is a 2-layer GraphSAGE
 (plain PyTorch) on account-weeks linked by payments between accounts of the bank (`python -m features graph` first), up to
 each week's cut-off; neighbours from any month, never their labels; the 38 inputs; fixed `gnn.DEFAULTS`. `gnn.method(out)`
-gives the comparison's `fit(train, valid)`. No fold run until the methods comparison adds it as a dated amendment.
+gives the comparison's `fit(train, valid)`. Added to the methods comparison as `G1_graphsage` (amendment, approved by
+Kee Chee Pheng, 19 Nov 2026) with the post hoc `A4c_logistic_inter` (`models.logreg`, interactions). Folds 1-3, 19 Nov:
+G1 `catch_rules` 0.434 / 0.451 / 0.465 vs ref 0.473 / 0.450 / 0.440, pooled gain -0.004 (95% -0.035 to +0.025, p 0.77);
+A4c 0.447 / 0.412 / 0.392, gain -0.038 (-0.066 to -0.010); no rival wins on the folds
+(`comparison/v1_full/interim_paired_tests_folds.csv`). G1 takes 22-40 min per fold. Month 5 with the other rivals at the gate.
 Phase 5 (28 Oct 2026): `python -m models train [--out D --params FILE]` fits the frozen model on months 0-4 ->
 `data/<run>/models/frozen/`; `python -m evaluation.score [--months 5]` runs the fixed-cohort harness at the rules' weekly
 budget -> `outputs/modelling/results/<run>/month5_dryrun/`; test months only with `--final-test`, once (lock file).

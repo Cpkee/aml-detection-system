@@ -6,6 +6,16 @@ Assumptions and Use" doc.
 
 
 
+## 19 Nov 2026 — Methods comparison: G1_graphsage and A4c_logistic_inter on the training folds (Keith Tan)
+
+No change to the data, the store, the feature list or the model of record. Two rivals added to
+`outputs/modelling/comparison/PLAN.md` as dated amendments (G1 approved by Kee Chee Pheng; A4c labelled post hoc) and
+run on folds 1-3 only (months 0-4; months 5-7 untouched). G1 (2-layer GraphSAGE on payment links): `catch_rules`
+0.434 / 0.451 / 0.465 vs ref 0.473 / 0.450 / 0.440, pooled gain -0.004 (95% -0.035 to +0.025). A4c (logistic with 4
+share x money interactions): 0.447 / 0.412 / 0.392, gain -0.038 (-0.066 to -0.010). Interim paired tests of every
+rival vs ref (folds only): `comparison/v1_full/interim_paired_tests_folds.csv`; no rival wins. Out-of-fold scores in
+`data/v1_full/comparison/` (not committed).
+
 ## 16 Nov 2026 — Fake-mix stress plan closed (no run)
 
 No data, model or result change. The draft plan `outputs/modelling/stress/PLAN.md` (5 Nov, never agreed, never run)
