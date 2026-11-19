@@ -1,6 +1,6 @@
 # CLAUDE.md — aml-detection-system
 
-BT4102 group project (NUS). Question: can account-opening data plus early activity catch money-laundering
+BT4012 group project (NUS). Question: can account-opening data plus early activity catch money-laundering
 (mule) accounts **earlier** than a bank's existing rules? No public data links applications to later
 transactions, so we **simulate** one: real BAF applications -> hidden profiles -> 18 months of simulated UK
 banking -> laundering planted from published evidence -> the bank's 6 rules as the benchmark.
@@ -54,7 +54,13 @@ of split gain to `outputs/modelling/models/v1_full/frozen_importance/importance.
 80%, top 10 89%); `tests/test_feature_lab.py` pins the 38. Tuning step 2 and later models use them;
 the lab's baseline includes them (`--baseline store` to re-check them). Notebooks 05/06 stay the records of the store-only
 runs. The lab also splits each gain by phase (`pre_start_recall`, `start_recall`, `later_recall`) and reports
-`first_caught_2wk` with permanent flags: weekly recall rewards re-flagging mules already found (26 Oct 2026 finding). The `feature-engineer` agent (`.claude/agents/`) runs propose -> implement -> verify -> evaluate
+`first_caught_2wk` with permanent flags: weekly recall rewards re-flagging mules already found (26 Oct 2026 finding).
+Feature selection (report appendix, under the freeze): `python -m features select [--out D]` runs
+`notebooks/10_feature_selection.ipynb` (helpers `src/models/feature_selection.py`: `FAMILIES` of the 38 inputs,
+near-duplicate groups, grouped permutation importance, SHAP) -> `outputs/modelling/feature_selection[/<run>]`; it labels
+each input needed / covered by a near-copy / mixed / weak. `python -m models.feature_lab --drop NAME... [--together]`
+leaves families or single inputs out; `--params FILE` refits with given LightGBM settings (e.g. tuning step 2's
+`tuned_params.json`). Results with the tuned settings: see CHANGELOG. The `feature-engineer` agent (`.claude/agents/`) runs propose -> implement -> verify -> evaluate
 trials; it never changes the store, which stays a team decision.
 Agent trials 26 Oct 2026 (v1_full, vs the adopted model; groups `new_cp4`, `self4`, `speed_cum` in `candidates.py`,
 merged from the agent worktree 27 Oct 2026): `self4` (last 4 weeks vs the account's own earlier average)
@@ -107,6 +113,14 @@ manifest, store untouched) and `graph_nb` (neighbours' scores from a two-stage m
 `<out>/features/graph_nb/`); `--scratch DIR` for development runs that skip the ledger. Report-appendix work under the
 freeze: v1_full results (catch_rules: rules 0.141, frozen model 0.457; `roll4` holds at the rules' budget, `app_split` and the
 graph groups no clear gain) agree with the frozen 38 inputs; measured refit noise 0.012 (catch_rules), 0.006 (weekly recall).
+GNN proposal (3 Nov 2026, Keith Tan; code + tests only, not pre-registered): `src/models/gnn.py` is a 2-layer GraphSAGE
+(plain PyTorch) on account-weeks linked by payments between accounts of the bank (`python -m features graph` first), up to
+each week's cut-off; neighbours from any month, never their labels; the 38 inputs; fixed `gnn.DEFAULTS`. `gnn.method(out)`
+gives the comparison's `fit(train, valid)`. Added to the methods comparison as `G1_graphsage` (amendment, approved by
+Kee Chee Pheng, 19 Nov 2026) with the post hoc `A4c_logistic_inter` (`models.logreg`, interactions). Folds 1-3, 19 Nov:
+G1 `catch_rules` 0.434 / 0.451 / 0.465 vs ref 0.473 / 0.450 / 0.440, pooled gain -0.004 (95% -0.035 to +0.025, p 0.77);
+A4c 0.447 / 0.412 / 0.392, gain -0.038 (-0.066 to -0.010); no rival wins on the folds
+(`comparison/v1_full/interim_paired_tests_folds.csv`). G1 takes 22-40 min per fold. Month 5 with the other rivals at the gate.
 Phase 5 (28 Oct 2026): `python -m models train [--out D --params FILE]` fits the frozen model on months 0-4 ->
 `data/<run>/models/frozen/`; `python -m evaluation.score [--months 5]` runs the fixed-cohort harness at the rules' weekly
 budget -> `outputs/modelling/results/<run>/month5_dryrun/`; test months only with `--final-test`, once (lock file).
