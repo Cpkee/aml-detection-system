@@ -1,6 +1,6 @@
 # Closing the modelling plan: implementation plan (drafted 19 Nov 2026)
 
-**Status (19 Nov 2026): items 1–4 done, results under each heading; items 5–7 wait on the team's decisions below.** The modelling plan (decision-record doc, tab
+**Status (19 Nov 2026): items 1–7 done, results under each heading; item 8 is stated as limits.** The modelling plan (decision-record doc, tab
 "Modelling plan", 9 Oct 2026) promised some things that are not in the repo yet. This file says, for each one, what
 to build, what it reads, how long it takes and how the result will be read. Report deadline: 22 Nov 2026.
 
@@ -267,6 +267,46 @@ on SAML-D shapes and our own choices and were tested for the rules only.
   against the chance band 0.31–0.55. A "shrinks" or "fails" is reported as a dependence on forwarding speed.
 - **Expectation, stated in advance:** the rules do not use forwarding speed inside a week, so they should lose
   little; the model should lose more. A smaller lead is the likely outcome.
+- **Result (done 19 Nov 2026; robustness plan, Amendment 2).** `data/sensitivity/forward_delay_shares__1` was built
+  from commit c4e47d8 with the three `--set` values (244,000 accounts, seed 42, rules frozen at 1.516; 7 min 43 s).
+  All 10 `sim.checks` pass. Store, cleaned tables (fitted on its own months 0–4) and `robust_avg5` (the settings of
+  `frozen_tuned`, LightGBM seeds 1–5, nothing tuned; 4.45M account-weeks, 89 s) were built, then its months 6–7
+  were scored once (28 s; `outputs/modelling/results/forward_delay_shares__1/final_test/`, locked).
+
+  *The rules, whole dataset (all months).* They lose more than expected.
+
+  | Data | Alerts | False alarms | Launderers alerted | Median days to catch |
+  |---|---|---|---|---|
+  | v1_full | 3,614 | 93.4% | 237 of 732 (32%) | 9 |
+  | Patient launderers | 3,572 | 94.4% | 199 of 732 (27%) | 8 |
+
+  *Lead (the robustness rule).* Weeks 0–26, test cohort, the rules' weekly budget. The verdict is **holds**.
+
+  | Data | Mules | Model caught | Rules caught | Lead | 95% interval | Precision model / rules | Verdict |
+  |---|---|---|---|---|---|---|---|
+  | v1_full (headline) | 163 | 120 | 50 | 0.43 | 0.35–0.52 | 0.43 / 0.19 | – |
+  | Patient launderers | 163 | 117 | 38 | 0.48 | 0.40–0.56 | 0.44 / 0.15 | **holds** |
+
+  The lead (0.48) is inside the chance band (0.31–0.55). McNemar: both 37, model only 80, rules only 1, neither 45;
+  chi-square 75.11, exact p 6.8e-23. By type (model / rules): fakes 107 / 34 of 147, witting 8 / 4 of 11,
+  unwitting 2 / 0 of 5. Weeks 0–77: model 126, rules 45 of 180.
+
+  What this means:
+  - **The expectation did not hold.** We expected a smaller lead. The lead is slightly larger (0.48 vs 0.43), well
+    inside the chance band.
+  - **The model lost its speed signal, as expected.** The five forwarding-speed inputs carried 14.4% of the model's
+    gain on v1_full and 4.8% here. The 1-hour share over 4 weeks fell from 12.7% (2nd input) to 2.2% (8th). The
+    model leaned more on other activity: rows in the last 4 weeks, the share paid to other accounts at the bank,
+    and the number of payers. It still caught nearly as many mules (117 vs 120).
+  - **The rules lost more.** In the test cohort they caught 38 mules instead of 50; over all months, true alerts fell
+    from 240 to 200. The likely reason: the pass-through rule (R4, 168 of the 200 true alerts here) needs 80% of a
+    week's money in to leave in the same week, and patient launderers often pay out the next week. We did not
+    compare R4 alone with v1_full (no committed per-rule count for v1_full).
+  - **So the lead depends on forwarding speed, but not the way we guessed.** Slow forwarding hurts the rules more
+    than the model here. This rests on an unsourced assumption, so it is a statement about the simulation only.
+  - **False alarms by age.** Normal customers are the same as in v1_full, so the rules flag exactly the same normal
+    accounts (ratios 0.94 and 0.96, as in item 2). The model's ratios are 0.41 (3 bands) and 0.47 (under 50 vs 50+),
+    against 0.31 and 0.43 on v1_full. It still flags 50+ normal customers most (0.54% vs 0.22% for under-30s).
 
 ## 6. Fairness on Variant II (optional)
 
@@ -277,6 +317,42 @@ on SAML-D shapes and our own choices and were tested for the rules only.
 - **Steps:** train `robust_avg5` on its months 0–4, score its months 6–7 once (own lock), report the lead and the
   item-2 ratio. Added to the robustness plan in the same amendment as item 5.
 - **How we read it:** reported beside item 2, never used to change the model.
+- **Result (done 19 Nov 2026; robustness plan, Amendment 2).** Variant II was not rebuilt: its store and cleaned
+  tables passed their manifest checks. `robust_avg5` was trained on its months 0–4 (the settings of `frozen_tuned`,
+  LightGBM seeds 1–5, nothing tuned; 4.45M account-weeks, 192 s). Its months 6–7 were then scored once (52 s;
+  `outputs/modelling/results/variant_II/final_test/`, locked). Weeks 0–26, test cohort, the rules' weekly budget.
+
+  *Lead (the robustness rule).* The verdict is **holds**.
+
+  | Data | Mules | Model caught | Rules caught | Lead | 95% interval | Precision model / rules | Verdict |
+  |---|---|---|---|---|---|---|---|
+  | v1_full (headline) | 163 | 120 | 50 | 0.43 | 0.35–0.52 | 0.43 / 0.19 | – |
+  | Variant II | 152 | 134 | 57 | 0.51 | 0.42–0.59 | 0.51 / 0.22 | **holds** |
+
+  The lead (0.51) is inside the chance band (0.31–0.55). McNemar: both 55, model only 79, rules only 2, neither 16;
+  chi-square 71.31, exact p 2.7e-21 (v1_full: 43 / 77 / 7 / 36, p 5.1e-16). By type (model / rules): fakes 126 / 53
+  of 138, witting 6 / 3 of 10, unwitting 2 / 1 of 4. 117 of the 152 mules are aged 50+.
+
+  *Fairness (item 2's measure).* Share of normal accounts flagged, and lowest ÷ highest rate:
+
+  | Data | Policy | Under 30 | 30–49 | 50+ | Ratio, 3 bands | Under 50 | Ratio, under 50 vs 50+ |
+  |---|---|---|---|---|---|---|---|
+  | v1_full | Model | 0.19% | 0.29% | 0.61% | 0.31 | 0.26% | 0.43 |
+  | v1_full | Rules | 0.42% | 0.43% | 0.44% | 0.94 | 0.43% | 0.96 |
+  | Variant II | Model | 0.07% (5) | 0.23% (39) | 0.35% (87) | **0.19** | 0.18% (44) | **0.52** |
+  | Variant II | Rules | 0.23% (17) | 0.37% (64) | 0.47% (119) | 0.48 | 0.33% (81) | 0.69 |
+
+  (In brackets: normal accounts flagged.) What this means:
+  - The model again flags 50+ customers most and under-30s least. Its three-band ratio is lower than on v1_full
+    (0.19 vs 0.31), because it almost never flags a normal under-30 customer (5 of 7,518).
+  - The two-group ratio is better than on v1_full (0.52 vs 0.43). The model's rate for 50+ is lower here (0.35% vs
+    0.61%), and lower than the rules' rate in every band. It raises fewer false alarms overall (131 vs the rules' 200).
+  - The rules are less even here than on v1_full (0.48 vs 0.94). The rules do not see age, so the difference comes
+    from how normal banking differs by age in this data. We did not check the cause.
+  - Variant II's test cohort is older: half its accounts are 50+ (25,304 of 50,061), against 16% on v1_full. So the
+    two datasets' rates are not a like-for-like comparison of the same customers.
+  - Reported as a cost of the model, as in item 2. Nothing is tuned to change it. Variant IV is left out (its store
+    is not built).
 
 ## 7. Money gone before the first flag, month 5 (optional)
 
@@ -288,6 +364,50 @@ on SAML-D shapes and our own choices and were tested for the rules only.
   transaction labels through `amldata.evaluation()` (scoring code, so allowed).
 - **Left out:** investigator cost in pounds. There is no sourced cost per alert, and all policies flag the same
   number of accounts by design, so it would add an invented number and no information.
+
+**Result (19 Nov 2026, branch `closing-item7`).** `python -m evaluation.cost --out data/v1_full` ->
+`outputs/modelling/results/v1_full/month5_cost/` (`summary.csv`, `by_type.csv`, `per_mule.csv`, `settings.json` with
+the sha256 of the 4 committed inputs, the data's `run_manifest.json` and the git commit; tests `tests/test_cost.py`).
+Month-5 cohort, weeks 0-26, the 78 mules of the harness. All laundering money these mules paid out by the end of
+week 26 (the ceiling): **GBP 310,207**.
+
+| Policy | Mules caught (of 78) | Money paid out before the first flag | Share of the ceiling gone | Share prevented |
+|---|---|---|---|---|
+| Rules | 16 | GBP 284,193 | 91.6% | 8.4% |
+| Rule scorecard | 34 | GBP 263,191 | 84.8% | 15.2% |
+| Model of record (`frozen_tuned_avg5`) | 65 | GBP 208,129 | 67.1% | 32.9% |
+
+Money stopped compared with the rules (paired bootstrap over the 78 mules, 10,000 draws, 95% interval): model
+GBP 76,063 (47,723 to 106,933); scorecard GBP 21,002 (-4,503 to 47,674, so not clearly more than the rules).
+
+- **Most money leaves before any flag.** Even for the mules a policy catches, most of their money is already gone at
+  the flag: 64% for the model's 65 (22 of them had paid out everything), 71% for the rules' 16, 73% for the scorecard's
+  34. No policy flags any mule before its first laundering payment out. Most of the model's gain comes from catching
+  mules at all (its 13 missed mules lose GBP 23,994; the rules' 62 missed mules lose GBP 219,771), not from flagging
+  them early in the burst.
+- **By type:** fakes (70 mules, GBP 288,214) prevented rules 8.5%, scorecard 15.8%, model 34.1%; witting (5, GBP
+  16,012) 9.6% / 9.7% / 23.7%; unwitting (3, GBP 5,981) 0% for every policy (all their money leaves before any
+  flag). Real-customer mules are 8 of 78, so these splits are small.
+
+Definitions, in plain words:
+- *Paid out:* a transaction out of the mule's account (transfer, cash withdrawal or cross-border payment) that the
+  hidden label marks as laundering. These are the same rows as each launderer's `laundered_out` total.
+- *First flag:* taken from each run's committed `launderers.csv` (rules: `rules_first_alert_week`; model and scorecard:
+  `model_flag_week_w26`), dated as the harness dates it: a rules flag on its first alert day (read from the hidden
+  alerts, checked against the file's week), a weekly model flag at the end of its week, the day its score exists. Both
+  see every transaction up to and including that day, so payments **on the flag day count as gone**; the flag is
+  assumed to stop every later payment (the bank's 3-30 day review is ignored for every policy alike, so all three
+  shares prevented are best cases).
+- *Never flagged by the end of week 26:* everything the mule paid out up to the end of week 26 counts as gone.
+- *Closed accounts:* the bank closes an account only after a rule alert, and the simulator removes everything after
+  closure. As in the harness, a model can no longer flag a closed account; for such a mule the money paid out before
+  closure counts as gone. This happens for 2 mules under the model and 1 under the scorecard; the money they would
+  have paid out had the rules not closed them does not exist in the data, which slightly flatters the model and
+  scorecard.
+
+Limits: month 5 only (78 mules), so this is a dry-run figure, not a test-month result; months 6-7 would be another
+counted look. Investigator cost is left out (no sourced cost per alert; all policies use the same weekly budget).
+Amounts are the simulator's (anchored to RUSI's GBP 532), so the pounds compare policies, not real losses.
 
 ## 8. Not done: stated as limits
 
@@ -302,7 +422,8 @@ example. Add one line at its top pointing here.
 
 ## Decisions for the team
 
-1. Item 5: is the patient-launderer test value acceptable as an assumption? (Blocks item 5.)
-2. Items 6 and 7: do them, or state them as not done?
+1. ~~Item 5: is the patient-launderer test value acceptable as an assumption? (Blocks item 5.)~~ Yes: approved as an
+   assumption 19 Nov 2026, Kee Chee Pheng.
+2. ~~Items 6 and 7: do them, or state them as not done?~~ Items 6 and 7: do them (19 Nov 2026, Kee Chee Pheng).
 3. ~~Item 3: re-run importance on `frozen_tuned_avg5` if PR #39 used `frozen_tuned`?~~ Not needed (19 Nov): the
    model of record's own importance is committed and rebuilds from its files; PR #39 is the lab baseline, a cross-check.

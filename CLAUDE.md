@@ -182,6 +182,19 @@ importance is `frozen_tuned_avg5/importance.csv` (rebuilds exactly from the 5 se
 account-weeks) takes a median 5.6 s on an Apple M5 Pro (~140,000 account-weeks/s; machine busy). (4) Inputs vs
 simulator assumptions table, ordered by gain share: forwarding speed (14.6%) untested for the model (item 5), money
 amounts (12.9%) the one tested group whose lead shrinks (0.17).
+**Closing plan items 5-7 (19 Nov 2026, Kee Chee Pheng approved all three; robustness plan Amendment 2 committed before
+any run):** (5) Patient launderers `data/sensitivity/forward_delay_shares__1` (`--set laundering.forward_delay_shares=
+{under_15min: 0.05, 15_to_60min: 0.10, 1_to_24h: 0.35, over_24h: 0.50}`, an unsourced assumption; 244k, seed 42, rules
+1.516, 10/10 checks; rules 94.4% false alarms, 27% caught): model 117 vs rules 38 of 163, lead 0.48 (0.40-0.56),
+**holds**; the expected shrink did not happen: the speed inputs fell from 14.4% to 4.8% of gain, but the rules lost more
+(likely R4's same-week pass-through). (6) `variant_II` (not rebuilt): model 134 vs rules 57 of 152, lead 0.51
+(0.42-0.59), holds; false-positive-rate ratio model / rules 0.19 / 0.48 (3 bands), 0.52 / 0.69 (under 50 vs 50+); its
+cohort is half 50+. Both have their own `robust_avg5`, months 6-7 scored once (`results/<run>/final_test/`, locked);
+`python -m evaluation.robustness --amendment` writes `robustness/summary_amendments.csv` (`summary.csv` unchanged).
+(7) `python -m evaluation.cost` -> `results/v1_full/month5_cost/` (month 5 only, 78 mules, weeks 0-26; laundering paid
+out on or before the first flag): of GBP 310,207 the rules prevent 8.4%, the rule scorecard 15.2%, the model of record
+32.9% (GBP 76k more than the rules, 95% 48k-107k); caught mules have already paid out about two thirds. Investigator
+cost left out.
 **Outlier appendix (30 Oct 2026, Kee Chee Pheng; plan `outputs/modelling/outlier/PLAN.md`, team doc
 https://claude.ai/artifact/MVKuDNLsRt74YdfLkygXZg):** can label-free detectors beat the rules, and do they find the 543
 mules the bank never confirmed (189 of 732 confirmed)? Decided: month 5 only, never 6-7 (D1); bank label = closed by

@@ -6,6 +6,17 @@ Assumptions and Use" doc.
 
 
 
+## 19 Nov 2026 — New sensitivity dataset `forward_delay_shares__1` (patient launderers); Variant II scored
+
+- New dataset `data/sensitivity/forward_delay_shares__1` (robustness plan Amendment 2): forwarding-delay shares
+  0.05 / 0.10 / 0.35 / 0.50 instead of RUSI's 0.28 / 0.25 / 0.32 / 0.15, set with `--set` only. An unsourced
+  assumption, approved 19 Nov 2026 by Kee Chee Pheng; `configs/sim.yaml` unchanged. 244,000 accounts, seed 42, rules
+  frozen at 1.516, built from commit c4e47d8; 10/10 checks pass. Rules: 3,572 alerts, 94.4% false alarms, 199 of 732
+  launderers alerted (27%), median 8 days. Store, cleaned tables and `robust_avg5` built; months 6-7 scored once
+  (locked). The folder is kept whole, like the 7 robustness runs (the amendment said large files would be deleted).
+- `data/variant_II`: no data change; `robust_avg5` trained on its months 0-4 and months 6-7 scored once (locked).
+- No change to v1_full, the main data or the model of record.
+
 ## 19 Nov 2026 — Methods comparison: G1_graphsage and A4c_logistic_inter on the training folds (Keith Tan)
 
 No change to the data, the store, the feature list or the model of record. Two rivals added to
@@ -15,6 +26,7 @@ run on folds 1-3 only (months 0-4; months 5-7 untouched). G1 (2-layer GraphSAGE 
 share x money interactions): 0.447 / 0.412 / 0.392, gain -0.038 (-0.066 to -0.010). Interim paired tests of every
 rival vs ref (folds only): `comparison/v1_full/interim_paired_tests_folds.csv`; no rival wins. Out-of-fold scores in
 `data/v1_full/comparison/` (not committed).
+
 
 ## 16 Nov 2026 — Fake-mix stress plan closed (no run)
 
