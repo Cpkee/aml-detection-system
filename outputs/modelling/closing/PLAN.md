@@ -69,21 +69,66 @@ Suggested order: 19 Nov items 1–4; 20 Nov item 5 (then 6 if time); 21 Nov repo
 
 ## 4. Which inputs rest on which simulator assumptions
 
-Writing only. One table for the report's limitations section, filled from the robustness report
-(`outputs/modelling/robustness/report.md`) and the source check of 18 Nov 2026 (PR #59). Draft rows:
+**Done 19 Nov 2026 (writing only; nothing run).** One table for the report's limitations section. It says, for
+each group of the model's 38 inputs, which simulator setting makes that input useful, how good the evidence for the
+setting is, and whether a robustness run changed the setting. Sources:
 
-| Model inputs | Simulator setting they rest on | Evidence for the setting | Tested by | Result |
-|---|---|---|---|---|
-| Forwarding speed (1 h / 24 h shares, minutes) | `forward_delay_shares` | RUSI 2025, confirmed | Not yet: item 5 | – |
-| Money in, pass-through | `out_transfer_mean` (£532) | RUSI 2025, confirmed | `out_transfer_mean__1` | Shrinks (lead 0.17) |
-| Payers, new payers | Laundering shapes; `group_collection` | SAML-D (itself synthetic); assumption | Not tested for the model | – |
-| Application score | `in_window_mix` (73% fake), BAF fraud rows | Our inference (Which?, RUSI do not state it) | `in_window_mix__1` | Holds (0.56) |
-| Application score: age | `fake_age_rule`, `real_mule_age_weights` | Cifas, confirmed | `fake_age_rule__1` | Holds (0.50) |
-| Weeks since opening | `fake_start_days` (~90 days) | Assumption, no source | `fake_start_days__1`, `__2` | Borderline (0.39, 0.37) |
-| All activity inputs | `bursts_per_launderer` (one burst) | Assumption, no source | `bursts_per_launderer__1` | Holds (0.46) |
+- Importance: `outputs/modelling/models/v1_full/frozen_tuned_avg5/importance.csv` (gain share per input, written by
+  `models train` for the model of record). **The order of the rows rests on this file.** Item 3 is checking that it
+  belongs to `frozen_tuned_avg5`; if it does not, the shares and the order must be redone.
+- Results: `outputs/modelling/robustness/summary.csv` and `report.md` (lead = (model caught − rules caught) / mules,
+  weeks 0–26, months 6–7 of each dataset; chance band 0.31–0.55; v1_full lead 0.43, 0.35–0.52).
+- Evidence: the `source` and `strength` of each setting in `configs/sim.yaml` as corrected by the source check of
+  18 Nov 2026 (PR #59, open; no values changed). Strength words are the file's own: sourced, derived, samld
+  (measured on SAML-D, itself a synthetic dataset), modelling (our shape choice), assumption (no source).
 
-To finish: check each row against the importance table from item 3, so the inputs the model uses most are the
-ones listed.
+**Table A. Each input once; the shares add to 1.00.** "Share" = summed gain share of the row's inputs in the model of
+record. Rows run from the inputs the model uses most to the least.
+
+| Share | Model inputs (frozen 38) | Simulator setting they rest on | Evidence for the setting | Tested by | Result |
+|--:|---|---|---|---|---|
+| 0.507 | `app_score` (logistic score of the 29 application columns) | `profiles.in_window_mix` (73% of mules are fake accounts, taken from BAF `fraud_bool = 1` rows) | Derived. Lloyds via Which? 2018 states only the witting and unwitting thirds; the fake third is our inference, and so is the 45 in RUSI's "33/45" (PR #59) | `in_window_mix__1` (53% fakes) | Holds: lead 0.56 (0.46–0.66). Real-customer mules caught 18 of 21 vs rules 6 (a small number) |
+| (part of the 0.507 above) | `app_score` through `customer_age` | `profiles.fake_age_rule` (fakes keep their BAF ages) and `profiles.real_mule_age_weights` (real-customer mules weighted to Cifas ages) | Sourced. Fake ages: Cifas (identity-fraud victims skew old) and BAF's own fraud rows. Real-mule ages: Cifas Fraudscape 2026 six-month update (40% / 24% / 17%; citation corrected in PR #59; the annual report gives 39% / 23% / 18%) | `fake_age_rule__1` (young fake ages). Real-mule ages: not tested | Holds: lead 0.50 (0.42–0.58). False alarms follow the fakes' ages (v1_full: 6.1 per 1,000 normal 50+ accounts vs rules 4.4) |
+| 0.146 | Forwarding speed and pass-through: `out_1h_share_4wk`, `out_24h_share_4wk`, `out_1h_share_wk`, `out_24h_share_wk`, `med_in_out_minutes_wk`, `passthrough_4wk`, `passthrough_wk` | `laundering.forward_delay_shares` (28% out within 15 min, 25% more within 1 h, 15% after 24 h); band edges `forward_delay_bands_minutes`; `holder_keeps` (0–10%) | Shares: sourced, RUSI 2025 (the 1–24 h share is derived); checked 18 Nov, note unchanged. Band edges: modelling (1-minute minimum and 7-day maximum ours). `holder_keeps`: assumption (no official percentage found, PR #59) | Not yet (item 5, pending approval) | – |
+| 0.129 | Money amounts: `money_in_4wk`, `money_out_cum`, `money_in_cum`, `money_out_4wk`, `max_in_wk`, `self_vs_past_money_in`, `money_in_wk`, `max_out_wk`, `money_out_wk`, `peer_ratio_money_in` | `laundering.out_transfer_mean` (£532) and each shape's `amount_rel` | £532: sourced, RUSI 2025 (Lloyds Faster Payments out of mule accounts); checked 18 Nov, note unchanged. `amount_rel`: samld (SAML-D medians) | `out_transfer_mean__1` (£1,500) | **Shrinks**: lead 0.17 (0.10–0.24). Rules catch 120 of 163 (vs 50); model 148 |
+| 0.085 | Counterparties: `n_payers_cum`, `n_payees_cum`, `n_payers_4wk`, `new_payer_share_wk`, `n_payees_wk`, `n_payers_wk`, `self_vs_past_payers` | Laundering shapes' `senders` / `recipients` (`laundering.shapes`); for normal accounts `normal.group_collection` (8–15 payers in a week) and `group_collection_yearly_rate` (1% a year) | Shapes: samld (measured on SAML-D). Group collection: partly sourced (Collection Pot's 11.4 contributors; online pots, so separate transfers are ours). Yearly rate: assumption | Not tested for the model (6 rules-only sensitivity runs on the group collection) | – |
+| 0.046 | `internal_out_share_cum` (share of money out sent to accounts in the same bank) | `networks.big_network_share` (25% in one network), `networks.internal_pieces_share` (0.5), layered shapes; for normal accounts `normal.internal_share_of_transfers` (10%) | Network share: sourced, Vocalink 2017 (PDF could not be re-opened on 18 Nov). Pieces share: modelling. Normal internal share: assumption | Not tested for the model (2 rules-only sensitivity runs on the normal internal share) | – |
+| 0.039 | Payment counts: `n_rows_cum`, `n_rows_4wk`, `n_in_4wk`, `self_vs_past_rows`, `n_in_wk`, `n_rows_wk`, `n_out_wk`, `card_items_wk` | `timing.incoming_per_burst` (3–4 payments in), `timing.burst_days` (14), `laundering.out_pieces_mean` (2 pieces out per payment in) | Payments in and burst length: sourced, Synectics 2024. Pieces out: modelling | Not tested for the model (`bursts_per_launderer__1` changes the number of bursts, not the payments in one) | – |
+| 0.027 | `weeks_since_open` | `timing.fake_start_days` (fakes start 60–120 days after opening); `timing.existing_start_bands` for real customers | Fake start: assumption, no source. Real-customer start: derived from RUSI 2025 (~60% of mule accounts older than one year) | `fake_start_days__1` (15–45 days), `fake_start_days__2` (150–210 days) | Holds, borderline: leads 0.39 (0.31–0.48) and 0.37 (0.30–0.45); both intervals reach just below the band floor 0.31. Read as "no clear change" |
+| 0.020 | Cash and abroad mix: `cash_in_share_cum`, `abroad_out_share_cum`, `high_risk_out_share_cum` | Cash shapes (Deposit-Send, Smurfing); `laundering.abroad_ratio_vs_normal` (3.15); for normal accounts `normal.cash_depositor_share` (6%) and `normal.abroad_sender_share` (7%) | Abroad ratio: samld, our measurement on the SAML-D file, not in the paper (PR #59). Cash depositors: FCA 6% measures paying with cash, not depositing (PR #59). Abroad senders: the FCA chart gives 9%, not 7% (PR #59; value kept until the team decides) | Not tested for the model (rules-only sensitivity runs on the abroad ratio and normal cash use) | – |
+
+**Table B. One setting that touches all activity inputs at once** (overlaps Table A).
+
+| Share | Model inputs | Simulator setting | Evidence | Tested by | Result |
+|--:|---|---|---|---|---|
+| 0.466 | All 36 activity inputs (everything except `app_score` and `weeks_since_open`) | `timing.bursts_per_launderer` (one ~2-week burst per launderer) | Assumption, no source | `bursts_per_launderer__1` (a new burst 30 days after each one, until closed) | Holds: lead 0.46 (0.37–0.54). Both sides catch more: model 150, rules 75 of 163 |
+
+**How to read it.** Half of the model's gain comes from the application score, and its main assumption (73% of mules
+are fake accounts) is our own inference; with 53% fakes the lead still holds. The next most-used input, forwarding
+speed (0.146), rests on a sourced figure but has not been tested: item 5 would test it. The one tested setting that
+shrinks the lead is the transfer size (money inputs, 0.129). Counterparties and internal links (0.13 together) rest
+on SAML-D shapes and our own choices and were tested for the rules only.
+
+**What changed versus the draft (19 Nov 2026).**
+- Rows now cover all 38 inputs by their real names, each input in one row, with its summed gain share; ordered by
+  share. Two new rows: `internal_out_share_cum` (the 4th most used input, 0.046, had no row) and cash / abroad mix
+  (0.020; three of its settings had their notes corrected in PR #59). The draft's "Payers" row is now
+  "Counterparties" (payees too); a "Payment counts" row is split off from the draft's "All activity inputs".
+- Pass-through moved from the money row to the forwarding row: it measures how much money in leaves in the same
+  week, which forwarding speed sets.
+- "All activity inputs / `bursts_per_launderer`" moved to Table B: it touches every activity input, so it cannot sit
+  in the ordered table without counting inputs twice.
+- Weeks since opening: the result was "Borderline"; the plan's verdict in `summary.csv` is "holds", borderline only
+  because the intervals reach below 0.31 (as `report.md` says). Now "Holds, borderline". Added the real-customer
+  start setting.
+- Age row: evidence was "Cifas, confirmed"; PR #59 corrected the citation to the Cifas six-month update (annual
+  report 39 / 23 / 18%); fake ages also rest on BAF's own fraud rows. Real-mule ages were never tested: now said.
+- Application score: evidence now names the strength (derived) and that the 45 in "33/45" is also ours (PR #59).
+- Forwarding: "Not yet: item 5" is now "Not yet (item 5, pending approval)"; added the band edges and `holder_keeps`.
+- Counterparties: evidence was "SAML-D; assumption"; the group collection is partly sourced (Collection Pot), its
+  yearly rate is the assumption, and rules-only sensitivity runs exist.
+- Results: 95% intervals added from `summary.csv`. Run 5 (`fake_start_days__1`): `report.md` gives 0.31–0.49, but
+  `summary.csv` gives 0.307–0.485, so 0.31–0.48 here.
 
 ## 5. Evasion test: patient launderers
 
