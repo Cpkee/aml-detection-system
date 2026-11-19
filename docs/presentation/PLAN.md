@@ -1,8 +1,13 @@
 # Slide plan: Catching More Mule Accounts with the Same Alerts
 
-BT4012 Fraud Analytics, Group 09. Drafted 19 Nov 2026 (Kee Chee Pheng, with Claude). Not committed.
+BT4012 Fraud Analytics, Group 09. Drafted 19 Nov 2026 (Kee Chee Pheng, with Claude).
 Replaces the structure of the current deck "BT4012 Group 9.pptx" (26 slides, SharePoint). Words follow
 [`GLOSSARY.md`](../../GLOSSARY.md).
+
+**Built 19 Nov 2026** as a Claude Slides deck from this plan (17 main + 12 backup slides, speaker notes on every
+slide): https://claude.ai/artifact/WnCujmAAgHgagdxoiS9V3Z (private until shared from its Share menu; export to
+`.pptx` / PDF or send to Canva from there). Where the built deck differs from the first draft of this plan, the plan
+below has been updated to match; the list is in section 1.
 
 **Contents**
 1. How to use this plan
@@ -33,6 +38,20 @@ Replaces the structure of the current deck "BT4012 Group 9.pptx" (26 slides, Sha
 7. **Number check** (section 12): every number on every slide against the ledger (section 9). AI layout tools can
    reword text and change numbers.
 8. **Export** from Canva to `.pptx` and PDF. Rehearse with a timer (section 5).
+
+Steps 2–4 are done: the deck was built directly from this plan (link above). Start at step 5.
+
+**Built deck: changes from the first draft of this plan** (all reflected below)
+- Slide 5 headline says "realistic applications": BAF is generated from a real bank's applications, not copied.
+- Slide 9 headline is "**Top** boosted trees tie": CatBoost, also boosted trees, is significantly behind (gain −0.049,
+  95% −0.076 to −0.024, passes Holm). The draft's "gaps under 0.085 are within noise" was wrong and is removed: 0.085 is
+  the pre-registered minimum detectable effect (the smallest gain the folds can reliably show), not a noise band.
+- Slide 12: the grey "started laundering" area replaces the timeline strip along the top (no room under the chart).
+- Slide 3: the footer's section tracker replaces the roadmap of six section names.
+- Slide 15: "Few mules are real customers (16)" (the hyphenated label broke badly across lines).
+- Section tracker sits in the footer row with the page number, not in a header. No NUS logo yet: add it by hand.
+- Backup B9 shows the out-of-fold reliability table (`calibration/reliability.csv`), not the PNG. B10 says 233
+  automated tests (233 passed, 3 skipped, 19 Nov), not 197.
 
 ---
 
@@ -67,8 +86,8 @@ Clean and intuitive: **the slide shows, the speaker explains.**
 | One visual per slide | A chart, a diagram or the timeline, never a wall of cards. At most one row of big numbers per section |
 | Colours | **NUS Blue `#003D7C` = the model.** **NUS Orange `#EF7C00` = the bank's rules.** Grey `#8C8C8C` = everything else. White backgrounds, dark text `#1A1A1A`. Never swap model and rules colours |
 | Type | One sans-serif family (the current deck's). Headline ~32 pt, body ≥ 18 pt, chart labels ≥ 14 pt |
-| Section tracker | Small header on every slide: **Why · Data · Method · Results · Limits · Conclusion**, current one bold. Replaces the 5 divider slides |
-| Logo | NUS logo top right, as now |
+| Section tracker | Small footer row on every slide: **Why · Data · Method · Results · Limits · Conclusion**, current one bold, page number on the right. Replaces the 5 divider slides |
+| Logo | NUS logo top right, as now (not in the built deck: add by hand) |
 | Numbers | Counts as "120 of 163", shares as whole percentages ("43%"), never 4 decimals. Same number, same wording everywhere |
 | Sources | External figures (BioCatch, RUSI, Oztas et al.) get a small footer citation. Internal sources (repo files) go only in speaker notes and backup slide B11, never on a slide |
 | Words | Use `GLOSSARY.md`: **mule account**, **the bank's rules**, **flag**, **caught**, **weekly alert budget**, **days from start**. Never "earlier" to mean "caught when the rules never are" |
@@ -142,7 +161,7 @@ presenter says, not on the slide) · **replaces** (current deck slide numbers).
 #### Slide 3 — Our question · A · 0:50
 - **Headline:** Same number of alerts: can early data catch more mules, sooner?
 - **On slide:** two question chips: "1. Does the application help?" · "2. More, or sooner?" · preview line:
-  "Answer: 2.4× as many. Not sooner." · roadmap: the six section names.
+  "Answer: 2.4× as many. Not sooner." (the footer's section tracker serves as the roadmap)
 - **Visual:** two weekly review lists of the same length side by side, orange (the bank's rules) and blue (the
   model), labelled "same length every week".
 - **Notes:** "Our question: if the bank keeps the same investigators, reviewing the same number of accounts each
@@ -169,7 +188,7 @@ presenter says, not on the slide) · **replaces** (current deck slide numbers).
 - **Replaces:** 6 (divider; it had one line on this). New slide; answers the professor's "justify your dataset".
 
 #### Slide 5 — The simulated bank · A · 1:00
-- **Headline:** We simulate 18 months of UK banking around real applications
+- **Headline:** We simulate 18 months of UK banking around realistic applications
 - **On slide:** five steps with one number under four of them: Applications **244,000 accounts** → Hidden profiles
   **732 mule accounts (0.3%)** → Everyday banking **109M transactions** → Laundering planted → The bank's rules
   **93.4% of alerts false**
@@ -229,15 +248,16 @@ presenter says, not on the slide) · **replaces** (current deck slide numbers).
 - **Replaces:** 11.
 
 #### Slide 9 — Model selection · B · 0:50
-- **Headline:** Boosted trees tie; logistic regression is clearly behind
-- **On slide:** chart only, plus one note: "gaps under 0.085 are within noise"
+- **Headline:** Top boosted trees tie; logistic regression is clearly behind
+- **On slide:** chart only; the top five bars sit in one shaded group labelled "Ties: gaps within noise"
 - **Visual:** horizontal bar chart C2 (section 8): share of mule accounts caught at the rules' budget. Our model in
   blue, the bank's rules in orange, the rest grey.
 - **Notes:** "We compared rivals on the training months only, before the test months were opened, under the same
-  rule: catch as many mule accounts as possible at the rules' weekly budget. The boosted trees, XGBoost, our
-  LightGBM and the graph neural network all land between 0.45 and 0.46. Gaps that small are within noise: we can only
-  detect differences above 0.085. So we kept the model we had frozen beforehand. Logistic regression is clearly
-  behind at 0.30, and the bank's rules catch 0.14 on the same folds."
+  rule: catch as many mule accounts as possible at the rules' weekly budget. The top group, activity only, untuned
+  LightGBM, our model, XGBoost and the graph neural network, all land between 0.45 and 0.46. Gaps that small are
+  within noise, so we kept the model we had frozen beforehand. CatBoost is behind at 0.41, and that gap holds up in
+  the paired test. Logistic regression is clearly behind at 0.30, and the bank's rules catch 0.14 on the same folds.
+  Activity only, our model without the application score, comes up again on slide 13."
 - **Replaces:** 12 (its label-free detectors → backup B6).
 
 ### Section 4: Evaluation and results
@@ -270,7 +290,7 @@ presenter says, not on the slide) · **replaces** (current deck slide numbers).
 - **Headline:** More mules, about as fast: both catch once laundering starts
 - **On slide:** "median 8 vs 9 days from start" · "2 of 120 flagged before laundering began"
 - **Visual:** chart C1: two lines (model, rules) over weeks 0–26, with a light grey area for "mules that have
-  started laundering". The timeline (fourth appearance) runs along the top: quiet weeks, then the burst.
+  started laundering", which stands in for the timeline's fourth appearance (quiet weeks, then the burst).
 - **Notes:** "Both curves stay flat until about week 8, because fake accounts lie quiet for two to three months.
   Then the gap opens exactly when laundering starts. The model is not earlier: its median is 8 days from the start of
   laundering to the first flag, the rules' 9. Only 2 of its 120 catches came before laundering began. And by the
@@ -308,7 +328,7 @@ presenter says, not on the slide) · **replaces** (current deck slide numbers).
 
 #### Slide 15 — Limitations · D · 0:50
 - **Headline:** Every result is a comparison inside a simulation
-- **On slide:** four icons with short labels: "Simulated data" · "Few real-customer mules (16)" · "False alarms fall
+- **On slide:** four icons with short labels: "Simulated data" · "Few mules are real customers (16)" · "False alarms fall
   on older customers" · "One dataset, one locked test"
 - **Visual:** four icons in a row; under "older customers" a tiny bar pair: 50+ false alarms per 1,000 normal
   accounts, model 6.1 vs rules 4.4.
@@ -366,8 +386,8 @@ For Q&A only; same design rules. Each reuses current-deck content where it exist
 | B6 | Label-free detectors | Month 5, 78 mule accounts, 124 flags: rules 16, frozen model 63, bank-label model 54, rarity score 16, rarity sum 39, Isolation Forest 16 | `outputs/modelling/outlier/v1_full/report.md` | 12 (right side) |
 | B7 | A stronger rule set | Month 5: rules 16, hand-written scorecard 34, model 65 of 78 | `outputs/modelling/scorecard/PLAN.md` | — |
 | B8 | Money gone before the first flag | Month 5: £310,207 paid out by week 26; stopped: rules 8.4%, scorecard 15.2%, model 32.9% | `results/v1_full/month5_cost/summary.csv` | — |
-| B9 | Calibration | Reliability plot on month 5 | `models/v1_full/frozen_tuned_avg5/calibration/01_reliability.png` | — |
-| B10 | Reproducibility | Same settings, same data; model files shared; test locked and every look logged; 197 automated tests | `README.md`, `results/v1_full/final_test/` | 25 (left half) |
+| B9 | Calibration | Month 5, out of fold: predicted vs observed mule-week rate per score band (isotonic); raw scores average 18.6% vs 0.24% observed | `models/v1_full/frozen_tuned_avg5/calibration/reliability.csv`, `report.md` | — |
+| B10 | Reproducibility | Same settings, same data; model files shared; test locked and every look logged; 233 automated tests | `README.md`, `results/v1_full/final_test/` | 25 (left half) |
 | B11 | Sources | Every external source, plus the internal files behind each slide | section 9 | footers of all slides |
 | B12 | The longer horizon | Weeks 0–77: model 138 vs rules 59 of 180 | `results/v1_full/final_test/summary_w77.csv` | 16 (last row) |
 
@@ -416,7 +436,11 @@ weekly-alerts column is for the speaker or a backup; don't plot it on the main s
 
 ### C2 — Model selection (slide 9)
 Source: `outputs/modelling/comparison/v1_full/folds.csv` (mean `catch_rules` over 3 training folds; XGBoost and
-CatBoost rows from branch `comparison-boosted`, PR #58). Noise floor 0.085 from `MDE.json`.
+CatBoost rows from branch `comparison-boosted`, PR #58). Paired tests against our model from
+`interim_paired_tests_folds.csv` (Holm over the rivals): XGBoost −0.003 (95% −0.017 to +0.010) and the graph neural
+network −0.004 (−0.035 to +0.025) are ties; CatBoost −0.049 (−0.076 to −0.024) and logistic regression are
+significantly behind. `MDE.json`'s 0.085 is the pre-registered minimum detectable effect (80% power), not a noise
+band: don't put it on the slide.
 
 | Method | Share of mule accounts caught at the rules' budget | Caught (of 210) |
 |---|---|---|
@@ -494,7 +518,8 @@ Every number that appears on a slide or in the notes. Check each slide against t
 | 20× · 1 of 163 | mules pay mules; links existing before both start | `CLAUDE.md` homophily finding |
 | 38 inputs · 19.0M account-weeks · 4.45M rows | model inputs; feature store size; training account-weeks (4,450,113) | `CLAUDE.md`; `CHANGELOG.md` (feature store entry) |
 | train 1.00 vs validation 0.40 | one tree on raw application fields | `CLAUDE.md` Phase 4 baselines |
-| 0.45 … 0.14 · 0.085 | model selection | C2 |
+| 0.458 … 0.141 | model selection (catch share at the rules' budget, training folds) | C2 |
+| −0.049 (−0.076 to −0.024) | CatBoost vs our model, paired test (notes only) | C2 |
 | 50,061 · 163 · about 10 a week | test accounts, mule accounts by week 26, rules' weekly alerts (280 over weeks 0–26) | `final_test/summary_w26.csv`, `settings.json` |
 | 120 vs 50 · 74% vs 31% | caught, recall | `final_test/summary_w26.csv` |
 | 42.9% vs 18.9% (say 43% vs 19%) · 160 vs 214 | precision; false alarms | `final_test/summary_w26.csv`, current slide 16 |
@@ -570,7 +595,7 @@ Design rules:
 - Colours: NUS Blue #003D7C always means the model; NUS Orange #EF7C00 always means the bank's rules; grey
   #8C8C8C for everything else; white backgrounds; dark text #1A1A1A.
 - One sans-serif font. Headline about 32 pt, body at least 18 pt, chart labels at least 14 pt.
-- A small section tracker in every slide's header: Why · Data · Method · Results · Limits · Conclusion, with the
+- A small section tracker in every slide's footer: Why · Data · Method · Results · Limits · Conclusion, with the
   current section bold. No section-divider slides.
 - NUS logo top right.
 - The "life of a mule account" timeline is drawn once and reused on slides 2, 5, 7 and 12 in the same style.
