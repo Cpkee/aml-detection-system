@@ -112,6 +112,34 @@ The model beats the rules in every scenario. The lead depends most on how launde
 large enough for the rules' amount thresholds, the rules catch 3 in 4 and most of the model's lead goes. The fake-
 account assumptions (share, start time, ages) move the lead within the chance band.
 
+## Is the model's lead more than chance? McNemar's test (added 19 Nov 2026)
+
+The lead compares two counts taken on the **same** mules, so the right test is a paired one. McNemar's test ignores
+the mules both methods caught or both missed, and looks only at the ones where they disagree: if the model and the
+rules were equally good, those disagreements would split about 50/50. Exact two-sided p from the binomial on the
+disagreements; chi-square with continuity correction beside it. Weeks 0–26, from each run's committed
+`final_test/launderers.csv` (`python -m evaluation.robustness` prints it; `robustness.mcnemar(run)`).
+
+| Run | Both caught | Model only | Rules only | Neither | Chi-square | Exact p |
+|:--|--:|--:|--:|--:|--:|--:|
+| v1_full (headline) | 43 | 77 | 7 | 36 | 56.68 | 5.1e-16 |
+| 1 `seed__44` | 35 | 79 | 0 | 31 | 77.01 | 3.3e-24 |
+| 2 `in_window_mix__1` | 24 | 75 | 6 | 19 | 57.09 | 2.9e-16 |
+| 3 `bursts_per_launderer__1` | 70 | 80 | 5 | 8 | 64.42 | 1.8e-18 |
+| 4 `fake_start_days__2` | 29 | 62 | 1 | 71 | 57.14 | 1.4e-17 |
+| 5 `fake_start_days__1` | 46 | 72 | 8 | 37 | 49.61 | 5.4e-14 |
+| 6 `out_transfer_mean__1` | 118 | 30 | 2 | 13 | 22.78 | 2.5e-07 |
+| 7 `fake_age_rule__1` | 42 | 86 | 5 | 30 | 70.33 | 4.0e-20 |
+
+- **Headline:** on the same 163 test mules, the model caught 77 that the rules missed, and the rules caught 7 that
+  the model missed. A split this lopsided would almost never happen by chance (p ≈ 5 × 10⁻¹⁶).
+- **Every run agrees.** The rules catch at most 8 mules per run that the model misses; the model finds nearly
+  everything the rules find, and more. The smallest gap is run 6 (£1,500 transfers, 30 vs 2), where the rules
+  already catch most mules: still far beyond chance, matching its "shrinks" verdict.
+- **What it does not say:** it covers mules only, nothing about false alarms (see precision above and the false-
+  positive rate by age); and a tiny p says the gap is real, not how big it is (that is the lead and its interval).
+  It is evidence within the simulation, not about real banking.
+
 ## Amendment 2 (19 Nov 2026): Variant II and patient launderers
 
 Plan: `PLAN.md`, "Amendment 2" (committed before either run). Same recipe, same verdict rule, same chance band
