@@ -1,6 +1,6 @@
 # CLAUDE.md — aml-detection-system
 
-BT4102 group project (NUS). Question: can account-opening data plus early activity catch money-laundering
+BT4012 group project (NUS). Question: can account-opening data plus early activity catch money-laundering
 (mule) accounts **earlier** than a bank's existing rules? No public data links applications to later
 transactions, so we **simulate** one: real BAF applications -> hidden profiles -> 18 months of simulated UK
 banking -> laundering planted from published evidence -> the bank's 6 rules as the benchmark.
@@ -54,7 +54,13 @@ of split gain to `outputs/modelling/models/v1_full/frozen_importance/importance.
 80%, top 10 89%); `tests/test_feature_lab.py` pins the 38. Tuning step 2 and later models use them;
 the lab's baseline includes them (`--baseline store` to re-check them). Notebooks 05/06 stay the records of the store-only
 runs. The lab also splits each gain by phase (`pre_start_recall`, `start_recall`, `later_recall`) and reports
-`first_caught_2wk` with permanent flags: weekly recall rewards re-flagging mules already found (26 Oct 2026 finding). The `feature-engineer` agent (`.claude/agents/`) runs propose -> implement -> verify -> evaluate
+`first_caught_2wk` with permanent flags: weekly recall rewards re-flagging mules already found (26 Oct 2026 finding).
+Feature selection (report appendix, under the freeze): `python -m features select [--out D]` runs
+`notebooks/10_feature_selection.ipynb` (helpers `src/models/feature_selection.py`: `FAMILIES` of the 38 inputs,
+near-duplicate groups, grouped permutation importance, SHAP) -> `outputs/modelling/feature_selection[/<run>]`; it labels
+each input needed / covered by a near-copy / mixed / weak. `python -m models.feature_lab --drop NAME... [--together]`
+leaves families or single inputs out; `--params FILE` refits with given LightGBM settings (e.g. tuning step 2's
+`tuned_params.json`). Results with the tuned settings: see CHANGELOG. The `feature-engineer` agent (`.claude/agents/`) runs propose -> implement -> verify -> evaluate
 trials; it never changes the store, which stays a team decision.
 Agent trials 26 Oct 2026 (v1_full, vs the adopted model; groups `new_cp4`, `self4`, `speed_cum` in `candidates.py`,
 merged from the agent worktree 27 Oct 2026): `self4` (last 4 weeks vs the account's own earlier average)

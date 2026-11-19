@@ -1,0 +1,8 @@
+,members,n,min_abs_rho
+C1,"n_out_wk, n_payees_wk",2,0.9354205586467158
+C2,"n_rows_wk, self_vs_past_rows",2,0.8699405714835874
+C12,"money_out_wk, max_out_wk",2,0.8299112435394919
+C17,"n_in_wk, money_in_wk, max_in_wk, n_payers_wk, self_vs_past_money_in, self_vs_past_payers, peer_ratio_money_in",7,0.8127129018009345
+C18,"n_in_4wk, n_payers_4wk",2,0.9623198609061177
+C22,"money_in_cum, money_out_cum",2,0.9650976297119166
+C23,"n_rows_cum, n_payees_cum, weeks_since_open",3,0.9289681566484875

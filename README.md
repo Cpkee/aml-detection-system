@@ -1,6 +1,6 @@
 # aml-detection-system
 
-Early detection of money-laundering accounts from account-opening and early-activity signals (BT4102).
+Early detection of money-laundering accounts from account-opening and early-activity signals (BT4012).
 
 ## Simulator
 

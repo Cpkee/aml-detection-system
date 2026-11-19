@@ -1,6 +1,6 @@
 # AGENTS.md — aml-detection-system
 
-BT4102 group project (NUS). Question: can account-opening data plus early activity catch money-laundering
+BT4012 group project (NUS). Question: can account-opening data plus early activity catch money-laundering
 (mule) accounts **earlier** than a bank's existing rules? No public data links applications to later
 transactions, so we **simulate** one: real BAF applications -> hidden profiles -> 18 months of simulated UK
 banking -> laundering planted from published evidence -> the bank's 6 rules as the benchmark.
