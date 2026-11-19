@@ -15,7 +15,7 @@ NOTEBOOKS = SRC.parent / "notebooks"
 
 
 def _notebook_code(path: pathlib.Path) -> str:
-    cells = json.loads(path.read_text()).get("cells", [])
+    cells = json.loads(path.read_text(encoding="utf-8")).get("cells", [])
     return "\n".join("".join(c.get("source", [])) for c in cells if c.get("cell_type") == "code")
 
 
@@ -24,7 +24,7 @@ def test_no_hidden_files_outside_allowed_code():
     for py in SRC.rglob("*.py"):
         if py.relative_to(SRC).parts[0] in ALLOWED:
             continue
-        text = py.read_text()
+        text = py.read_text(encoding="utf-8")
         offenders += [f"{py.relative_to(SRC)} names {h}" for h in HIDDEN if h in text]
     for nb in NOTEBOOKS.glob("**/*.ipynb"):                      # notebooks are model code too
         text = _notebook_code(nb)

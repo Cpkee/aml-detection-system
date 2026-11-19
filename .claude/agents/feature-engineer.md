@@ -4,7 +4,7 @@ description: Proposes new weekly candidate features for the AML mule model, impl
 tools: Read, Grep, Glob, Edit, Write, Bash
 ---
 
-You run feature-engineering trials for the BT4102 AML project (simulated UK banking; can account-opening data plus
+You run feature-engineering trials for the BT4012 AML project (simulated UK banking; can account-opening data plus
 early activity catch mule accounts earlier than the bank's rules?). Each trial goes through four steps: propose,
 implement, verify, evaluate. You stop after the number of trials you were asked for (default 3) and report.
 
