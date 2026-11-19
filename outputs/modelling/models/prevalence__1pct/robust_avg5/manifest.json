@@ -1,0 +1,142 @@
+{
+  "name": "robust_avg5",
+  "data_folder": "/Users/cheepheng/aml-detection-system/data/sensitivity/prevalence__1pct",
+  "input_set": "frozen",
+  "inputs": [
+    "n_rows_wk",
+    "n_in_wk",
+    "n_out_wk",
+    "money_in_wk",
+    "money_out_wk",
+    "n_rows_cum",
+    "money_in_cum",
+    "money_out_cum",
+    "max_in_wk",
+    "max_out_wk",
+    "card_items_wk",
+    "n_payers_wk",
+    "n_payees_wk",
+    "new_payer_share_wk",
+    "n_payers_cum",
+    "n_payees_cum",
+    "passthrough_wk",
+    "out_1h_share_wk",
+    "out_24h_share_wk",
+    "med_in_out_minutes_wk",
+    "self_vs_past_money_in",
+    "self_vs_past_payers",
+    "self_vs_past_rows",
+    "peer_ratio_money_in",
+    "internal_out_share_cum",
+    "cash_in_share_cum",
+    "abroad_out_share_cum",
+    "high_risk_out_share_cum",
+    "n_rows_4wk",
+    "n_in_4wk",
+    "money_in_4wk",
+    "money_out_4wk",
+    "n_payers_4wk",
+    "out_1h_share_4wk",
+    "out_24h_share_4wk",
+    "passthrough_4wk",
+    "weeks_since_open",
+    "app_score"
+  ],
+  "n_inputs": 38,
+  "train_months": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "weeks": [
+    0,
+    26
+  ],
+  "label": "mule_by_day; account-weeks after closure dropped",
+  "label_source": "truth",
+  "rows": 4446978,
+  "mule_rows": 27663,
+  "accounts": 164819,
+  "lightgbm_params": {
+    "class_weight": "balanced",
+    "deterministic": true,
+    "force_row_wise": true,
+    "verbose": -1,
+    "learning_rate": 0.032735723260064485,
+    "n_estimators": 500,
+    "num_leaves": 15,
+    "min_child_samples": 2000,
+    "colsample_bytree": 0.9047505230698577,
+    "subsample": 0.918855052953664,
+    "reg_alpha": 3.785717387766898e-05,
+    "reg_lambda": 0.00045683792971933475,
+    "subsample_freq": 1
+  },
+  "params_source": "file",
+  "tree_files": [
+    "lgbm_seed1.txt",
+    "lgbm_seed2.txt",
+    "lgbm_seed3.txt",
+    "lgbm_seed4.txt",
+    "lgbm_seed5.txt"
+  ],
+  "tree_seeds": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "app_score_seed": 42,
+  "score": "mean of the tree files' probabilities",
+  "app_score": "LogisticRegression(class_weight='balanced', max_iter=2000) on accounts_linear; out of fold (5 folds) for training rows, fitted on all training accounts for new ones",
+  "run_manifest_sha256": "b9924a67fdc210e653993df06e1e99cec6e4a30d26fbc9b91d5e116e65568c23",
+  "data_identity": {
+    "version": "v1",
+    "seed": 42,
+    "set": [
+      "size.n_accounts=244000",
+      "rules.fixed_scale=1.516",
+      "profiles.launderer_share=0.01"
+    ],
+    "config_sha256": "2d631de5b9f6cf899cd6aa6daafb1e5e466f999d786ca71aa660ab1f5ecb0e1a",
+    "baf_sha256": "7bf10a37ce07e72e14c1b09e5efee3d27261baff4facc7da767b0474dcf9b809"
+  },
+  "input_fingerprints": {
+    "duckdb": "1.5.6",
+    "accounts.parquet": {
+      "rows": 244000,
+      "fingerprint": 51646089
+    },
+    "features/accounts_linear.parquet": {
+      "rows": 244000,
+      "fingerprint": 82994433
+    },
+    "features/accounts_tree.parquet": {
+      "rows": 244000,
+      "fingerprint": 18593764
+    },
+    "features/peer_medians.parquet": {
+      "rows": 6162,
+      "fingerprint": 923524314
+    },
+    "features/weekly.parquet": {
+      "rows": 19032000,
+      "fingerprint": 345421031
+    }
+  },
+  "store_code_sha256": "e5eecf368077977274d860af83d2c2c035fde3d2f3b0f863cbec730b27bb1294",
+  "preprocess_manifest_sha256": "535c097b25f01c7be1e89bc69f022ff4bd792eb50dddd59690bc5c96ba12b1fa",
+  "git_commit": "9ab7838ff1f8d6b4450e525f2a7db285f80be8a9",
+  "git_uncommitted_changes": false,
+  "lightgbm": "4.7.0",
+  "machine": {
+    "os": "macOS-26.5.1-arm64-arm-64bit",
+    "processor": "arm",
+    "cpu_count": 15,
+    "python": "3.12.15"
+  },
+  "seconds": 84
+}
