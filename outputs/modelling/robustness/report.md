@@ -111,3 +111,34 @@ below the band floor of 0.31. Read them as "no clear change", not as evidence th
 The model beats the rules in every scenario. The lead depends most on how launderers move money: when transfers are
 large enough for the rules' amount thresholds, the rules catch 3 in 4 and most of the model's lead goes. The fake-
 account assumptions (share, start time, ages) move the lead within the chance band.
+
+## Amendment 2 (19 Nov 2026): Variant II and patient launderers
+
+Plan: `PLAN.md`, "Amendment 2" (committed before either run). Same recipe, same verdict rule, same chance band
+(0.31–0.55). Numbers: `summary_amendments.csv` (`python -m evaluation.robustness --amendment`); `summary.csv` is
+unchanged.
+
+**`variant_II`, 19 Nov 2026.** BAF Variant II (launderer rate higher for ages 50+ in all months), 244,000 accounts,
+seed 42, rules frozen at 1.516. Not rebuilt: its store and cleaned tables pass their manifest checks. `robust_avg5`
+trained on its months 0–4 (settings of `frozen_tuned`, LightGBM seeds 1–5, nothing tuned; 4.45M account-weeks, 8,528
+mule weeks), months 6–7 scored once (`results/variant_II/final_test/`, locked).
+
+| Run | Mules | Model | Rules | Lead | 95% interval | Precision model / rules | Verdict |
+|:--|--:|--:|--:|--:|:--|:--|:--|
+| `variant_II` | 152 | 134 | 57 | 0.51 | 0.42–0.59 | 0.51 / 0.22 | **holds** |
+
+Beside the verdict (model / rules, weeks 0–26): fakes 126 / 53 of 138, witting 6 / 3 of 10, unwitting 2 / 1 of 4.
+Median days from start 7 / 9. McNemar: model only 79, rules only 2 (exact p 2.7e-21). Weeks 0–77: 147 / 63 of 169.
+False-positive rate by age (normal accounts flagged; lowest ÷ highest over 3 bands, and under 50 vs 50+):
+
+| Policy | Under 30 | 30–49 | 50+ | Ratio, 3 bands | Ratio, 2 groups | v1_full ratios |
+|:--|--:|--:|--:|--:|--:|:--|
+| Model | 0.07% | 0.23% | 0.35% | 0.19 | 0.52 | 0.31 / 0.43 |
+| Rules | 0.23% | 0.37% | 0.47% | 0.48 | 0.69 | 0.94 / 0.96 |
+
+The lead holds where older customers launder more. The model still flags 50+ normal customers most, but less often
+than the rules do in every band; its uneven spread comes mostly from almost never flagging under-30s. Variant II's
+test cohort is half 50+ (16% on v1_full), and here the rules' false alarms also rise with age. Variant IV is left out
+(its store is not built).
+
+**`forward_delay_shares__1`:** not yet run.

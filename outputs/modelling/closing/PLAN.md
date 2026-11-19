@@ -277,6 +277,42 @@ on SAML-D shapes and our own choices and were tested for the rules only.
 - **Steps:** train `robust_avg5` on its months 0–4, score its months 6–7 once (own lock), report the lead and the
   item-2 ratio. Added to the robustness plan in the same amendment as item 5.
 - **How we read it:** reported beside item 2, never used to change the model.
+- **Result (done 19 Nov 2026; robustness plan, Amendment 2).** Variant II was not rebuilt: its store and cleaned
+  tables passed their manifest checks. `robust_avg5` was trained on its months 0–4 (the settings of `frozen_tuned`,
+  LightGBM seeds 1–5, nothing tuned; 4.45M account-weeks, 192 s). Its months 6–7 were then scored once (52 s;
+  `outputs/modelling/results/variant_II/final_test/`, locked). Weeks 0–26, test cohort, the rules' weekly budget.
+
+  *Lead (the robustness rule).* The verdict is **holds**.
+
+  | Data | Mules | Model caught | Rules caught | Lead | 95% interval | Precision model / rules | Verdict |
+  |---|---|---|---|---|---|---|---|
+  | v1_full (headline) | 163 | 120 | 50 | 0.43 | 0.35–0.52 | 0.43 / 0.19 | – |
+  | Variant II | 152 | 134 | 57 | 0.51 | 0.42–0.59 | 0.51 / 0.22 | **holds** |
+
+  The lead (0.51) is inside the chance band (0.31–0.55). McNemar: both 55, model only 79, rules only 2, neither 16;
+  chi-square 71.31, exact p 2.7e-21 (v1_full: 43 / 77 / 7 / 36, p 5.1e-16). By type (model / rules): fakes 126 / 53
+  of 138, witting 6 / 3 of 10, unwitting 2 / 1 of 4. 117 of the 152 mules are aged 50+.
+
+  *Fairness (item 2's measure).* Share of normal accounts flagged, and lowest ÷ highest rate:
+
+  | Data | Policy | Under 30 | 30–49 | 50+ | Ratio, 3 bands | Under 50 | Ratio, under 50 vs 50+ |
+  |---|---|---|---|---|---|---|---|
+  | v1_full | Model | 0.19% | 0.29% | 0.61% | 0.31 | 0.26% | 0.43 |
+  | v1_full | Rules | 0.42% | 0.43% | 0.44% | 0.94 | 0.43% | 0.96 |
+  | Variant II | Model | 0.07% (5) | 0.23% (39) | 0.35% (87) | **0.19** | 0.18% (44) | **0.52** |
+  | Variant II | Rules | 0.23% (17) | 0.37% (64) | 0.47% (119) | 0.48 | 0.33% (81) | 0.69 |
+
+  (In brackets: normal accounts flagged.) What this means:
+  - The model again flags 50+ customers most and under-30s least. Its three-band ratio is lower than on v1_full
+    (0.19 vs 0.31), because it almost never flags a normal under-30 customer (5 of 7,518).
+  - The two-group ratio is better than on v1_full (0.52 vs 0.43). The model's rate for 50+ is lower here (0.35% vs
+    0.61%), and lower than the rules' rate in every band. It raises fewer false alarms overall (131 vs the rules' 200).
+  - The rules are less even here than on v1_full (0.48 vs 0.94). The rules do not see age, so the difference comes
+    from how normal banking differs by age in this data. We did not check the cause.
+  - Variant II's test cohort is older: half its accounts are 50+ (25,304 of 50,061), against 16% on v1_full. So the
+    two datasets' rates are not a like-for-like comparison of the same customers.
+  - Reported as a cost of the model, as in item 2. Nothing is tuned to change it. Variant IV is left out (its store
+    is not built).
 
 ## 7. Money gone before the first flag, month 5 (optional)
 
@@ -303,6 +339,6 @@ example. Add one line at its top pointing here.
 ## Decisions for the team
 
 1. Item 5: is the patient-launderer test value acceptable as an assumption? (Blocks item 5.)
-2. Items 6 and 7: do them, or state them as not done?
+2. ~~Items 6 and 7: do them, or state them as not done?~~ Items 6 and 7: do them (19 Nov 2026, Kee Chee Pheng).
 3. ~~Item 3: re-run importance on `frozen_tuned_avg5` if PR #39 used `frozen_tuned`?~~ Not needed (19 Nov): the
    model of record's own importance is committed and rebuilds from its files; PR #39 is the lab baseline, a cross-check.
