@@ -1,4 +1,4 @@
-"""Command line: python -m features <command> [options]."""
+﻿"""Command line: python -m features <command> [options]."""
 from __future__ import annotations
 import argparse
 import os
@@ -63,6 +63,12 @@ def main(argv=None):
     c.add_argument("--report", default=None,
                    help="report folder (default outputs/modelling/features, or .../features/<data folder name>)")
 
+    s = sub.add_parser("select", help="feature selection steps 1-3: execute notebooks/10_feature_selection.ipynb -> "
+                                      "<report>/report.md (inventory, near-duplicates, permutation importance)")
+    s.add_argument("--out", default="data/v1_full", help="data folder with a built store and preprocess files")
+    s.add_argument("--report", default=None, help="report folder (default outputs/modelling/feature_selection, "
+                                                  "or .../feature_selection/<data folder name>)")
+
     a = ap.parse_args(argv)
     if a.cmd == "weekly":
         path, n = build(a.out, parse_weeks(a.weeks), force=a.force)
@@ -80,6 +86,8 @@ def main(argv=None):
         run_notebook("02_preprocess.ipynb", a.out, a.report, report_root="outputs/modelling/preprocess")
     elif a.cmd == "store-check":
         run_notebook("03_feature_store.ipynb", a.out, a.report, report_root="outputs/modelling/features")
+    elif a.cmd == "select":
+        run_notebook("10_feature_selection.ipynb", a.out, a.report, report_root="outputs/modelling/feature_selection")
     else:
         raise SystemExit(f"`{a.cmd}` is not built yet (see the modelling plan)")
 

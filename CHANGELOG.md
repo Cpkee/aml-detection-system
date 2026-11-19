@@ -6,6 +6,16 @@ Assumptions and Use" doc.
 
 
 
+## 19 Nov 2026 — Methods comparison: G1_graphsage and A4c_logistic_inter on the training folds (Keith Tan)
+
+No change to the data, the store, the feature list or the model of record. Two rivals added to
+`outputs/modelling/comparison/PLAN.md` as dated amendments (G1 approved by Kee Chee Pheng; A4c labelled post hoc) and
+run on folds 1-3 only (months 0-4; months 5-7 untouched). G1 (2-layer GraphSAGE on payment links): `catch_rules`
+0.434 / 0.451 / 0.465 vs ref 0.473 / 0.450 / 0.440, pooled gain -0.004 (95% -0.035 to +0.025). A4c (logistic with 4
+share x money interactions): 0.447 / 0.412 / 0.392, gain -0.038 (-0.066 to -0.010). Interim paired tests of every
+rival vs ref (folds only): `comparison/v1_full/interim_paired_tests_folds.csv`; no rival wins. Out-of-fold scores in
+`data/v1_full/comparison/` (not committed).
+
 ## 16 Nov 2026 — Fake-mix stress plan closed (no run)
 
 No data, model or result change. The draft plan `outputs/modelling/stress/PLAN.md` (5 Nov, never agreed, never run)
@@ -37,6 +47,23 @@ their `run_manifest.json` where needed, each gets its own feature store, cleaned
 - Runs 3-7 (6 Nov; rebuilt, 10/10 checks, summaries identical), lead (95%): repeated bursts 0.46 (0.37-0.54) holds;
   fakes start 150-210 days 0.37 (0.30-0.45) holds; fakes start 15-45 days 0.39 (0.31-0.49) holds; GBP 1,500 transfers
   0.17 (0.10-0.24) shrinks (rules 120 of 163); young fake ages 0.50 (0.42-0.58) holds. No scenario fails.
+
+## 3 Nov 2026 — GraphSAGE on the payment graph: code and tests only (Keith Tan; proposal, not pre-registered)
+
+No data change, no model change, no result. `src/models/gnn.py` + `tests/test_gnn.py` (8 tests on hand-made graphs).
+- **What:** a 2-layer GraphSAGE (mean aggregator, plain PyTorch) on account-weeks. Links = payments between two
+  accounts of the bank (`features/graph_edges.parquet`) on or before the focal week's cut-off; a neighbour enters as
+  its own latest week with a cut-off no later than that (never later). Neighbours may have opened in any month
+  (decided 3 Nov 2026); only their public inputs are read, never a label. Node inputs = the 38 frozen inputs;
+  fixed settings in `gnn.DEFAULTS` (not tuned). `gnn.method(out)` is the methods comparison's `fit(train, valid)`.
+- **Tests:** neighbour rules equal a plain-Python version; payments after day D change no state with a cut-off on or
+  before D, at either level; preprocessing fitted on training rows only; learns a signal only the neighbours carry
+  (AUC ~0.99 with links, ~0.51 without); same seed gives identical scores; validation labels never read.
+- **Plumbing check on `data/v1` (no labels, random-label timing only):** `python -m features graph --out data/v1`
+  93 s. 76% of focal account-weeks (months 0-4, weeks 0-26) have at least one neighbour (median 3, max 19); a
+  third of neighbour accounts opened in months 5-7. One epoch, one seed, fold-3 size: 75 s, so the full method
+  (4 epochs x 5 seeds x 3 folds) is ~1 h on v1 and ~4-5 h on v1_full.
+- **Next:** runs on the folds only after the methods comparison adds it as a dated amendment; judged on catch_rules.
 
 ## 2 Nov 2026 — Counted re-tests of the test months (decision by Kee Chee Pheng)
 
@@ -242,6 +269,18 @@ under the feature freeze of 28 Oct 2026: none of it changes the 38 frozen inputs
   (+0.076 / +0.079 / +0.055, `better`; rules 0.162), weekly recall +0.047 / +0.048 / +0.045, PR-AUC 0.691 -> 0.859.
   Seed 44 not run (disk).
 - `outputs/modelling/feature_lab/PLAN.md`: the planned trials, their results and the seed-43 check.
+
+## 28 Oct 2026 — Importance of the frozen inputs
+
+No data, feature-store or model-input change. `python -m models.frozen_importance` refits the frozen 38-input model
+exactly as the feature lab's baseline (same 3 folds on months 0–4, seed 42, LightGBM settings; it reproduces the lab's
+weekly recall, 0.407 / 0.366 / 0.453 on v1_full) and writes each input's share of split gain per fold and on average
+to `outputs/modelling/models/v1_full/frozen_importance/importance.csv`. On v1_full: application score 51.0%,
+`out_1h_share_4wk` 11.5%, `money_in_4wk` 6.7%, `n_payers_cum` 6.7%, `internal_out_share_cum` 4.1%; the top 5 carry
+80%, the top 10 89%; the 28 store features together 24%, the 8 four-week windows 23%. Gain share shows what the
+trees lean on, not what the model could do without (inputs that measure the same thing share the credit). Selects
+nothing, so it is not another look at the folds. `tests/test_feature_lab.py` now pins the 38 inputs. Used in the
+decision-record doc's "Feature engineering" tab (section "The final feature list: 38 inputs").
 
 ## 28 Oct 2026 — Feature list frozen
 
