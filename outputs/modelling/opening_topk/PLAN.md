@@ -1,6 +1,6 @@
 # Top N at opening: what account-opening data buys (plan, drafted 19 Nov 2026)
 
-**Status: plan accepted 19 Nov 2026 (Kee Chee Pheng); committed before the run.** Report-appendix work only. It changes nothing in
+**Status: plan accepted 19 Nov 2026 (Kee Chee Pheng); committed before the run. Run once 19 Nov 2026 (result below).** Report-appendix work only. It changes nothing in
 the simulator, the rules, the data, the feature store, the frozen feature list or the model of record, fits no
 model, and never reads test months 6–7. The headline result (final test, 2 Nov 2026) stays as it is.
 
@@ -61,6 +61,31 @@ The **N = 500 row is the test**; the other rows describe the shape and are not t
 | Above chance | Account-opening data does flag some mules early, by the head start shown, at a cost of so many reviews per mule. We report that cost beside the activity flags' cost (the model of record: about 2 reviews per mule, 65 of 124 on month 5) and say which types it finds |
 
 Either way the report states a number in place of "not supported at the bank's budget".
+
+## Result: month 5, run once (19 Nov 2026)
+
+`outputs/modelling/opening_topk/v1_full/` (`table.csv`, `report.md`). Cohort: 29,120 accounts, 97 launderers
+(70 fake, 15 unwitting, 12 witting).
+
+| Top N at opening | Launderers | By chance | Lift | Reviews per launderer | Share of the 97 | Fake / witting / unwitting | Median days from opening to start |
+|---|---|---|---|---|---|---|---|
+| 25 | 2 | 0.08 | 24x | 12.5 | 2% | 2 / 0 / 0 | 74 |
+| 50 | 2 | 0.17 | 12x | 25 | 2% | 2 / 0 / 0 | 74 |
+| 100 | 4 | 0.33 | 12x | 25 | 4% | 4 / 0 / 0 | 75 |
+| 200 | 12 | 0.67 | 18x | 16.7 | 12% | 12 / 0 / 0 | 81.5 |
+| **500** | **24** | 1.67 | 14x | 20.8 | 25% | 24 / 0 / 0 | 89 |
+
+- **Reading (second row of the table decided above): above chance.** At N = 500 the chance of 24 or more by luck
+  is about 3 in 10^21. Account-opening data does flag some mules early: about 12 to 25 reviews per mule, with a
+  head start of about 11 to 13 weeks before laundering starts.
+- **The cost.** The model of record's activity flags cost about 2 reviews per mule (65 of 124 on month 5) but come
+  after laundering starts. A flag at opening costs about 10 times more reviews and comes about 3 months sooner.
+- **Fake accounts only.** All 24 are fakes (24 of 70). Not one of the 27 real-customer mules is in the top 500.
+- **Why the main comparison missed it.** At the rules' budget the model had 24 flags in weeks 0-7; at about 1 mule
+  per 20 flags that is about 1 expected catch, so finding none was unremarkable.
+- The lift does not grow as N shrinks (4 of the top 100, 2 of the top 25): the score separates a broad group of
+  suspicious applications, not a sharp top few. That is why 5 flags a week cannot use it.
+- This run is spent: the sizes and the ranking do not change after it.
 
 ## Limits, stated in advance
 

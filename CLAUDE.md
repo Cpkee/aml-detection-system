@@ -168,6 +168,13 @@ code and model files, and runs once). D4 (31 Oct): no autoencoder. Frozen 31 Oct
 M1 63, M1b 63, M2 54, M3 16, M3s 39, M4 16; never-confirmed (62): rules 3, M1 50, M2 42. Write-up:
 `notebooks/12_outlier_detection.ipynb` (reads only the committed look outputs) -> `outputs/modelling/outlier/v1_full/
 report.md`; draft appendix text `outputs/modelling/outlier/APPENDIX.md`. On this Mac run commands with `venv/bin/python`.
+**Top N at opening appendix (19 Nov 2026, Kee Chee Pheng; plan and result `outputs/modelling/opening_topk/PLAN.md`,
+committed before the run):** does account-opening data flag mules earlier? The harness cannot say (24 model flags in
+weeks 0-7 of month 5, ~1 catch expected, 0 seen). `python -m evaluation.opening_topk` (`src/evaluation/opening_topk.py`,
+`tests/test_opening_topk.py`; month 5 only) ranks accounts by the model of record's saved application score on opening
+day. Month 5, 97 launderers, top 25 / 50 / 100 / 200 / 500: 2 / 2 / 4 / 12 / **24** launderers (chance 1.67 at 500, 14x),
+all fake (24 of 70, 0 of 27 real-customer mules), ~12-25 reviews per mule vs ~2 for the model's activity flags, head
+start ~74-89 days before laundering starts. Run once (spent).
 Sensitivity runs (rules frozen, 244k, one `test` value each): `python -m sim.sensitivity --list | --run [--only NAME]
 | --summarise` -> `data/sensitivity/<name>/` (large files deleted) and `outputs/sensitivity/summary.csv`.
 Single steps: `accounts`, `normal --batches 3-3`, `laundering`, `rules`, `finalize`. Use `--out` for another
