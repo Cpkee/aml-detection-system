@@ -56,6 +56,43 @@ Suggested order: 19 Nov items 1–4; 20 Nov item 5 (then 6 if time); 21 Nov repo
   file). One test on a made-up table.
 - **How we read it (decided now):** reported as a cost of the model, with the cause already found in robustness
   run 7 (false alarms follow the fake accounts' ages). No threshold is applied and nothing is tuned to improve it.
+- **Result (done 19 Nov 2026; `robustness.fpr_ratio(run)`, `tests/test_robustness.py`).** Weeks 0–26, test cohort,
+  read only from the committed `final_test/by_age_w26.csv` files. The rate is the harness's own: normal accounts
+  flagged ÷ (accounts − mules) in the band, where a mule is a mule by the end of week 26 (`score.by_age`). The code
+  first rebuilds the file's three rates from its counts this way and stops if they differ. Under 50 pools the
+  counts of the two younger bands. Ratio = lowest rate ÷ highest rate (1.0 = equal treatment).
+
+  *Headline (v1_full).* Normal accounts: 12,500 under 30, 29,255 aged 30–49, 8,143 aged 50+.
+
+  | Policy | Under 30 | 30–49 | 50+ | Ratio, 3 bands | Under 50 | Ratio, under 50 vs 50+ |
+  |---|---|---|---|---|---|---|
+  | Model | 0.19% (24) | 0.29% (86) | 0.61% (50) | **0.31** | 0.26% (110) | **0.43** |
+  | Rules | 0.42% (52) | 0.43% (126) | 0.44% (36) | 0.94 | 0.43% (178) | 0.96 |
+
+  (In brackets: normal accounts flagged.) **This is a cost of the model.** It raises fewer false alarms overall
+  than the rules (160 vs 214), but it puts them unevenly: a normal customer aged 50+ is about 3 times as likely to
+  be flagged as one under 30 (0.61% vs 0.19%), and 1.4 times as likely as under the rules (0.61% vs 0.44%). The
+  rules treat the age groups almost equally. The cause is known (robustness run 7): the model's false alarms
+  follow the fake accounts' ages, and in this data the fakes are older.
+
+  *Robustness runs* (each its own `robust_avg5` model, months 6–7 scored once; model rates per band, then the
+  ratios):
+
+  | Run | Model: under 30 / 30–49 / 50+ | Model, 3 bands | Model, 2 groups | Rules, 3 bands | Rules, 2 groups |
+  |---|---|---|---|---|---|
+  | seed__44 | 0.09% / 0.25% / 0.54% | 0.16 | 0.37 | 0.79 | 0.92 |
+  | in_window_mix__1 | 0.30% / 0.28% / 0.51% | 0.55 | 0.55 | 0.94 | 0.97 |
+  | bursts_per_launderer__1 | 0.22% / 0.30% / 0.58% | 0.37 | 0.48 | 0.94 | 0.96 |
+  | fake_start_days__2 | 0.17% / 0.28% / 0.82% | 0.20 | 0.30 | 0.94 | 0.96 |
+  | fake_start_days__1 | 0.22% / 0.29% / 0.64% | 0.35 | 0.43 | 0.94 | 0.96 |
+  | out_transfer_mean__1 | 0.22% / 0.36% / 0.90% | 0.24 | 0.36 | 0.94 | 0.96 |
+  | fake_age_rule__1 | 0.35% / 0.30% / 0.23% | 0.67 | 0.75 | 0.95 | 0.97 |
+
+  The model is less even than the rules in every run (3-band ratio 0.16–0.67 vs the rules' 0.79–0.95). In six runs
+  the 50+ band carries the highest rate. With young fakes (`fake_age_rule__1`) the gap shrinks and turns round: the
+  under-30s now have the highest rate. That supports the cause above: the model learns the fakes' ages, so whichever
+  age group the fakes come from pays for it in false alarms. With fewer fakes (`in_window_mix__1`, 53%) the ratio is
+  also better (0.55). The rules' rates barely move, because the rules do not see age.
 
 ## 3. Interpretability and scoring time
 
