@@ -94,3 +94,39 @@ Recorded 2 Nov 2026 from the reference run (commit 9e1a46f), before any rival wa
   to [0, 1] like every share, and its rare 1s (raw values reach 164) put normal accounts at the top of the ranking.
   A4b = A4 without `out_1h_share_4wk` (fold 1: `catch_rules` 0.305). It was chosen after seeing fold 1, so it is
   labelled post hoc; the change only helps a rival, so it cannot flatter our model.
+- **4 Nov 2026, G1_graphsage (proposed by Keith Tan, before any run of it; approved by Kee Chee Pheng, relayed by
+  Keith Tan 19 Nov 2026).** Two attempts on 4 Nov ran out of memory before any fold finished (no result seen); the
+  memory fixes (commits 4f94102, 72c1be8) change neither the model nor its settings.
+  Committed before G1 is trained on any fold. Code `src/models/gnn.py`, tests `tests/test_gnn.py` (branch
+  `gnn-graphsage`). *Question:* does reading the accounts an account pays and is paid by catch mules earlier than
+  reading each account alone?
+  - *Method:* a 2-layer GraphSAGE (mean aggregator, plain PyTorch) on account-weeks. Links are payments between two
+    accounts of the bank (`features/graph_edges.parquet`, `python -m features graph`) on or before the focal week's
+    cut-off; a neighbour enters as its own latest week whose cut-off is no later than that. Neighbours may come from
+    any opening month, including 5-7 (a bank sees every payment between its own accounts; decided 3 Nov 2026); only
+    their public inputs are read, never a label. Node inputs: the 38 frozen inputs, the neighbours' `app_score` from
+    the same fold's application model (seed 42); preprocessing as A4 (fitted on the training rows).
+  - *Fixed settings, not tuned:* `gnn.DEFAULTS` = 2 layers, the 10 then 5 most recent neighbours, hidden 64,
+    dropout 0.1, Adam lr 1e-3, weight decay 1e-5, 4 epochs, batch 2,048, balanced class weights, seeds 1-5 averaged.
+    No early stopping, no setting chosen on the folds.
+  - *Judged* like every rival: same rows, folds, budget and measures; `catch_rules` against `ref` with the paired
+    bootstrap; Holm over the rivals compared (now 14 with G1; the MDE above used 13 and is recomputed at the gate).
+    Reported beside it: the start-week flag rate, as the feature lab's `graph_nb` group.
+  - *Expectation stated in advance:* a small gain at most. Only 1 of 163 launderer-launderer links exists before both
+    ends start laundering, and `graph_nb` (neighbours' scores as LightGBM inputs) showed no clear `catch_rules` gain.
+    A null result is reported as one.
+  - *Cost:* about 4-5 h on v1_full on one laptop (timed on `data/v1` with random labels: 75 s per epoch and seed at
+    fold-3 size). Month 5 is scored once with the other rivals, after all groups.
+- **19 Nov 2026, A4c_logistic_inter (post hoc; Keith Tan, approved by Kee Chee Pheng, relayed by Keith Tan).** A
+  logistic regression that can tell a fast pay-out of real money from one of a few pounds. Code `src/models/logreg.py`
+  (`MuleLogit(C=0.01, interactions=True)`, tests `tests/test_logreg.py`); chosen in `notebooks/15_logreg_tuning.ipynb`
+  on these same folds by top-1% weekly recall (C over 1e-4 to 10; with / without interactions).
+  - *Method:* the 38 frozen inputs prepared as A4 (median fill + missing flags; log1p of counts and money, shares
+    clipped to [0, 1], self-vs-past clipped to [-10, 10], standardised; all fitted on the training rows), plus 4
+    interaction terms, each a share times log(1 + money in) over the same window: `out_1h_share_4wk`,
+    `out_24h_share_4wk`, `passthrough_4wk` x `money_in_4wk`, and `out_1h_share_wk` x `money_in_wk`. L2, C = 0.01,
+    balanced class weights, max_iter 2000; deterministic, so one fit.
+  - *Why post hoc:* its fold results are already known from notebook 15 (`catch_rules` 0.447 / 0.412 / 0.392 in the
+    notebook's own scoring). It is the same diagnosis as A4b (a share of 1 on a tiny balance tops the ranking) with
+    a different remedy: keep the input but weight it by the money behind it. It only helps a rival, so it cannot
+    flatter our model. Reported as post hoc beside A4 and A4b; counted in Holm's correction (15 with G1).
