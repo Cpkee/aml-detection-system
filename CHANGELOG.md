@@ -38,20 +38,6 @@ their `run_manifest.json` where needed, each gets its own feature store, cleaned
   fakes start 150-210 days 0.37 (0.30-0.45) holds; fakes start 15-45 days 0.39 (0.31-0.49) holds; GBP 1,500 transfers
   0.17 (0.10-0.24) shrinks (rules 120 of 163); young fake ages 0.50 (0.42-0.58) holds. No scenario fails.
 
-## 2 Nov 2026 — Counted re-tests of the test months (decision by Kee Chee Pheng)
-
-No data change, no model change, no change to any result. The test months may be re-used to judge well-justified
-improvements, stated as a limitation in the report; the first final test stays the headline.
-- `python -m evaluation.score --months 6 7 --final-test --model M --retest "REASON"` scores into a new folder
-  `results/<data>/final_test_r<N>/` (never `final_test/`). Before anything about months 6-7 is read it appends a row
-  to `results/<data>/final_test_looks.csv` (look, folder, started, score_source, git_commit, reason), so a crashed or
-  unhelpful look still counts. Refused before the first final test is locked, without a reason, or with uncommitted
-  code. The report and `settings.json` (`retest_reason`) mark the run as a re-test.
-- Rules (CLAUDE.md, Phase 5): the change and its months 0-5 evidence are written and committed before the look; one
-  look per change; never choose among changes by their months 6-7 scores; report every look.
-- `results/v1_full/final_test_looks.csv` starts with look 1 = the final test below. Test:
-  `test_retest_is_counted_before_any_read_and_never_overwrites`.
-
 ## 3 Nov 2026 — GraphSAGE on the payment graph: code and tests only (Keith Tan; proposal, not pre-registered)
 
 No data change, no model change, no result. `src/models/gnn.py` + `tests/test_gnn.py` (8 tests on hand-made graphs).
@@ -68,6 +54,20 @@ No data change, no model change, no result. `src/models/gnn.py` + `tests/test_gn
   third of neighbour accounts opened in months 5-7. One epoch, one seed, fold-3 size: 75 s, so the full method
   (4 epochs x 5 seeds x 3 folds) is ~1 h on v1 and ~4-5 h on v1_full.
 - **Next:** runs on the folds only after the methods comparison adds it as a dated amendment; judged on catch_rules.
+
+## 2 Nov 2026 — Counted re-tests of the test months (decision by Kee Chee Pheng)
+
+No data change, no model change, no change to any result. The test months may be re-used to judge well-justified
+improvements, stated as a limitation in the report; the first final test stays the headline.
+- `python -m evaluation.score --months 6 7 --final-test --model M --retest "REASON"` scores into a new folder
+  `results/<data>/final_test_r<N>/` (never `final_test/`). Before anything about months 6-7 is read it appends a row
+  to `results/<data>/final_test_looks.csv` (look, folder, started, score_source, git_commit, reason), so a crashed or
+  unhelpful look still counts. Refused before the first final test is locked, without a reason, or with uncommitted
+  code. The report and `settings.json` (`retest_reason`) mark the run as a re-test.
+- Rules (CLAUDE.md, Phase 5): the change and its months 0-5 evidence are written and committed before the look; one
+  look per change; never choose among changes by their months 6-7 scores; report every look.
+- `results/v1_full/final_test_looks.csv` starts with look 1 = the final test below. Test:
+  `test_retest_is_counted_before_any_read_and_never_overwrites`.
 
 ## 2 Nov 2026 — Final test on months 6-7 (run once; Kee Chee Pheng, moved forward from 5 Nov)
 
