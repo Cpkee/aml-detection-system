@@ -37,6 +37,25 @@ Suggested order: 19 Nov items 1–4; 20 Nov item 5 (then 6 if time); 21 Nov repo
   budget; it says nothing about false alarms, which precision covers.
 - **Also state** (plan, 9 Oct): with ~160 mules, a gap of 3–5 catches is not significant. That applies to the
   onboarding comparison (65 vs 61 of 78 on month 5).
+- **Result (done 19 Nov 2026):** `mcnemar(run)` in `src/evaluation/robustness.py`; `python -m evaluation.robustness`
+  prints it (not saved in `summary.csv`). Weeks 0–26, mules of the test cohort (months 6–7), from the committed
+  `final_test/launderers.csv` of each run; nothing re-scored. v1_full matches the expected arithmetic above.
+
+  | Run | Both | Model only | Rules only | Neither | Chi-square | Exact p |
+  |---|---|---|---|---|---|---|
+  | v1_full (headline) | 43 | 77 | 7 | 36 | 56.68 | 5.1e-16 |
+  | seed__44 | 35 | 79 | 0 | 31 | 77.01 | 3.3e-24 |
+  | in_window_mix__1 | 24 | 75 | 6 | 19 | 57.09 | 2.9e-16 |
+  | bursts_per_launderer__1 | 70 | 80 | 5 | 8 | 64.42 | 1.8e-18 |
+  | fake_start_days__2 | 29 | 62 | 1 | 71 | 57.14 | 1.4e-17 |
+  | fake_start_days__1 | 46 | 72 | 8 | 37 | 49.61 | 5.4e-14 |
+  | out_transfer_mean__1 | 118 | 30 | 2 | 13 | 22.78 | 2.5e-07 |
+  | fake_age_rule__1 | 42 | 86 | 5 | 30 | 70.33 | 4.0e-20 |
+
+  In every run the model catches many mules the rules miss, and the rules catch few that the model misses. The
+  gap is far beyond chance in all 8 runs. It is smallest with £1,500 transfers (30 vs 2), where the rules
+  already catch most mules. The test covers mules only: it says the model catches more mules than the rules at
+  the same budget, and nothing about false alarms (precision covers those).
 
 ## 2. Fairness: ratio of false-positive rates between age groups
 

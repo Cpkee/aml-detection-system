@@ -2,7 +2,8 @@
 
 Reads each run's committed harness output (results/<run>/final_test/launderers.csv) and gives its lead:
 mules caught by the model minus mules caught by the rules, weeks 0-26, as a share of the cohort's mules,
-with a paired bootstrap over the mules (1,000 resamples, 95% interval).
+with a paired bootstrap over the mules (1,000 resamples, 95% interval). Also prints McNemar's test per run
+(mcnemar: mules caught by exactly one method; printed only, not in summary.csv).
 
   PYTHONPATH=src python -m evaluation.robustness            # the plan's 7 runs -> summary.csv
   PYTHONPATH=src python -m evaluation.robustness seed__44 in_window_mix__1   # a subset: printed, not saved
@@ -10,6 +11,7 @@ with a paired bootstrap over the mules (1,000 resamples, 95% interval).
 summary.csv is the committed record, so it is written only for the plan's full list (or to --to PATH).
 """
 import argparse
+import math
 import os
 
 import numpy as np
@@ -33,6 +35,22 @@ def mules(run: str, horizon: int = HORIZON) -> pd.DataFrame:
     m["model"] = m[f"model_flag_week_w{horizon}"].notna().astype(int)
     m["rules"] = (m.rules_first_alert_week <= horizon).astype(int)
     return m
+
+
+def mcnemar(run: str) -> dict:
+    """McNemar's paired test on the same mules: model vs rules, weeks 0-26. Only the mules that exactly one
+    method caught count. chi2 has the continuity correction; p_exact is the two-sided exact binomial test
+    (each discordant mule is a fair coin if the two methods are equally good). Mules only: says nothing about
+    false alarms."""
+    m = mules(run)
+    b = int(((m.model == 1) & (m.rules == 0)).sum())
+    c = int(((m.model == 0) & (m.rules == 1)).sum())
+    n = b + c
+    tail = sum(math.comb(n, k) for k in range(min(b, c) + 1))
+    return {"both": int(((m.model == 1) & (m.rules == 1)).sum()), "model_only": b, "rules_only": c,
+            "neither": int(((m.model == 0) & (m.rules == 0)).sum()),
+            "chi2": (abs(b - c) - 1) ** 2 / n if n else float("nan"),
+            "p_exact": min(1.0, 2 * tail / 2 ** n)}
 
 
 def lead(run: str, n_boot: int = 1000, seed: int = 0) -> dict:
@@ -90,6 +108,9 @@ def main():
         print(f"written: {to}")
     else:
         print(f"not written: {OUT} holds the plan's full list only (use --to PATH to save a subset)")
+    print("\nMcNemar's test, model vs rules on the same mules (mules only, not false alarms):")
+    mc = pd.DataFrame([{"run": r, **mcnemar(r)} for r in [HEADLINE, *a.runs]])
+    print(mc.to_string(index=False, formatters={"chi2": "{:.2f}".format, "p_exact": "{:.2g}".format}))
 
 
 if __name__ == "__main__":
