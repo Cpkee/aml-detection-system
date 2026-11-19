@@ -58,6 +58,21 @@ def test_band_has_a_minimum_width(fake_results, tmp_path):
     assert t.band_lo.iloc[0] == pytest.approx(0.4 - rb.MIN_HALF_BAND)
 
 
+def test_mcnemar_on_a_hand_made_run(fake_results):
+    """'good': 4 caught by both, 4 by the model only, 0 by the rules only, 2 by neither (the late starter is out).
+    chi2 = (|4 - 0| - 1)^2 / 4 = 2.25; exact p = 2 * (1/2)^4 = 0.125."""
+    r = rb.mcnemar("good")
+    assert (r["both"], r["model_only"], r["rules_only"], r["neither"]) == (4, 4, 0, 2)
+    assert r["chi2"] == pytest.approx(2.25) and r["p_exact"] == pytest.approx(0.125)
+
+
+def test_mcnemar_is_symmetric_and_capped(fake_results):
+    """'bad': 5 rules only, 5 model only -> no evidence either way, p capped at 1."""
+    r = rb.mcnemar("bad")
+    assert (r["model_only"], r["rules_only"]) == (5, 5)
+    assert r["chi2"] == pytest.approx(0.1) and r["p_exact"] == 1.0
+
+
 def test_no_yardstick_no_verdict(fake_results):
     assert "verdict" not in rb.table(["good"]).columns
 
@@ -106,3 +121,10 @@ def test_headline_is_120_vs_50_of_163():
 def test_committed_summary_is_reproduced():
     saved = pd.read_csv(rb.OUT, keep_default_na=False)
     pd.testing.assert_frame_equal(rb.table(rb.PLAN_RUNS), saved, check_exact=False, rtol=1e-12)
+
+
+@committed
+def test_headline_mcnemar():
+    r = rb.mcnemar(rb.HEADLINE)
+    assert (r["both"], r["model_only"], r["rules_only"], r["neither"]) == (43, 77, 7, 36)
+    assert round(r["chi2"], 2) == 56.68 and r["p_exact"] == pytest.approx(5.1e-16, rel=0.02)
