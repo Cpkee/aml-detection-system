@@ -1,6 +1,7 @@
 # Imbalance check: model vs rules at 0.1%, 0.3% and 1% prevalence (plan, drafted 19 Nov 2026)
 
-**Status: draft for the team. Nothing has been run.** This closes the open half of the professor's comment 1
+**Status: both runs approved 19 Nov 2026 (Kee Chee Pheng); added to the robustness plan as Amendment 1 and
+committed before any run.** This closes the open half of the professor's comment 1
 (`docs/professor_feedback.md`). It changes nothing in the simulator, `configs/sim.yaml`, the main data, the frozen
 feature list or the model of record, and it never re-reads months 6–7 of v1_full.
 
@@ -110,5 +111,5 @@ twice. Not part of the main plan.
 
 ## Decisions for the team
 
-1. Run both, or only the 1% run?
+1. ~~Run both, or only the 1% run?~~ Both (19 Nov 2026, Kee Chee Pheng).
 2. Add the optional extra?

@@ -54,3 +54,22 @@ Reported beside the verdict, never used to change it: precision, median days fro
 - A "shrinks" or "fails" is reported as a dependence on that assumption, not hidden or re-run.
 - Outputs: `outputs/modelling/results/<name>/final_test/`, a summary table `outputs/modelling/robustness/summary.csv`,
   and a short report. Time: ~15 min for run 1, ~25–30 min each after (~3 h in all).
+
+## Amendment 1 (19 Nov 2026, Kee Chee Pheng): two prevalence runs, written before either is run
+
+The 7 runs above are closed and unchanged. Two more datasets go through the same recipe ("How each run is done"),
+to answer the open half of the professor's comment 1: the model against the rules when mules are rarer or more
+common. Full plan, reporting table and reading of each outcome: `outputs/modelling/prevalence/PLAN.md`.
+
+| Run | Change | Accounts | Order |
+|:--|:--|:--|:--|
+| `prevalence__1pct` | `profiles.launderer_share=0.01` | 244,000 | first |
+| `prevalence__0.1pct` | `profiles.launderer_share=0.001` | 732,000 (so the test months keep ~190 launderers) | second |
+
+- Same rules as above: rebuilt from the run's manifest and checked against its committed sensitivity summary;
+  `robust_avg5` trained on its own months 0–4, nothing tuned; months 6–7 scored once (own lock); verdict by the
+  rule above against the same chance band (0.31–0.55); both results reported whatever they show.
+- If the 0.1% run cannot finish by 21 Nov 2026, the 1% result is reported and the report says that at 0.1% only
+  the rules were tested. No setting is changed to make it fit.
+- The 7 rows of `summary.csv` stay identical; these runs are added as amendment rows.
+
