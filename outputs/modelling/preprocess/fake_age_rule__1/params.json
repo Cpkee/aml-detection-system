@@ -1,0 +1,422 @@
+{
+  "recipe_version": 1,
+  "notebook": "notebooks/02_preprocess.ipynb",
+  "data_folder": "data/sensitivity/fake_age_rule__1",
+  "run_manifest_sha256": "1edfcdbab4f6b2f03a09163792ec73a97c53a2534714e3c2aa9610bb590c8643",
+  "keys": [
+    "account_id",
+    "open_month"
+  ],
+  "recipe": {
+    "income": {
+      "kind": "binned",
+      "missing": false,
+      "clip": false,
+      "log": false,
+      "note": "BAF deciles 0.1-0.9"
+    },
+    "name_email_similarity": {
+      "kind": "continuous",
+      "missing": false,
+      "clip": false,
+      "log": false,
+      "note": "0-1 score"
+    },
+    "prev_address_months_count": {
+      "kind": "continuous",
+      "missing": true,
+      "clip": false,
+      "log": true,
+      "note": "-1 = unknown; skewed"
+    },
+    "current_address_months_count": {
+      "kind": "continuous",
+      "missing": true,
+      "clip": false,
+      "log": true,
+      "note": "-1 = unknown; log added: skew 1.4 -> -0.5 (changed 10 Oct 2026)"
+    },
+    "customer_age": {
+      "kind": "binned",
+      "missing": false,
+      "clip": false,
+      "log": false,
+      "note": "BAF decades 10-90"
+    },
+    "days_since_request": {
+      "kind": "continuous",
+      "missing": false,
+      "clip": false,
+      "log": true,
+      "note": "very skewed"
+    },
+    "intended_balcon_amount": {
+      "kind": "continuous",
+      "missing": true,
+      "clip": false,
+      "log": false,
+      "note": "negative = no amount given; no log: it turns skew 1.3 into -1.2 (changed 10 Oct 2026)"
+    },
+    "payment_type": {
+      "kind": "categorical",
+      "missing": false,
+      "clip": false,
+      "log": false,
+      "note": ""
+    },
+    "zip_count_4w": {
+      "kind": "continuous",
+      "missing": false,
+      "clip": false,
+      "log": true,
+      "note": "skewed count"
+    },
+    "velocity_6h": {
+      "kind": "continuous",
+      "missing": false,
+      "clip": true,
+      "log": false,
+      "note": "never negative in months 0-4; clip is a fixed rule; no log: barely skewed (changed 10 Oct 2026)"
+    },
+    "velocity_24h": {
+      "kind": "continuous",
+      "missing": false,
+      "clip": false,
+      "log": false,
+      "note": "no log: barely skewed (changed 10 Oct 2026)"
+    },
+    "velocity_4w": {
+      "kind": "continuous",
+      "missing": false,
+      "clip": false,
+      "log": false,
+      "note": "no log: barely skewed (changed 10 Oct 2026)"
+    },
+    "bank_branch_count_8w": {
+      "kind": "continuous",
+      "missing": false,
+      "clip": false,
+      "log": true,
+      "note": "skewed count"
+    },
+    "date_of_birth_distinct_emails_4w": {
+      "kind": "continuous",
+      "missing": false,
+      "clip": false,
+      "log": false,
+      "note": "count"
+    },
+    "employment_status": {
+      "kind": "categorical",
+      "missing": false,
+      "clip": false,
+      "log": false,
+      "note": ""
+    },
+    "credit_risk_score": {
+      "kind": "continuous",
+      "missing": false,
+      "clip": false,
+      "log": false,
+      "note": "negative values are real scores: keep"
+    },
+    "email_is_free": {
+      "kind": "binary",
+      "missing": false,
+      "clip": false,
+      "log": false,
+      "note": ""
+    },
+    "housing_status": {
+      "kind": "categorical",
+      "missing": false,
+      "clip": false,
+      "log": false,
+      "note": ""
+    },
+    "phone_home_valid": {
+      "kind": "binary",
+      "missing": false,
+      "clip": false,
+      "log": false,
+      "note": ""
+    },
+    "phone_mobile_valid": {
+      "kind": "binary",
+      "missing": false,
+      "clip": false,
+      "log": false,
+      "note": ""
+    },
+    "bank_months_count": {
+      "kind": "continuous",
+      "missing": true,
+      "clip": false,
+      "log": false,
+      "note": "-1 = unknown"
+    },
+    "has_other_cards": {
+      "kind": "binary",
+      "missing": false,
+      "clip": false,
+      "log": false,
+      "note": ""
+    },
+    "proposed_credit_limit": {
+      "kind": "binned",
+      "missing": false,
+      "clip": false,
+      "log": false,
+      "note": "12 BAF bands"
+    },
+    "foreign_request": {
+      "kind": "binary",
+      "missing": false,
+      "clip": false,
+      "log": false,
+      "note": ""
+    },
+    "source": {
+      "kind": "categorical",
+      "missing": false,
+      "clip": false,
+      "log": false,
+      "note": ""
+    },
+    "session_length_in_minutes": {
+      "kind": "continuous",
+      "missing": true,
+      "clip": false,
+      "log": true,
+      "note": "-1 = unknown; skewed"
+    },
+    "device_os": {
+      "kind": "categorical",
+      "missing": false,
+      "clip": false,
+      "log": false,
+      "note": ""
+    },
+    "keep_alive_session": {
+      "kind": "binary",
+      "missing": false,
+      "clip": false,
+      "log": false,
+      "note": ""
+    },
+    "device_distinct_emails_8w": {
+      "kind": "continuous",
+      "missing": true,
+      "clip": false,
+      "log": false,
+      "note": "-1 = unknown; count 0-2"
+    }
+  },
+  "params": {
+    "fitted_on": {
+      "months": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "n_accounts": 164819
+    },
+    "levels": {
+      "payment_type": [
+        "AA",
+        "AB",
+        "AC",
+        "AD",
+        "AE"
+      ],
+      "employment_status": [
+        "CA",
+        "CB",
+        "CC",
+        "CD",
+        "CE",
+        "CF",
+        "CG"
+      ],
+      "housing_status": [
+        "BA",
+        "BB",
+        "BC",
+        "BD",
+        "BE",
+        "BF",
+        "BG"
+      ],
+      "source": [
+        "INTERNET",
+        "TELEAPP"
+      ],
+      "device_os": [
+        "linux",
+        "macintosh",
+        "other",
+        "windows",
+        "x11"
+      ]
+    },
+    "median": {
+      "income": 0.6000000000000001,
+      "name_email_similarity": 0.5067881801269889,
+      "prev_address_months_count": 3.4965075614664802,
+      "current_address_months_count": 3.9512437185814275,
+      "customer_age": 30.0,
+      "days_since_request": 0.015271486189538462,
+      "intended_balcon_amount": 32.356881861807636,
+      "zip_count_4w": 7.255591274253665,
+      "velocity_6h": 6274.7173479632775,
+      "velocity_24h": 5147.673082835521,
+      "velocity_4w": 5214.993106791108,
+      "bank_branch_count_8w": 2.3978952727983707,
+      "date_of_birth_distinct_emails_4w": 10.0,
+      "credit_risk_score": 117.0,
+      "bank_months_count": 15.0,
+      "proposed_credit_limit": 200.0,
+      "session_length_in_minutes": 1.843966386389757,
+      "device_distinct_emails_8w": 1.0
+    },
+    "mean": {
+      "income": 0.5412816483536486,
+      "name_email_similarity": 0.5036137678952226,
+      "prev_address_months_count": 3.5596691334447703,
+      "current_address_months_count": 3.83767094957379,
+      "customer_age": 33.6591655088309,
+      "days_since_request": 0.22368115648233847,
+      "intended_balcon_amount": 33.47166108693612,
+      "zip_count_4w": 7.281723780656272,
+      "velocity_6h": 6392.5126191819145,
+      "velocity_24h": 5257.145890867524,
+      "velocity_4w": 5292.3300632619475,
+      "bank_branch_count_8w": 2.6138347965376636,
+      "date_of_birth_distinct_emails_4w": 10.248333019858148,
+      "credit_risk_score": 124.79447151117286,
+      "bank_months_count": 14.98012971805435,
+      "proposed_credit_limit": 535.5289742080706,
+      "session_length_in_minutes": 1.9258594528512858,
+      "device_distinct_emails_8w": 1.0239960198763491
+    },
+    "std": {
+      "income": 0.29254111028501467,
+      "name_email_similarity": 0.2913938169989509,
+      "prev_address_months_count": 0.4852683658055714,
+      "current_address_months_count": 1.2869767977792836,
+      "customer_age": 12.080631310212059,
+      "days_since_request": 0.6776489326232069,
+      "intended_balcon_amount": 12.11596303650227,
+      "zip_count_4w": 0.602653637300343,
+      "velocity_6h": 3040.3984970707,
+      "velocity_24h": 1342.4147716415412,
+      "velocity_4w": 693.2871741167287,
+      "bank_branch_count_8w": 2.2302103399815167,
+      "date_of_birth_distinct_emails_4w": 5.276646842077108,
+      "credit_risk_score": 71.83987395540159,
+      "bank_months_count": 9.941121030143748,
+      "proposed_credit_limit": 507.7696625968259,
+      "session_length_in_minutes": 0.6879957760462743,
+      "device_distinct_emails_8w": 0.19310611349097556
+    }
+  },
+  "columns": {
+    "linear": [
+      "income",
+      "name_email_similarity",
+      "prev_address_months_count",
+      "prev_address_months_count_missing",
+      "current_address_months_count",
+      "current_address_months_count_missing",
+      "customer_age",
+      "days_since_request",
+      "intended_balcon_amount",
+      "intended_balcon_amount_missing",
+      "payment_type_AA",
+      "payment_type_AB",
+      "payment_type_AC",
+      "payment_type_AD",
+      "payment_type_AE",
+      "zip_count_4w",
+      "velocity_6h",
+      "velocity_24h",
+      "velocity_4w",
+      "bank_branch_count_8w",
+      "date_of_birth_distinct_emails_4w",
+      "employment_status_CA",
+      "employment_status_CB",
+      "employment_status_CC",
+      "employment_status_CD",
+      "employment_status_CE",
+      "employment_status_CF",
+      "employment_status_CG",
+      "credit_risk_score",
+      "email_is_free",
+      "housing_status_BA",
+      "housing_status_BB",
+      "housing_status_BC",
+      "housing_status_BD",
+      "housing_status_BE",
+      "housing_status_BF",
+      "housing_status_BG",
+      "phone_home_valid",
+      "phone_mobile_valid",
+      "bank_months_count",
+      "bank_months_count_missing",
+      "has_other_cards",
+      "proposed_credit_limit",
+      "foreign_request",
+      "source_INTERNET",
+      "source_TELEAPP",
+      "session_length_in_minutes",
+      "session_length_in_minutes_missing",
+      "device_os_linux",
+      "device_os_macintosh",
+      "device_os_other",
+      "device_os_windows",
+      "device_os_x11",
+      "keep_alive_session",
+      "device_distinct_emails_8w",
+      "device_distinct_emails_8w_missing"
+    ],
+    "tree": [
+      "income",
+      "name_email_similarity",
+      "prev_address_months_count",
+      "prev_address_months_count_missing",
+      "current_address_months_count",
+      "current_address_months_count_missing",
+      "customer_age",
+      "days_since_request",
+      "intended_balcon_amount",
+      "intended_balcon_amount_missing",
+      "payment_type",
+      "zip_count_4w",
+      "velocity_6h",
+      "velocity_24h",
+      "velocity_4w",
+      "bank_branch_count_8w",
+      "date_of_birth_distinct_emails_4w",
+      "employment_status",
+      "credit_risk_score",
+      "email_is_free",
+      "housing_status",
+      "phone_home_valid",
+      "phone_mobile_valid",
+      "bank_months_count",
+      "bank_months_count_missing",
+      "has_other_cards",
+      "proposed_credit_limit",
+      "foreign_request",
+      "source",
+      "session_length_in_minutes",
+      "session_length_in_minutes_missing",
+      "device_os",
+      "keep_alive_session",
+      "device_distinct_emails_8w",
+      "device_distinct_emails_8w_missing"
+    ]
+  }
+}
