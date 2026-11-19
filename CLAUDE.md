@@ -49,7 +49,9 @@ the 8 four-week-window features (`candidates.ADOPTED`, group `roll4`), added at 
 LightGBM inputs are the 28 store features + the 8 `roll4` features + `weeks_since_open` + the application score
 (`app_score`): 38, the lab's baseline. Changed only by team decision. Feature-lab trials and `/feature-round` run only on
 explicit request and are report-appendix work; re-checking `roll4` on Variant II / IV is a robustness check, not a
-reopening of the list. Tuning step 2 and later models use them;
+reopening of the list. `python -m models.frozen_importance` (~30 s) refits that baseline and writes each input's share
+of split gain to `outputs/modelling/models/v1_full/frozen_importance/importance.csv` (v1_full: `app_score` 51%, top 5
+80%, top 10 89%); `tests/test_feature_lab.py` pins the 38. Tuning step 2 and later models use them;
 the lab's baseline includes them (`--baseline store` to re-check them). Notebooks 05/06 stay the records of the store-only
 runs. The lab also splits each gain by phase (`pre_start_recall`, `start_recall`, `later_recall`) and reports
 `first_caught_2wk` with permanent flags: weekly recall rewards re-flagging mules already found (26 Oct 2026 finding). The `feature-engineer` agent (`.claude/agents/`) runs propose -> implement -> verify -> evaluate
@@ -181,6 +183,12 @@ code and model files, and runs once). D4 (31 Oct): no autoencoder. Frozen 31 Oct
 M1 63, M1b 63, M2 54, M3 16, M3s 39, M4 16; never-confirmed (62): rules 3, M1 50, M2 42. Write-up:
 `notebooks/12_outlier_detection.ipynb` (reads only the committed look outputs) -> `outputs/modelling/outlier/v1_full/
 report.md`; draft appendix text `outputs/modelling/outlier/APPENDIX.md`. On this Mac run commands with `venv/bin/python`.
+**Rule scorecard appendix (18 Nov 2026, Kee Chee Pheng; plan and results `outputs/modelling/scorecard/PLAN.md`):** would a
+stronger rule set close the gap? Three hand-written scenarios on the store (fast forwarding, new payers, pass-through;
+starting values are assumptions), scored as points at the rules' budget (`python -m models scorecard`,
+`src/models/rule_scorecard.py`; refuses months 6-7). Scale chosen on months 0-4 (1.0: 178 vs rules 109 of 361), then
+month 5 scored **once** (spent; settings never change): rules 16, scorecard 34, model of record 65 of 78. Written with
+hindsight (the model leans on forwarding speed), so generous to the rules; stated as a limitation.
 **Prevalence runs (19 Nov 2026, Kee Chee Pheng; robustness plan Amendment 1; plan and results
 `outputs/modelling/prevalence/PLAN.md`, leads in `robustness/summary_amendment1.csv`):** the open half of the professor's
 comment 1. `prevalence__1pct` (244k) and `prevalence__0.1pct` (732k) through the robustness recipe, months 6-7 scored once
