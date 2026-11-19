@@ -1,0 +1,59 @@
+{
+  "params": {
+    "C": 0.1
+  },
+  "weekly_recall_cv": 0.35569773055120407,
+  "grid": [
+    0.0001,
+    0.001,
+    0.01,
+    0.1,
+    1.0,
+    10.0
+  ],
+  "data": "data/v1_full",
+  "inputs": [
+    "n_rows_wk",
+    "n_in_wk",
+    "n_out_wk",
+    "money_in_wk",
+    "money_out_wk",
+    "n_rows_cum",
+    "money_in_cum",
+    "money_out_cum",
+    "max_in_wk",
+    "max_out_wk",
+    "card_items_wk",
+    "n_payers_wk",
+    "n_payees_wk",
+    "new_payer_share_wk",
+    "n_payers_cum",
+    "n_payees_cum",
+    "passthrough_wk",
+    "out_1h_share_wk",
+    "out_24h_share_wk",
+    "med_in_out_minutes_wk",
+    "self_vs_past_money_in",
+    "self_vs_past_payers",
+    "self_vs_past_rows",
+    "peer_ratio_money_in",
+    "internal_out_share_cum",
+    "cash_in_share_cum",
+    "abroad_out_share_cum",
+    "high_risk_out_share_cum",
+    "n_rows_4wk",
+    "n_in_4wk",
+    "money_in_4wk",
+    "money_out_4wk",
+    "n_payers_4wk",
+    "out_1h_share_4wk",
+    "out_24h_share_4wk",
+    "passthrough_4wk",
+    "weeks_since_open",
+    "app_score"
+  ],
+  "fixed": {
+    "class_weight": "balanced",
+    "max_iter": 2000
+  }
+}

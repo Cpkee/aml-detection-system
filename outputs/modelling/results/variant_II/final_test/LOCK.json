@@ -1,0 +1,40 @@
+{
+  "scored": "2026-11-19 17:01",
+  "data": "/Users/cheepheng/aml-detection-system/data/variant_II",
+  "cohort_months": [
+    6,
+    7
+  ],
+  "horizons": [
+    26,
+    77
+  ],
+  "model": "robust_avg5",
+  "model_params_source": "file",
+  "model_git_commit": "8e37e746b1721047ffe36a9585799e7db2a3c0a3",
+  "model_machine": {
+    "os": "macOS-26.5.1-arm64-arm-64bit",
+    "processor": "arm",
+    "cpu_count": 15,
+    "python": "3.12.15"
+  },
+  "machine": {
+    "os": "macOS-26.5.1-arm64-arm-64bit",
+    "processor": "arm",
+    "cpu_count": 15,
+    "python": "3.12.15"
+  },
+  "cohort_accounts": 50061,
+  "launderers": 169,
+  "budget_per_horizon": {
+    "26": 265,
+    "77": 716
+  },
+  "score_source": "model:robust_avg5",
+  "scores_sha256": null,
+  "run_manifest_sha256": "994539a119411f70226522464122f071349c00e025727d6261553180cae20ad2",
+  "git_commit": "e12b0d0223ea9cea8b27380f663deb82e2de3f52",
+  "git_uncommitted_changes": false,
+  "retest_reason": null,
+  "seconds": 52
+}

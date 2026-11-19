@@ -33,6 +33,7 @@ from evaluation import hybrid
 from features import candidates
 from features.weekly import FEATURES as WEEKLY
 from models import feature_lab as fl
+from models import gnn
 from models import lgbm_baseline as base
 from models import stability
 
@@ -209,6 +210,14 @@ def tuned_boosted(out: str, method: str):
     return fit
 
 
+def logistic_inter(train: pd.DataFrame, valid: pd.DataFrame) -> np.ndarray:
+    """A4c: logistic regression on the 38 inputs plus 4 share x log(money in) terms, C = 0.01 (amendment 19 Nov
+    2026; models.logreg, chosen in notebooks/15_logreg_tuning.ipynb)."""
+    from models.logreg import MuleLogit
+    m = MuleLogit(C=0.01, interactions=True).fit(train[stability.INPUTS], train["mule_by_day"])
+    return m.predict_proba(valid[stability.INPUTS])[:, 1]
+
+
 def app_columns(out: str) -> list[str]:
     import pyarrow.parquet as pq
     names = pq.read_schema(os.path.join(out, "features", "accounts_tree.parquet")).names
@@ -224,7 +233,9 @@ def methods(out: str) -> dict:
             "A3_app_only": app_only,
             "A4_logistic": logistic,
             "A4b_logistic": lambda train, valid: logistic(train, valid, drop=("out_1h_share_4wk",)),
-            **{m: tuned_boosted(out, m) for m in B_METHODS}}
+            "A4c_logistic_inter": logistic_inter,      # amendment 19 Nov 2026 (PLAN.md), post hoc
+            "G1_graphsage": gnn.method(out),           # amendment 4 Nov 2026 (PLAN.md); builds nothing until fit
+            **{m: tuned_boosted(out, m) for m in B_METHODS}}   # amendment 16 Nov 2026 (PLAN.md)
 
 
 # ---------------------------------------------------------------- measures
