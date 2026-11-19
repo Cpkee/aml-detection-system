@@ -95,6 +95,29 @@ def table(runs: list[str]) -> pd.DataFrame:
     return t
 
 
+def fpr_ratio(run: str, horizon: int = HORIZON) -> pd.DataFrame:
+    """Fairness (closing plan item 2): per policy, the share of normal accounts flagged in each age band and the
+    lowest rate divided by the highest (1.0 = equal treatment), for the harness's three bands and for BAF's two
+    groups, under 50 vs 50+. Reads results/<run>/final_test/by_age_w<horizon>.csv.
+
+    The harness (score.by_age) divides normal_flagged by the band's normal accounts = accounts - mules, where a mule
+    is a mule by the end of the horizon (max 1). Under 50 pools the counts of 'under 30' and '30-49' the same way,
+    after checking that rule gives back the file's own three rates."""
+    d = pd.read_csv(os.path.join(RESULTS, run, "final_test", f"by_age_w{horizon}.csv"))
+    rate = lambda x: x.normal_flagged / np.maximum(x.accounts - x.mules, 1)
+    assert np.allclose(rate(d), d.false_positive_rate, rtol=1e-9), f"{run}: rates not rebuilt from the counts"
+    rows = []
+    for policy, p in d.groupby("policy", sort=False):
+        p = p.set_index("age")
+        under50 = p.loc[["under 30", "30-49"], ["accounts", "mules", "normal_flagged"]].sum()
+        three = p.loc[["under 30", "30-49", "50+"], "false_positive_rate"]
+        two = pd.Series([rate(under50), p.loc["50+", "false_positive_rate"]])
+        rows.append({"run": run, "policy": policy, "fpr_under30": three.iloc[0], "fpr_30_49": three.iloc[1],
+                     "fpr_50plus": three.iloc[2], "ratio_3band": three.min() / three.max(),
+                     "fpr_under50": two.iloc[0], "ratio_2group": two.min() / two.max()})
+    return pd.DataFrame(rows)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("runs", nargs="*", default=PLAN_RUNS, help="default: the plan's 7 runs")
@@ -111,6 +134,9 @@ def main():
     print("\nMcNemar's test, model vs rules on the same mules (mules only, not false alarms):")
     mc = pd.DataFrame([{"run": r, **mcnemar(r)} for r in [HEADLINE, *a.runs]])
     print(mc.to_string(index=False, formatters={"chi2": "{:.2f}".format, "p_exact": "{:.2g}".format}))
+    print("\nFairness: false-positive rate by age, lowest / highest (printed only)")
+    f = pd.concat([fpr_ratio(r) for r in [HEADLINE, *a.runs]])
+    print(f[f.policy.isin(["model", "rules"])].round(5).to_string(index=False))
 
 
 if __name__ == "__main__":
