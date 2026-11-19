@@ -18,6 +18,7 @@ output of the locked final test (`outputs/modelling/results/v1_full/final_test/`
 | 6 | Fairness on Variant II | `data/variant_II` (store already built) | ~30 min | 2–3 h | Optional |
 | 7 | Money gone before the first flag (£) | Month 5 hidden transactions | ~5 min | 2–3 h | Optional |
 | 8 | Unseen shapes, PCA / autoencoder, CNN, LLM | – | – | – | No: state as limits |
+| 9 | Model vs rules at 0.1% and 1% prevalence (professor's comment 1) | Two sensitivity datasets, rebuilt | ~35 min + ~2 h | Half a day | Yes: plan in `outputs/modelling/prevalence/PLAN.md` |
 
 Suggested order: 19 Nov items 1–4; 20 Nov item 5 (then 6 if time); 21 Nov report text. Items 1–4 need no decision.
 
