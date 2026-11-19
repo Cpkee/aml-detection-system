@@ -2,6 +2,86 @@
 
 Early detection of money-laundering accounts from account-opening and early-activity signals (BT4012).
 
+**Question.** With the same weekly number of alerts as a bank's rules, does a model on account-opening data plus
+weekly account activity catch mule accounts more often and sooner? No public dataset links applications to later
+transactions, so we simulate one from real BAF applications. **Headline (final test, months 6-7, weeks 0-26):**
+the model caught 120 of 163 mule accounts, the rules 50 (precision 42.9% vs 18.9%).
+
+## Reproducing the results
+
+Tested with Python 3.13 on Windows 11 and macOS. Commands are written for bash; on Windows PowerShell set the path
+once with `$env:PYTHONPATH="src"` and drop the `PYTHONPATH=src` prefix.
+
+**0. Setup.**
+
+```bash
+pip install -r requirements.txt
+```
+
+Download the Bank Account Fraud dataset suite (Jesus et al., NeurIPS 2022) from Kaggle:
+<https://www.kaggle.com/datasets/sgpjesus/bank-account-fraud-dataset-neurips-2022>, and save `Base.csv` as
+`data/raw/BAF_Base.csv`. Generated data goes under `data/` and is never committed.
+
+**1. Check the results without rebuilding anything** (reads only committed files, seconds):
+
+```bash
+PYTHONPATH=src python -m evaluation.robustness     # robustness table (report 4.4.1) from the committed final tests
+```
+
+| Result in the report | Committed file |
+|---|---|
+| Final test, model vs rules (4.3) | `outputs/modelling/results/v1_full/final_test/report.md`, `summary_w26.csv` |
+| Month 5 dry run (4.2) | `outputs/modelling/results/v1_full/month5_dryrun_frozen_tuned_avg5/report.md` |
+| Robustness checks (4.4.1) | `outputs/modelling/robustness/report.md`, `summary.csv` |
+| Methods comparison (Table 4.2) | `outputs/modelling/comparison/v1_full/folds.csv`, `interim_paired_tests_folds.csv` |
+| The model of record | `outputs/modelling/models/v1_full/frozen_tuned_avg5/` (5 tree files, application score, calibration) |
+| Simulator settings and their sources | `configs/sim.yaml` |
+
+**2. Rebuild the main dataset** (244,000 accounts, ~11 min, 7.2 GB on disk, ~16 GB RAM recommended):
+
+```bash
+PYTHONPATH=src python -m sim.run all --baf data/raw/BAF_Base.csv --out data/v1_full --set size.n_accounts=244000
+PYTHONPATH=src python -m sim.checks --baf data/raw/BAF_Base.csv --out data/v1_full    # 10 checks + data card
+```
+
+The simulator is seeded: the same settings and BAF file give identical data. `data/v1_full/run_manifest.json`
+records the settings, seed, BAF hash and code version.
+
+**3. Build the model inputs.**
+
+```bash
+PYTHONPATH=src python -m features weekly --out data/v1_full --weeks 0-77    # weekly feature store, ~4 min, ~4 GB
+PYTHONPATH=src python -m features preprocess --out data/v1_full             # cleaned application tables
+```
+
+**4. Score the committed model on month 5** (the dry run; it uses the committed model files, no retraining):
+
+```bash
+PYTHONPATH=src python -m evaluation.score --months 5 --name repro_check
+```
+
+Expected: weeks 0-26, model 65 of 78 mules caught vs rules 16, the same as
+`results/v1_full/month5_dryrun_frozen_tuned_avg5/`. Scoring the committed files gives identical results on any
+machine; retraining (`python -m models train`) can differ by a mule or two between machines, which is why the
+trained model is committed.
+
+The test months 6-7 are locked: they were scored once on 2 Nov 2026 and `evaluation.score --final-test` refuses
+to run again (`final_test/LOCK.json`). Their outputs are committed (table above).
+
+**5. Run the tests.**
+
+```bash
+PYTHONPATH=src BAF_PATH=data/raw/BAF_Base.csv python -m pytest -q tests
+```
+
+219 tests: the data checks, an independent re-computation of the weekly features, a no-look-ahead test, a guard that
+no model code reads the hidden label files, and checks on the committed results. Tests that need a built dataset
+skip when it is missing.
+
+**Where the rest is.** Analysis notebooks in `notebooks/` (01 EDA, 02 preprocessing, 03 feature store, 04-09
+models and tuning, 10-15 appendices); every modelling result in `outputs/modelling/` (see its README);
+decisions and data changes in `CHANGELOG.md`.
+
 ## Simulator
 
 Builds a linked dataset: real BAF applications -> hidden profiles -> 18 months of simulated UK banking,
