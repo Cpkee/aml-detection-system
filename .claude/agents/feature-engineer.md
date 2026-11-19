@@ -34,9 +34,13 @@ or a published typology already cited in `configs/sim.yaml`.
   example, night share: everyone has the same hour weights), drop the idea and say why.
 - Do not propose what the project already dropped: round or under-limit amounts, quiet-then-active accounts, weekly
   cash / abroad / high-risk shares, night share, cumulative speed shares (`speed_cum`: its gain was re-flagging mules
-  already found), new counterparties over 4 weeks (`new_cp4`: no change on v1). Graph or network-partner features
-  need raw transactions, and only 1 of 163 launderer-launderer links exists before both ends start laundering, so
-  they find partners after a burst, not before.
+  already found), new counterparties over 4 weeks (`new_cp4`: no change on v1). Graph features already exist as the
+  lab's special groups `graph_struct` (`src/features/graph.py`) and `graph_nb` (`src/models/graph_nb.py`, proposal
+  28 Oct 2026); do not rebuild them. Structural graph measures (degree, clustering, triangles, PageRank) and shared
+  external counterparties are artefacts or empty in this simulator: normal internal payees are uniformly random and
+  external ids are never reused.
+- Check `outputs/modelling/feature_lab/PLAN.md`: trials there are planned; do not add looks outside it unless the
+  user asks.
 - Do not propose anything that needs labels, hidden files, the launderer type, or the bank's alerts.
 
 ## 2. Implement
@@ -61,6 +65,9 @@ or a published typology already cited in `configs/sim.yaml`.
   of each week's mules in that week's top 1% of open accounts, averaged over weeks 0-26, on the **activity +
   application score** model (the lab's default view, `app`). Account-level PR-AUC and `caught_2wk` are reported
   beside it but do not decide.
+- Proposal 28 Oct 2026 (pending the team): decide on `catch_rules` instead (`--decide catch_rules`): permanent
+  flags at the rules' own weekly alert count, the scale of the final comparison. If the user or CLAUDE.md says the
+  team adopted it, pass `--decide catch_rules` on every trial.
 - Quick look on the 50k data:
   `PYTHONPATH=src venv/bin/python -m models.feature_lab --out data/v1 --groups <group> --name <short-name> --hypothesis "<sentence>"`
   (about 40 s). On v1 each validation month has only ~17 launderers, so treat it as a screen, not a result.
@@ -120,7 +127,7 @@ Then:
 - the groups you recommend the team review, and any idea you could not build because it needs raw transactions;
 - every file you changed or created, with full paths (including the worktree path if you ran in one), so the main
   session can merge them;
-- this caveat: the lab judges each week's top 1% (~300-500 accounts), about 60x more flags than the rules raise in
-  weeks 0-12; only the Phase 5 harness at the rules' budget shows whether a feature helps.
+- this caveat: `weekly_recall` judges each week's top 1% (~300-500 accounts), about 60x more flags than the rules
+  raise; quote `d_catch_rules` per fold too (the rules' budget, permanent flags), and say if the two disagree.
 
 Use plain language: the team includes non-specialists.

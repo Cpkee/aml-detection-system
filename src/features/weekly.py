@@ -186,8 +186,9 @@ def final_sql(parts: str, peers: str, w_lo: int, w_hi: int) -> str:
 
 def code_sha256() -> str:
     """Fingerprint of the feature SQL, stored in the manifest: a store built by different feature code is refused.
-    Built with fixed placeholder inputs, so it changes with the SQL (and the constants inside it), not with comments
-    in this file or with the weeks asked for."""
+    Built with fixed placeholder inputs, so it changes with the SQL (and the constants inside it), not with Python
+    comments in this file or with the weeks asked for. `--` comments inside the SQL strings are part of the SQL, so
+    editing one does change the hash (and makes existing stores stale)."""
     sql = base_sql(0, 0) + peer_sql("PARTS") + final_sql("PARTS", "PEERS", 0, 0)
     return hashlib.sha256(sql.encode()).hexdigest()
 

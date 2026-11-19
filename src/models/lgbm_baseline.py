@@ -33,7 +33,7 @@ import numpy as np
 import pandas as pd
 
 import amldata
-from features import candidates, weekly
+from features import candidates, manifest, weekly
 from features.weekly import FEATURES as WEEKLY
 
 REPORT_ROOT = "outputs/modelling/models"
@@ -54,6 +54,7 @@ def load_table(out: str, months: tuple[int, ...], weeks: tuple[int, int],
     tree_path = os.path.join(out, "features", "accounts_tree.parquet")
     if not os.path.exists(tree_path):
         raise FileNotFoundError(f"{tree_path} not found - run `python -m features preprocess --out {out}` first")
+    manifest.check_preprocess(out)                # cleaned from this data run
     app = pd.read_parquet(tree_path)
     app = app[app["open_month"].isin(months)].reset_index(drop=True)
     app_cols = [c for c in app.columns if c not in ("account_id", "open_month")]

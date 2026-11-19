@@ -90,3 +90,52 @@ def test_frozen_inputs_are_the_lab_baseline():
     assert len(INPUTS) == len(set(INPUTS)) == 38
     assert INPUTS == list(FEATURES) + candidates.ADOPTED + ["weeks_since_open", "app_score"]
     assert candidates.ADOPTED_GROUP == "roll4"
+
+
+# ---------------------------------------------------------------- proposal 28 Oct 2026: rules' budget, catch, noise
+def test_permanent_flags_with_a_budget_by_hand():
+    d = _valid()
+    first = lab.first_flag_weeks(d, {0: 1, 1: 2})          # 1 flag in week 0, 2 in week 1; week 2 not in k
+    assert first.to_dict() == {"M0": 0, "M1": 1, "N0": 1}
+    assert lab.first_flag_weeks(d, {}).empty                # no budget, no flags
+    assert lab.pct_budget(d, 0.01) == {0: 2, 1: 2} and lab.pct_budget(d, 0.0001) == {0: 1, 1: 1}
+
+
+def test_catch_curve_by_hand():
+    first = pd.Series({"M0": 0, "M1": 3})
+    mules = pd.DataFrame({"account_id": ["M0", "M1", "M2", "M0", "M1", "M2"],
+                          "weeks_since_open": [0, 0, 0, 1, 1, 1]})
+    curve = lab.catch_curve(first, mules)
+    assert np.isclose(curve[0], 1 / 3) and np.isclose(curve[1], 1 / 3)   # M1 flagged only at week 3: not yet
+    assert np.isclose(lab.catch_mean(first, mules), 1 / 3)
+    assert lab.catch_boot_sd(first, mules) >= 0
+
+
+def test_placebo_keeps_each_week_and_breaks_accounts():
+    from models.feature_lab import PLACEBO_COLS
+    rng = np.random.default_rng(0)
+    df = pd.DataFrame({"account_id": np.repeat([f"A{i}" for i in range(50)], 3),
+                       "weeks_since_open": np.tile([0, 1, 2], 50)})
+    for c in PLACEBO_COLS:
+        df[c] = rng.normal(size=len(df)).astype("float32")
+    out, cols = lab.add_placebo(df, 1)
+    assert len(cols) == len(PLACEBO_COLS)
+    for c in PLACEBO_COLS:
+        for w in (0, 1, 2):                                  # same values inside each week, in another order
+            a, b = df.loc[df.weeks_since_open == w, c], out.loc[out.weeks_since_open == w, f"placebo1_{c}"]
+            assert np.allclose(np.sort(a), np.sort(b)) and not np.allclose(a, b)
+
+
+def test_verdict_without_a_noise_level():
+    assert lab.verdict(pd.Series([0.05, 0.03, 0.04]), None) == "no noise level yet"
+
+
+def test_ledger_new_columns_keep_old_lines(tmp_path, monkeypatch):
+    path = tmp_path / "ledger.csv"
+    path.write_text('date,trial,x\n2026-10-26,"a, b",0.57046485261439\n')
+    monkeypatch.setattr(lab, "LEDGER", str(path))
+    lab.append_ledger(pd.DataFrame({"date": ["2026-10-28"], "trial": ["t"], "x": [1.0], "y": [2.0]}))
+    lines = path.read_text().splitlines()
+    assert lines[0] == "date,trial,x,y"
+    assert lines[1] == '2026-10-26,"a, b",0.57046485261439,'           # old line untouched, one empty field added
+    assert lines[2] == "2026-10-28,t,1.0,2.0"
