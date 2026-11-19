@@ -49,7 +49,9 @@ the 8 four-week-window features (`candidates.ADOPTED`, group `roll4`), added at 
 LightGBM inputs are the 28 store features + the 8 `roll4` features + `weeks_since_open` + the application score
 (`app_score`): 38, the lab's baseline. Changed only by team decision. Feature-lab trials and `/feature-round` run only on
 explicit request and are report-appendix work; re-checking `roll4` on Variant II / IV is a robustness check, not a
-reopening of the list. Tuning step 2 and later models use them;
+reopening of the list. `python -m models.frozen_importance` (~30 s) refits that baseline and writes each input's share
+of split gain to `outputs/modelling/models/v1_full/frozen_importance/importance.csv` (v1_full: `app_score` 51%, top 5
+80%, top 10 89%); `tests/test_feature_lab.py` pins the 38. Tuning step 2 and later models use them;
 the lab's baseline includes them (`--baseline store` to re-check them). Notebooks 05/06 stay the records of the store-only
 runs. The lab also splits each gain by phase (`pre_start_recall`, `start_recall`, `later_recall`) and reports
 `first_caught_2wk` with permanent flags: weekly recall rewards re-flagging mules already found (26 Oct 2026 finding).
@@ -161,6 +163,19 @@ vs the rules' 4.4; with young fakes the excess moves to under-30s). **Fake-mix s
 (decision 16 Nov 2026, Kee Chee Pheng):** `outputs/modelling/stress/PLAN.md` was a draft that never ran; its Stress 1
 (`in_window_mix__1`) is robustness run 2, reported under the robustness plan's rule. `in_window_mix__2` and `seed__43`
 are not run (plan, Amendment 1).
+**Closing plan items 1-4 (19 Nov 2026; `outputs/modelling/closing/PLAN.md`, only committed final-test outputs read):**
+(1) McNemar on the same mules (`robustness.mcnemar`): v1_full both 43, model only 77, rules only 7, neither 36, chi2
+56.68, exact p 5.1e-16; significant in all 7 robustness runs (smallest `out_transfer_mean__1`, 30 vs 2, p 2.5e-07); mules
+only, says nothing about false alarms. (2) Fairness (`robustness.fpr_ratio`, rate = normal flagged / (accounts - mules
+by week 26) as `score.by_age`): lowest / highest false-positive rate over 3 age bands model 0.31 vs rules 0.94 (under 50
+vs 50+: 0.43 vs 0.96); fewer false alarms (160 vs 214) but 50+ flagged ~3x as often as under-30; a cost of the model,
+nothing tuned. Both printed by `python -m evaluation.robustness`, `summary.csv` unchanged. (3) The model of record's
+importance is `frozen_tuned_avg5/importance.csv` (rebuilds exactly from the 5 seed files): `app_score` 50.7%, store
+24.5%, `roll4` 22.1%; PR #39's table is the lab's untuned 3-fold baseline (Spearman 0.96), branch
+`frozen-importance-update` brings it up to date with `main`, unmerged. Scoring month 5 weeks 0-26 (786,240
+account-weeks) takes a median 5.6 s on an Apple M5 Pro (~140,000 account-weeks/s; machine busy). (4) Inputs vs
+simulator assumptions table, ordered by gain share: forwarding speed (14.6%) untested for the model (item 5), money
+amounts (12.9%) the one tested group whose lead shrinks (0.17).
 **Outlier appendix (30 Oct 2026, Kee Chee Pheng; plan `outputs/modelling/outlier/PLAN.md`, team doc
 https://claude.ai/artifact/MVKuDNLsRt74YdfLkygXZg):** can label-free detectors beat the rules, and do they find the 543
 mules the bank never confirmed (189 of 732 confirmed)? Decided: month 5 only, never 6-7 (D1); bank label = closed by
@@ -178,6 +193,12 @@ code and model files, and runs once). D4 (31 Oct): no autoencoder. Frozen 31 Oct
 M1 63, M1b 63, M2 54, M3 16, M3s 39, M4 16; never-confirmed (62): rules 3, M1 50, M2 42. Write-up:
 `notebooks/12_outlier_detection.ipynb` (reads only the committed look outputs) -> `outputs/modelling/outlier/v1_full/
 report.md`; draft appendix text `outputs/modelling/outlier/APPENDIX.md`. On this Mac run commands with `venv/bin/python`.
+**Rule scorecard appendix (18 Nov 2026, Kee Chee Pheng; plan and results `outputs/modelling/scorecard/PLAN.md`):** would a
+stronger rule set close the gap? Three hand-written scenarios on the store (fast forwarding, new payers, pass-through;
+starting values are assumptions), scored as points at the rules' budget (`python -m models scorecard`,
+`src/models/rule_scorecard.py`; refuses months 6-7). Scale chosen on months 0-4 (1.0: 178 vs rules 109 of 361), then
+month 5 scored **once** (spent; settings never change): rules 16, scorecard 34, model of record 65 of 78. Written with
+hindsight (the model leans on forwarding speed), so generous to the rules; stated as a limitation.
 Sensitivity runs (rules frozen, 244k, one `test` value each): `python -m sim.sensitivity --list | --run [--only NAME]
 | --summarise` -> `data/sensitivity/<name>/` (large files deleted) and `outputs/sensitivity/summary.csv`.
 Single steps: `accounts`, `normal --batches 3-3`, `laundering`, `rules`, `finalize`. Use `--out` for another

@@ -1,0 +1,45 @@
+{
+  "data": "data/v1_full",
+  "cohort_months": [
+    5
+  ],
+  "horizons": [
+    26
+  ],
+  "model": null,
+  "model_params_source": null,
+  "model_git_commit": null,
+  "model_machine": null,
+  "machine": {
+    "os": "macOS-26.5.1-arm64-arm-64bit",
+    "processor": "arm",
+    "cpu_count": 15,
+    "python": "3.12.15"
+  },
+  "cohort_accounts": 29120,
+  "launderers": 97,
+  "budget_per_horizon": {
+    "26": 124
+  },
+  "score_source": "file:data/v1_full/scores/scorecard_m5.parquet",
+  "scores_sha256": "2fd5dc863c6db887688a3da69164c5551584e18211e57e01f7a8555359845365",
+  "run_manifest_sha256": "4ce1c4fb593a8ae5f40e9acb082f1969655095c5a4977dc81f58c9026c62d7ba",
+  "git_commit": "0c52c88890b1f14909e9426c6398a0062223d50f",
+  "git_uncommitted_changes": false,
+  "retest_reason": null,
+  "seconds": 1,
+  "head_to_head": {
+    "26": {
+      "mules": 78,
+      "both": 13,
+      "model_only": 21,
+      "rules_only": 3,
+      "either": 37,
+      "neither": 41,
+      "median_days_model_earlier_when_both": -1.0,
+      "model_first_when_both": 3,
+      "rules_first_when_both": 7,
+      "median_min_days_earlier_model_only": 84.0
+    }
+  }
+}
