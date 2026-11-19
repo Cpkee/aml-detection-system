@@ -121,8 +121,10 @@ each week's cut-off; neighbours from any month, never their labels; the 38 input
 gives the comparison's `fit(train, valid)`. Added to the methods comparison as `G1_graphsage` (amendment, approved by
 Kee Chee Pheng, 19 Nov 2026) with the post hoc `A4c_logistic_inter` (`models.logreg`, interactions). Folds 1-3, 19 Nov:
 G1 `catch_rules` 0.434 / 0.451 / 0.465 vs ref 0.473 / 0.450 / 0.440, pooled gain -0.004 (95% -0.035 to +0.025, p 0.77);
-A4c 0.447 / 0.412 / 0.392, gain -0.038 (-0.066 to -0.010); no rival wins on the folds
-(`comparison/v1_full/interim_paired_tests_folds.csv`). G1 takes 22-40 min per fold. Month 5 with the other rivals at the gate.
+A4c 0.447 / 0.412 / 0.392, gain -0.038 (-0.066 to -0.010). Group B (PR #58, merged 19 Nov): B1 XGBoost 0.466 / 0.460 /
+0.427, gain -0.003 (-0.017 to +0.010, p 0.60); B2 CatBoost gain -0.049 (-0.076 to -0.024). No rival wins on the folds
+(`python -m models.comparison --interim` -> `comparison/v1_full/interim_paired_tests_folds.csv`, Holm over the 15 rivals
+present). G1 takes 22-40 min per fold. Month 5 with the other rivals at the gate.
 Phase 5 (28 Oct 2026): `python -m models train [--out D --params FILE]` fits the frozen model on months 0-4 ->
 `data/<run>/models/frozen/`; `python -m evaluation.score [--months 5]` runs the fixed-cohort harness at the rules' weekly
 budget -> `outputs/modelling/results/<run>/month5_dryrun/`; test months only with `--final-test`, once (lock file).

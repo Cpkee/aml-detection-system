@@ -126,3 +126,18 @@ def test_boosted_averages_seeds_and_ranks_the_signal():
 def test_best_trial_breaks_ties_by_lower_trial():
     t = pd.DataFrame({"trial": [2, 0, 1], "weekly_recall": [0.4, 0.3, 0.4]})
     assert cmp.best_trial(t)["trial"] == 1
+
+
+def test_interim_tests_judge_every_rival_against_ref(tmp_path, monkeypatch):
+    monkeypatch.setattr(cmp, "REPORT_ROOT", str(tmp_path))
+    rows = [("b", 1.0, "ref"), ("f", 2.0, "ref"),                       # ref catches b, then f
+            ("b", 1.0, "same"), ("f", 2.0, "same"),                     # a copy of ref
+            ("b", 1.0, "better"), ("d", 1.0, "better"), ("f", 1.0, "better")]
+    flags = pd.DataFrame(rows, columns=["account_id", "week", "method"]).assign(fold=1)
+    (tmp_path / "run").mkdir()
+    flags.to_csv(tmp_path / "run" / "first_flags.csv", index=False)
+    r = cmp.interim_tests("data/run", mules()).set_index("method")
+    assert list(r.index) == ["better", "same"]                          # ref is never its own rival
+    assert r.loc["same", "gain"] == 0 and not r.loc["same", "wins_on_folds"]
+    assert r.loc["better", "gain"] > cmp.NOISE and r.loc["better", "cohorts_ahead"] == 2
+    assert r.loc["better", "wins_on_folds"] == r.loc["better", "holm_pass"]
