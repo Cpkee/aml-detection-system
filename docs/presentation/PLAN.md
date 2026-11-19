@@ -1,7 +1,8 @@
 # Slide plan: Early Detection of Money Mule Accounts
 
 BT4012 Fraud Analytics, Group 09. Drafted 19 Nov 2026 (Kee Chee Pheng, with Claude); revised the same day for
-technical depth (second pass) and to fold the backup slides into the talk (third pass, below). Replaces the structure
+technical depth (second pass), to fold the backup slides into the talk (third pass) and to state hypotheses
+before the results (fourth pass, below). Replaces the structure
 of the old deck "BT4012 Group 9.pptx" (26 slides, SharePoint). Words follow [`GLOSSARY.md`](../../GLOSSARY.md).
 
 **Built deck:** a Claude Slides deck, **28 main slides + 2 appendix slides** (References, AI declaration), speaker
@@ -38,6 +39,13 @@ Project > Presentation).
    the speaker notes, the NUS Computing logo and the system diagram's arrows survived the export.
 5. **Rehearse with a timer** (section 5), then record.
 
+**Fourth pass, 19 Nov 2026 (slide 3 no longer gives the answers away).** Slide 3 states the report's research
+question and three hypotheses (H1 more mule accounts, H2 earlier, H3 opening data helps) beside two blank review
+lists of the same length; the answers wait for the results, and slide 28 gives a verdict on each (supported / not
+supported / not at this budget). Slides 11 and 14 keep their month-5 numbers (65 vs 16, 63 vs 16): they are checks,
+not the test. Team edits kept: the closing slide no longer lists the names; slide 13 was rebuilt in a separate
+session ("No method beats ours", notes 160 words). The talk is now **17:21** (section 5).
+
 **Third pass, 19 Nov 2026 (why the deck grew from 24 to 28 main slides and lost its backups).** With no Q&A a
 backup slide is never shown, so what matters moved into the talk and the rest was deleted:
 - **Cover and closing slide share one frame:** the off-white background of every other slide, the NUS Computing logo
@@ -71,8 +79,8 @@ talk follows the report's order:
   on 19 Nov.
 
 **First pass, 19 Nov 2026 (still true):** slide 5 says "realistic applications" (BAF is generated from a real bank's
-applications, not copied); slide 13 says "**Top** boosted trees tie" (CatBoost is reliably behind: gain −0.049, 95%
-−0.076 to −0.024); 0.085 is the pre-registered minimum detectable effect, not a noise band, and is not on any slide;
+applications, not copied); CatBoost is shown as reliably behind (gain −0.049, 95% −0.076 to −0.024; slide 13 now
+reads "No method beats ours"); 0.085 is the pre-registered minimum detectable effect, not a noise band, and is not on any slide;
 the section tracker in the footer replaces divider slides and the roadmap.
 
 ---
@@ -85,12 +93,16 @@ the section tracker in the footer replaces divider slides and the roadmap.
 > caught **2.4× as many mule accounts (120 vs 50 of 163)**. It was **not earlier**, and **not thanks to the
 > application form**: it read the laundering burst more precisely.
 
-**The arc is question → answer.** Slide 3 asks two questions and previews the answers; slide 28 answers each:
+**The arc is hypothesis → verdict.** Slide 3 states the report's research question ("At the same weekly alert
+budget as the bank's rules, can a model using account-opening data and early activity catch mule accounts
+earlier?") and three hypotheses, without the answers; the results section tests them; slide 28 gives a verdict on
+each:
 
-| Question (slide 3) | Answer (slide 28) |
+| Hypothesis (slide 3) | Verdict (slide 28) |
 |---|---|
-| Does account-opening data help catch mule accounts? | Not at the bank's alert budget: the gain comes from transactions |
-| With the same alerts, can we catch more, or sooner? | More: 2.4× (120 vs 50 of 163). Sooner: no (median 8 vs 9 days from start) |
+| H1 More mule accounts: the model catches more than the rules with the same alerts | Supported: 120 vs 50 of 163 (2.4×) |
+| H2 Earlier: it catches them sooner, ideally before laundering starts | Not supported: 2 of 120 caught before the start; median 8 vs 9 days from start |
+| H3 Opening data helps: the application adds to what activity alone catches | Not at this budget: with vs without it 180 vs 184 of 210 (folds), 65 vs 61 of 78 (month 5) |
 
 **Six sections**, in the report's order: Why this matters → Why we simulate (data) → Method → Evaluation and
 results → Limitations → Future work and conclusion.
@@ -109,7 +121,7 @@ Clean and intuitive: **the slide shows, the speaker explains.**
 | Colours | **NUS Blue `#003D7C` = the model.** **Orange `#EF7C00` = the bank's rules** (text `#B35C00`). Greys for everything else. Never swap model and rules colours |
 | Type | Inter. Headline 52 px on a 1920 × 1080 slide, body ≥ 22 px, chart labels ≥ 20 px |
 | Footer | Section tracker **Why · Data · Method · Results · Limits · Conclusion** (current one bold), external sources, the report section ("Report §4.3, Table 4.3A"), page number. None on the cover and the closing slide |
-| Cover and closing slide | One frame: off-white background (as every slide), NUS Computing logo top left, orange bottom bar, large navy title, the four names |
+| Cover and closing slide | One frame: off-white background (as every slide), NUS Computing logo top left, orange bottom bar, large navy title; the four names on the cover |
 | Numbers | Counts as "120 of 163", shares as whole percentages ("43%"). Same number, same wording everywhere |
 | Words | Use `GLOSSARY.md`: **mule account**, **the bank's rules**, **flag**, **caught**, **weekly alert budget**, **days from start**. Never "earlier" to mean "caught when the rules never are" |
 
@@ -135,21 +147,21 @@ Clean and intuitive: **the slide shows, the speaker explains.**
 ## 5. Presenters and timing
 
 At most 15 minutes; every member speaks (course guideline 1). Times are the deck's speaker notes at 130 words a
-minute: **16:33 in all** (2,152 words), **about 1:30 over the guideline**. On 19 Nov the team chose to move the
-backup slides' plots into the talk and accept up to about 16:30; section 11 says what to cut if the 15 minutes is
-enforced. The team fills in names.
+minute: **17:21 in all** (2,255 words), **about 2:20 over the guideline** and about 50 s over the ~16:30 the team
+accepted on 19 Nov when it moved the backup slides' plots into the talk. Most of the rise since then is slide 13's
+rebuilt notes (78 → 160 words, +0:38). Section 11 says what to cut. The team fills in names.
 
 | Slot | Slides | Sections | Time |
 |---|---|---|---|
-| A: ________ | 1–6 | Why this matters; why we simulate; the bank's rules | 4:08 |
-| B: ________ | 7–13 | Training data; method; calibration; model selection | 4:12 |
+| A: ________ | 1–6 | Why this matters; the hypotheses; why we simulate; the bank's rules | 4:11 |
+| B: ________ | 7–13 | Training data; method; calibration; model selection | 4:50 |
 | C: ________ | 14–20 | Label-free detectors; the fair test and results; what drives the catches | 4:01 |
-| D: ________ | 21–28 | At opening; robustness; stronger rules; use in a bank; limitations; future work; conclusion | 4:12 |
+| D: ________ | 21–28 | At opening; robustness; stronger rules; use in a bank; limitations; future work; verdicts | 4:18 |
 
 The cover stays up for its notes (about 40 s), well over the guideline's 8 seconds for reading the title. If a
 presenter runs long, slides 20 (drivers), 21 (at opening) and 23 (thresholds) can each lose a sentence. To get under
-15:00, the four slides that came from the backups (12, 14, 17, 24; 1:36 together) are the first to drop: 14:57
-without them.
+15:00: take slide 13's notes back to about 80 words (−0:38) and drop the four slides that came from the backups
+(12, 14, 17, 24; −1:36): 15:07. Part B (4:50) is the longest slot.
 
 ---
 
@@ -161,7 +173,7 @@ Speaker notes: in the deck. Times as section 5.
 |---|---|---|---|---|
 | 1 | Early Detection of Money Mule Accounts | Cover frame: NUS Computing logo; question line; Group 09 and the four names | — | A · 0:42 |
 | 2 | Mule accounts pass stolen money on within hours | Life-of-a-mule timeline with 0.3% · 53% within 1 hour · 90–95% of alerts false; three kinds of mule | §1.1–1.2 | A · 0:36 |
-| 3 | Two questions, at the bank's own alert budget | Two 10-row review lists of the same length (illustration: rules 2 mules, model 4; precision 19% vs 43%); the two questions with their answers | §1.1 | A · 0:36 |
+| 3 | Three hypotheses, tested at the bank's own alert budget | Two blank 10-row review lists of the same length ("Which list holds more mule accounts?"); the research question; H1 more mule accounts, H2 earlier, H3 opening data helps; no answers | §1.1 | A · 0:39 |
 | 4 | No public dataset follows an account from application to transactions | BAF / SAML-D / real bank data boxes → our simulator | §2.1 | A · 0:34 |
 | 5 | We simulate 18 months of UK banking around realistic applications | Five-step pipeline: 244,000 accounts → 732 mule accounts → 109M transactions → one burst → 93.4% of alerts false | §2.1–2.2 | A · 1:04 |
 | 6 | The benchmark: six rules a bank would run each week | Table R1–R6 (C9); alert → 28-day pause → review 3–30 days → 80% of true alerts confirmed → closed | §2.2, App. B | A · 0:36 |
@@ -171,7 +183,7 @@ Speaker notes: in the deck. Times as section 5.
 | 10 | The system: two models feed one weekly ranked list | System diagram (C12); cards "Why two stages" (PR-AUC 1.00 train vs 0.40 validation; gap 0.74 → 0.18) and "Why LightGBM" | §3.3 | B · 0:42 |
 | 11 | Every modelling choice was made on months 0–4 only | Fold grid over months 0–7 (C13); four steps; month-5 dry run 65 vs 16 of 78 | §3.3, §4.2 | B · 0:40 |
 | 12 | Calibrated: a 5% score means about 5% are mule weeks | Out-of-fold reliability table, 8 bands (C14); raw 18.6% vs 0.24%, isotonic 0.24% vs 0.24%; Brier 0.074 → 0.0018 | §4.2 | B · 0:23 |
-| 13 | Top boosted trees tie; how the inputs are fed matters more | 13 bars, Table 4.2 (C2), tie band shaded | §4.2 | B · 0:36 |
+| 13 | No method beats ours; how the inputs are fed matters more | 13 bars, Table 4.2 (C2): ours on top as the reference, the four tied methods shaded with gain and 95% interval, then the methods behind; caught of 210 | §4.2, Table 4.2 | B · 1:14 |
 | 14 | Without labels, detectors catch 16 to 39 of 78; the model 63 | Bars, month 5, 124 flags each (C15); of 62 mules the bank never confirmed: 50 / 42 / 3 | §3.3, §4.4.4 | C · 0:24 |
 | 15 | A fair test: same accounts, same weeks, same number of flags | Four cards: 50,061 accounts, 163 mules · every week · top N · scored once; strip "Reproducible": seeded data, run records, shared model files, plan committed first, 233 automated tests | §4.1 | C · 0:43 |
 | 16 | With the same alerts, the model caught 2.4× as many mule accounts | 163-dot grid (C4); 120 vs 50; precision 43% vs 19%; over all 78 weeks 138 vs 59 of 180 | §4.3, Table 4.3A | C · 0:44 |
@@ -186,7 +198,7 @@ Speaker notes: in the deck. Times as section 5.
 | 25 | A bank would get a weekly ranked list, the same length as today | Four steps: score every week (≈6 s) · keep the top N · calibrated probability · investigators decide | §4.5 | D · 0:35 |
 | 26 | Every result is a comparison inside a simulation | Four limits; 50+ false alarms per 1,000: model 6.1 vs rules 4.4 | §5.2 | D · 0:40 |
 | 27 | Next: run it silently beside a real bank's rules | Three steps: shadow run · harder simulation · fix the age skew | §5.4 | D · 0:24 |
-| 28 | Earlier? No. More mule accounts, same alerts? Yes. | Cover frame: the two answers; "Thank you"; the four names; repository link | — | D · 0:28 |
+| 28 | Earlier? No. More mule accounts, same alerts? Yes. | Cover frame: a verdict card per hypothesis (H1 supported, H2 not supported, H3 not at this budget); "Thank you"; repository link | — | D · 0:34 |
 
 ---
 
@@ -588,9 +600,9 @@ model `frozen_tuned`); "65 of 78" is the model of record. Use 65 everywhere exce
 
 ## 11. Open points for the team
 
-1. **Talk length.** 16:33 at 130 words a minute, over the course's "no more than 15 minutes"; the team accepted up to
-   about 16:30 on 19 Nov. If the limit is enforced, take slides 12, 14, 17 and 24 out of the talk (1:36 together:
-   14:57 without them), or cut a sentence from several slides' notes.
+1. **Talk length.** 17:21 at 130 words a minute, over the course's "no more than 15 minutes" and over the ~16:30
+   the team accepted on 19 Nov. Slide 13's rebuilt notes (160 words, 1:14) are the largest single item; bringing them
+   back to about 80 words saves 0:38. Taking slides 12, 14, 17 and 24 out of the talk saves 1:36 more (15:07).
 2. **Report title.** The deck and its cover are "Early Detection of Money Mule Accounts"; the report is titled
    "Anti-Money Laundering Mule Account Detection System". Use one name for the deck, the video and the report.
 3. **CatBoost in the report.** Report §3.3 / §4.2 says CatBoost is within the 0.085 margin; the paired test puts it
@@ -618,6 +630,6 @@ model `frozen_tuned`); "65 of 78" is the model of record. Use 65 everywhere exce
 - [ ] The NUS Computing logo shows on the cover and the closing slide after export
 - [ ] The system diagram's arrows (slide 10) survive the export
 - [ ] Glossary words used throughout (no "launderer", "detected earlier")
-- [ ] Each presenter rehearses with a timer: A 4:08, B 4:12, C 4:01, D 4:12 (total 16:33; over the 15:00 guideline, see section 11)
+- [ ] Each presenter rehearses with a timer: A 4:11, B 4:50, C 4:01, D 4:18 (total 17:21; over the 15:00 guideline, see section 11)
 - [ ] Title and names readable for at least 8 seconds at the start of the video
 - [ ] Exported `.pptx` and PDF open correctly (fonts, charts, notes)
