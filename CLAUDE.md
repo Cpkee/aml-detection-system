@@ -181,6 +181,13 @@ code and model files, and runs once). D4 (31 Oct): no autoencoder. Frozen 31 Oct
 M1 63, M1b 63, M2 54, M3 16, M3s 39, M4 16; never-confirmed (62): rules 3, M1 50, M2 42. Write-up:
 `notebooks/12_outlier_detection.ipynb` (reads only the committed look outputs) -> `outputs/modelling/outlier/v1_full/
 report.md`; draft appendix text `outputs/modelling/outlier/APPENDIX.md`. On this Mac run commands with `venv/bin/python`.
+**Prevalence runs (19 Nov 2026, Kee Chee Pheng; robustness plan Amendment 1; plan and results
+`outputs/modelling/prevalence/PLAN.md`, leads in `robustness/summary_amendment1.csv`):** the open half of the professor's
+comment 1. `prevalence__1pct` (244k) and `prevalence__0.1pct` (732k) through the robustness recipe, months 6-7 scored once
+each (locked; never re-run). Test cohort, weeks 0-26, 0.1% / 0.3% / 1%: model caught 151 of 172 / 120 of 163 / 297 of 524,
+rules 40 / 50 / 138; false-alarm share of flags model 80% / 57% / 20%, rules 94% / 81% / 61% (model below the rules at all
+three; use this cohort basis, not the whole-dataset 97.8 / 93.4 / 81.3%). Lead 0.65 holds at 0.1%; **shrinks at 1%** (0.30,
+0.25-0.36): the budget barely grows while mules triple (369 flags for 524 mules), an after-the-fact explanation.
 Sensitivity runs (rules frozen, 244k, one `test` value each): `python -m sim.sensitivity --list | --run [--only NAME]
 | --summarise` -> `data/sensitivity/<name>/` (large files deleted) and `outputs/sensitivity/summary.csv`.
 Single steps: `accounts`, `normal --batches 3-3`, `laundering`, `rules`, `finalize`. Use `--out` for another
