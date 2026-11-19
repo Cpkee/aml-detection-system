@@ -1,6 +1,6 @@
 # Rules vs model at several alert volumes (plan, 19 Nov 2026)
 
-**Status: plan accepted 19 Nov 2026 (Kee Chee Pheng); committed before any run.** Report-appendix work only. It
+**Status: plan accepted 19 Nov 2026 (Kee Chee Pheng); committed before any run. Run 19 Nov 2026 (result at the end).** Report-appendix work only. It
 changes nothing in the simulator, the six rules, the data, the feature store or the model of record, and it never
 reads test months 6–7. The headline result (final test, 2 Nov 2026) stays as it is.
 
@@ -57,3 +57,25 @@ between neighbouring scales are noise; only the direction at each scale is read.
 - **R1 and R2 never move** (they are fixed limits), so the rules' line flattens at the strict end by construction.
 - **Month 5 only.** It is the calibration month and has been looked at many times. Months 6–7 are not read; scoring
   this there would be a counted re-test (decision 2 Nov 2026) and is a separate team decision.
+
+## Result (run 19 Nov 2026, `v1_full/report.md`, `curve.csv`, `curve.png`)
+
+The self-check passed: at 1.516 the re-applied rules reproduce the cohort's alerts exactly, and the row equals the
+committed dry run (rules 16, model 65 of 78). **The lead holds across thresholds: the model catches more mules than
+the rules at all 7 scales.**
+
+| Scale | Budget (alerts, weeks 0–26) | Rules caught | Model caught | Lead |
+|---|---|---|---|---|
+| 1.0 | 1,432 | 40 | 78 | 0.49 |
+| 1.149 | 597 | 30 | 77 | 0.60 |
+| 1.32 | 246 | 24 | 73 | 0.63 |
+| **1.516** | 124 | 16 | 65 | 0.63 |
+| 1.741 | 69 | 10 | 47 | 0.47 |
+| 2.0 | 46 | 8 | 35 | 0.35 |
+| 2.639 | 33 | 3 | 26 | 0.29 |
+
+Reading notes: with about 12 times the alerts (scale 1.0) the rules catch 40 of 78, still fewer than the model
+catches at the scale of record with 124 flags (65). At the loose end the model has caught every mule, so the lead
+can only shrink there; at the strict end the budget (33 to 69 flags) is smaller than the number of mules, so the
+lead is capped by the budget. The rules' own mules are almost all found by the model too (rules-only catches: 0 to 2
+per scale). One cohort of 78 mules, not re-run.

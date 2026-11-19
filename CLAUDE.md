@@ -151,6 +151,13 @@ vs the rules' 4.4; with young fakes the excess moves to under-30s). **Fake-mix s
 (decision 16 Nov 2026, Kee Chee Pheng):** `outputs/modelling/stress/PLAN.md` was a draft that never ran; its Stress 1
 (`in_window_mix__1`) is robustness run 2, reported under the robustness plan's rule. `in_window_mix__2` and `seed__43`
 are not run (plan, Amendment 1).
+**Budget curve appendix (19 Nov 2026, Kee Chee Pheng; plan and result `outputs/modelling/budget_curve/PLAN.md`,
+committed before the run):** did the model win only because of the rules' one threshold? `python -m evaluation.budget_curve`
+(`src/evaluation/budget_curve.py`, `tests/test_budget_curve.py`; refuses months 6-7) re-applies `sim.rules` to the
+finished v1_full transactions at 7 scales fixed in the plan (1.0 to 2.639), gives the model of record each scale's
+weekly alert count, and scores both with the harness; at 1.516 it must reproduce `aml_alerts` exactly. Month 5, 78
+mules, rules / model caught: 40 / 78 (1,432 alerts), 30 / 77, 24 / 73, **16 / 65 (124, scale of record)**, 10 / 47,
+8 / 35, 3 / 26 (33): the lead holds at all 7. Approximate (closures are those of 1.516; no data regenerated).
 **Outlier appendix (30 Oct 2026, Kee Chee Pheng; plan `outputs/modelling/outlier/PLAN.md`, team doc
 https://claude.ai/artifact/MVKuDNLsRt74YdfLkygXZg):** can label-free detectors beat the rules, and do they find the 543
 mules the bank never confirmed (189 of 732 confirmed)? Decided: month 5 only, never 6-7 (D1); bank label = closed by
