@@ -1,6 +1,6 @@
 # Closing the modelling plan: implementation plan (drafted 19 Nov 2026)
 
-**Status (19 Nov 2026): items 1–4 done, results under each heading; items 5–7 wait on the team's decisions below.** The modelling plan (decision-record doc, tab
+**Status (19 Nov 2026): items 1–7 done, results under each heading; item 8 is stated as limits.** The modelling plan (decision-record doc, tab
 "Modelling plan", 9 Oct 2026) promised some things that are not in the repo yet. This file says, for each one, what
 to build, what it reads, how long it takes and how the result will be read. Report deadline: 22 Nov 2026.
 

@@ -6,6 +6,17 @@ Assumptions and Use" doc.
 
 
 
+## 19 Nov 2026 — New sensitivity dataset `forward_delay_shares__1` (patient launderers); Variant II scored
+
+- New dataset `data/sensitivity/forward_delay_shares__1` (robustness plan Amendment 2): forwarding-delay shares
+  0.05 / 0.10 / 0.35 / 0.50 instead of RUSI's 0.28 / 0.25 / 0.32 / 0.15, set with `--set` only. An unsourced
+  assumption, approved 19 Nov 2026 by Kee Chee Pheng; `configs/sim.yaml` unchanged. 244,000 accounts, seed 42, rules
+  frozen at 1.516, built from commit c4e47d8; 10/10 checks pass. Rules: 3,572 alerts, 94.4% false alarms, 199 of 732
+  launderers alerted (27%), median 8 days. Store, cleaned tables and `robust_avg5` built; months 6-7 scored once
+  (locked). The folder is kept whole, like the 7 robustness runs (the amendment said large files would be deleted).
+- `data/variant_II`: no data change; `robust_avg5` trained on its months 0-4 and months 6-7 scored once (locked).
+- No change to v1_full, the main data or the model of record.
+
 ## 16 Nov 2026 — Fake-mix stress plan closed (no run)
 
 No data, model or result change. The draft plan `outputs/modelling/stress/PLAN.md` (5 Nov, never agreed, never run)
