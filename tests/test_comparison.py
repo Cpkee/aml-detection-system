@@ -78,3 +78,66 @@ def test_budget_measures_counts():
     assert (r["caught"], r["mules"], r["flags"]) == (2, 3, 3)
     assert np.isclose(r["recall_w26"], 2 / 3) and np.isclose(r["precision"], 2 / 3)
     assert r["median_weeks_from_start"] == 0.5 and r["rules_budget_fake"] == "2/2"
+
+
+# ---------------------------------------------------------------- group B (amendment 16 Nov 2026)
+def test_draws_start_with_defaults_and_repeat():
+    for learner in ("xgboost", "catboost"):
+        d = cmp.draws(learner)
+        assert len(d) == 40 and d[0] == {} and d == cmp.draws(learner)       # seeded: the same 40 trials every run
+        assert all(set(x) == set(cmp.spaces()[learner]) for x in d[1:])
+
+
+def test_draws_stay_inside_the_registered_ranges():
+    for x in cmp.draws("xgboost")[1:]:
+        assert 0.01 <= x["learning_rate"] <= 0.3 and x["n_estimators"] in cmp.TREES
+        assert x["max_leaves"] in (15, 23, 31, 47, 63, 95, 127, 191, 255)
+        assert 0.5 <= x["subsample"] <= 1 and 0.5 <= x["colsample_bytree"] <= 1
+    for x in cmp.draws("catboost")[1:]:
+        assert x["depth"] in (4, 5, 6, 7, 8) and x["iterations"] in cmp.TREES and 0.5 <= x["rsm"] <= 1
+
+
+def test_balanced_row_weights_equal_lightgbm_class_weights():
+    from sklearn.utils.class_weight import compute_sample_weight
+    y = np.array([0] * 98 + [1] * 2)
+    w = compute_sample_weight("balanced", y)
+    assert np.isclose(w[0], 100 / (2 * 98)) and np.isclose(w[-1], 100 / (2 * 2))   # n / (2 x class count)
+
+
+def toy():
+    rng = np.random.default_rng(0)
+    x = rng.normal(size=(400, 2))
+    d = pd.DataFrame({"a": x[:, 0], "b": x[:, 1], "mule_by_day": (x[:, 0] > 1.5).astype(int)})
+    return d.iloc[:300], d.iloc[300:]
+
+
+def test_boosted_averages_seeds_and_ranks_the_signal():
+    train, valid = toy()
+    for learner, params in (("xgboost", {"n_estimators": 100, "max_leaves": 15}), ("catboost", {"iterations": 100,
+                                                                                                 "depth": 4})):
+        fit = cmp.boosted(learner, params, seeds=(1, 2), cols=["a", "b"])
+        s = fit(train, valid)
+        one = [cmp.boosted(learner, params, seeds=(k,), cols=["a", "b"])(train, valid) for k in (1, 2)]
+        assert np.allclose(s, (one[0] + one[1]) / 2)
+        from sklearn.metrics import roc_auc_score
+        assert roc_auc_score(valid["mule_by_day"], s) > 0.9
+
+
+def test_best_trial_breaks_ties_by_lower_trial():
+    t = pd.DataFrame({"trial": [2, 0, 1], "weekly_recall": [0.4, 0.3, 0.4]})
+    assert cmp.best_trial(t)["trial"] == 1
+
+
+def test_interim_tests_judge_every_rival_against_ref(tmp_path, monkeypatch):
+    monkeypatch.setattr(cmp, "REPORT_ROOT", str(tmp_path))
+    rows = [("b", 1.0, "ref"), ("f", 2.0, "ref"),                       # ref catches b, then f
+            ("b", 1.0, "same"), ("f", 2.0, "same"),                     # a copy of ref
+            ("b", 1.0, "better"), ("d", 1.0, "better"), ("f", 1.0, "better")]
+    flags = pd.DataFrame(rows, columns=["account_id", "week", "method"]).assign(fold=1)
+    (tmp_path / "run").mkdir()
+    flags.to_csv(tmp_path / "run" / "first_flags.csv", index=False)
+    r = cmp.interim_tests("data/run", mules()).set_index("method")
+    assert list(r.index) == ["better", "same"]                          # ref is never its own rival
+    assert r.loc["same", "gain"] == 0 and not r.loc["same", "wins_on_folds"]
+    assert r.loc["better", "gain"] > cmp.NOISE and r.loc["better", "cohorts_ahead"] == 2
+    assert r.loc["better", "wins_on_folds"] == r.loc["better", "holm_pass"]

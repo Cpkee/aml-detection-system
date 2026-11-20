@@ -94,3 +94,89 @@ Recorded 2 Nov 2026 from the reference run (commit 9e1a46f), before any rival wa
   to [0, 1] like every share, and its rare 1s (raw values reach 164) put normal accounts at the top of the ranking.
   A4b = A4 without `out_1h_share_4wk` (fold 1: `catch_rules` 0.305). It was chosen after seeing fold 1, so it is
   labelled post hoc; the change only helps a rival, so it cannot flatter our model.
+- **16 Nov 2026, group B: B1 XGBoost and B2 CatBoost (decided by Kee Chee Pheng; committed before either is fitted).**
+  Group label and names from the team doc tab "Methods comparison: research + plan" (group B "Other tabular models":
+  B1 XGBoost, B2 CatBoost, on the same 38 inputs). Methods `B1_xgboost` and `B2_catboost`; both were already counted
+  in the 13 rivals of the Holm bar, so `N_RIVALS` is unchanged. Packages added to `requirements.txt` (the doc's open
+  question; agreed by Kee Chee Pheng 16 Nov): xgboost 3.4.1, catboost 1.2.10.
+  - **Same as `ref`:** rows (`stability.lab_setup`), label `mule_by_day`, the 3 folds, the 38 frozen inputs including
+    the fold's out-of-fold `app_score` (`feature_lab.app_scores`, seed 42), scoring (`stability.fold_measures` +
+    `comparison.budget_measures`), months 0-4 only.
+  - **Class imbalance:** row weights `sklearn.utils.class_weight.compute_sample_weight("balanced", y)`, passed as
+    `sample_weight`. These are exactly the weights LightGBM's `class_weight="balanced"` gives `ref`. No resampling.
+  - **Tuning:** random search as notebook 08: 40 trials, trial 0 = the learner's own defaults, trials 1-39 =
+    `sklearn.model_selection.ParameterSampler(SPACE, random_state=42)`; model seed 42 during tuning (as notebook 08).
+    Measure: top-1% weekly recall (`feature_lab.weekly_recall`), mean of the 3 folds; the highest wins, a tie goes to
+    the lower trial number. Every trial's settings, per-fold measures and minutes are saved
+    (`outputs/modelling/comparison/v1_full/tuning/<method>_trials.csv`), the winner in `<method>_best.json`.
+  - **Early stopping: not used** (as `ref`'s search). The number of trees is searched instead, over the same list
+    as LightGBM. Why: stopping on the last training month means fold 1 (train months 0-1) would fit on month 0 alone,
+    half its rows, a handicap `ref` never had.
+  - **Final fit:** the chosen settings with seeds 1-5 on each fold's training months; the 5 probabilities averaged per
+    account-week before flagging at the rules' weekly budget (as `ref`). Rows in `folds.csv` / `first_flags.csv`,
+    out-of-fold scores in `data/v1_full/comparison/<method>.parquet`. No win rule is applied on the folds; month 5
+    is scored once, after every group is done.
+  - **B1 XGBoost search space** (`tree_method="hist"`, `grow_policy="lossguide"`, `max_depth=0`: leaf-wise trees
+    capped by leaf count, as LightGBM grows them; rows resampled every tree, as `ref`'s `subsample_freq=1`):
+
+    | setting | range | LightGBM counterpart (notebook 08) |
+    |---|---|---|
+    | `learning_rate` | 0.01-0.3, log scale | same |
+    | `n_estimators` | 100, 150, ..., 1000 | same |
+    | `max_leaves` | 15, 23, 31, 47, 63, 95, 127, 191, 255 | `num_leaves`, same list |
+    | `min_child_weight` | 0.001, 0.01, 0.1, 1, 10, 100 | `min_child_samples` 20-2000. **Differs:** XGBoost has no row-count limit, only a minimum sum of row weight x p(1-p) per leaf |
+    | `colsample_bytree` | 0.5-1.0 | same |
+    | `subsample` | 0.5-1.0 | same |
+    | `reg_alpha`, `reg_lambda` | 1e-8-10, log scale | same |
+
+  - **B2 CatBoost search space** (CatBoost's own symmetric trees, its standard and fastest form;
+    `bootstrap_type="Bernoulli"` so `subsample` means the same as in LightGBM):
+
+    | setting | range | LightGBM counterpart (notebook 08) |
+    |---|---|---|
+    | `learning_rate` | 0.01-0.3, log scale | same |
+    | `iterations` | 100, 150, ..., 1000 | `n_estimators`, same list |
+    | `depth` | 4, 5, 6, 7, 8 | `num_leaves` 15-255. **Differs:** a symmetric tree of depth d has 2^d leaves, so 16-256 leaves, the same span |
+    | `rsm` | 0.5-1.0 | `colsample_bytree` |
+    | `subsample` | 0.5-1.0 | same |
+    | `l2_leaf_reg` | 1e-8-10, log scale | `reg_lambda` |
+
+    **Left out, and why:** a leaf minimum (`min_data_in_leaf` works only with non-symmetric trees) and an L1 penalty
+    (CatBoost has none). Other settings stay at CatBoost's defaults (e.g. `random_strength` 1, 254 borders).
+  - **Fixed for both:** all 15 cores, missing values left as NaN (both learners handle them), log loss.
+- **4 Nov 2026, G1_graphsage (proposed by Keith Tan, before any run of it; approved by Kee Chee Pheng, relayed by
+  Keith Tan 19 Nov 2026).** Two attempts on 4 Nov ran out of memory before any fold finished (no result seen); the
+  memory fixes (commits 4f94102, 72c1be8) change neither the model nor its settings.
+  Committed before G1 is trained on any fold. Code `src/models/gnn.py`, tests `tests/test_gnn.py` (branch
+  `gnn-graphsage`). *Question:* does reading the accounts an account pays and is paid by catch mules earlier than
+  reading each account alone?
+  - *Method:* a 2-layer GraphSAGE (mean aggregator, plain PyTorch) on account-weeks. Links are payments between two
+    accounts of the bank (`features/graph_edges.parquet`, `python -m features graph`) on or before the focal week's
+    cut-off; a neighbour enters as its own latest week whose cut-off is no later than that. Neighbours may come from
+    any opening month, including 5-7 (a bank sees every payment between its own accounts; decided 3 Nov 2026); only
+    their public inputs are read, never a label. Node inputs: the 38 frozen inputs, the neighbours' `app_score` from
+    the same fold's application model (seed 42); preprocessing as A4 (fitted on the training rows).
+  - *Fixed settings, not tuned:* `gnn.DEFAULTS` = 2 layers, the 10 then 5 most recent neighbours, hidden 64,
+    dropout 0.1, Adam lr 1e-3, weight decay 1e-5, 4 epochs, batch 2,048, balanced class weights, seeds 1-5 averaged.
+    No early stopping, no setting chosen on the folds.
+  - *Judged* like every rival: same rows, folds, budget and measures; `catch_rules` against `ref` with the paired
+    bootstrap; Holm over the rivals compared (now 14 with G1; the MDE above used 13 and is recomputed at the gate).
+    Reported beside it: the start-week flag rate, as the feature lab's `graph_nb` group.
+  - *Expectation stated in advance:* a small gain at most. Only 1 of 163 launderer-launderer links exists before both
+    ends start laundering, and `graph_nb` (neighbours' scores as LightGBM inputs) showed no clear `catch_rules` gain.
+    A null result is reported as one.
+  - *Cost:* about 4-5 h on v1_full on one laptop (timed on `data/v1` with random labels: 75 s per epoch and seed at
+    fold-3 size). Month 5 is scored once with the other rivals, after all groups.
+- **19 Nov 2026, A4c_logistic_inter (post hoc; Keith Tan, approved by Kee Chee Pheng, relayed by Keith Tan).** A
+  logistic regression that can tell a fast pay-out of real money from one of a few pounds. Code `src/models/logreg.py`
+  (`MuleLogit(C=0.01, interactions=True)`, tests `tests/test_logreg.py`); chosen in `notebooks/15_logreg_tuning.ipynb`
+  on these same folds by top-1% weekly recall (C over 1e-4 to 10; with / without interactions).
+  - *Method:* the 38 frozen inputs prepared as A4 (median fill + missing flags; log1p of counts and money, shares
+    clipped to [0, 1], self-vs-past clipped to [-10, 10], standardised; all fitted on the training rows), plus 4
+    interaction terms, each a share times log(1 + money in) over the same window: `out_1h_share_4wk`,
+    `out_24h_share_4wk`, `passthrough_4wk` x `money_in_4wk`, and `out_1h_share_wk` x `money_in_wk`. L2, C = 0.01,
+    balanced class weights, max_iter 2000; deterministic, so one fit.
+  - *Why post hoc:* its fold results are already known from notebook 15 (`catch_rules` 0.447 / 0.412 / 0.392 in the
+    notebook's own scoring). It is the same diagnosis as A4b (a share of 1 on a tiny balance tops the ranking) with
+    a different remedy: keep the input but weight it by the money behind it. It only helps a rival, so it cannot
+    flatter our model. Reported as post hoc beside A4 and A4b; counted in Holm's correction (15 with G1).
