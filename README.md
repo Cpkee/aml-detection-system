@@ -30,24 +30,23 @@ PYTHONPATH=src python -m evaluation.robustness     # robustness table (report 4.
 ```
 
 Paths below are under `outputs/modelling/` unless they start with `configs/`. Section numbers refer to the report.
-Four rows point to files that are still on open pull requests (#61, #62, #64, #73); they name the branch.
 
 | Result in the report | Committed file |
 |---|---|
 | Inputs that drive the catches (3.4) | `feature_selection/report.md` |
 | Calibration (3.3) | `models/v1_full/frozen_tuned_avg5/calibration/report.md` |
 | Tuned settings (4.2) | `models/v1_full/lgbm_tuning_step2/tuned_params.json` |
-| Methods comparison (4.2, Table 4.2) | `comparison/v1_full/folds.csv`; paired tests `comparison/v1_full/interim_paired_tests_folds.csv` (the XGBoost and CatBoost rows are on branch `interim-tests-group-b`, PR #73) |
+| Methods comparison (4.2, Table 4.2) | `comparison/v1_full/folds.csv`; paired tests `comparison/v1_full/interim_paired_tests_folds.csv` |
 | Month 5 dry run (4.2) | `results/v1_full/month5_dryrun_frozen_tuned_avg5/report.md` |
 | Final test, model vs rules (4.3, Table 4.3A) | `results/v1_full/final_test/report.md`, `summary_w26.csv`; weeks 0-77: `summary_w77.csv` |
 | Robustness checks (4.4.1, Table 4.4A) | `robustness/report.md`, `summary.csv`, `summary_amendments.csv` (Variant II, patient launderers) |
-| Prevalence at 0.1% and 1% (4.4.1) | branch `prevalence-runs` (PR #64): `results/prevalence__0.1pct/final_test/`, `results/prevalence__1pct/final_test/` |
+| Prevalence at 0.1% and 1% (4.4.1) | `results/prevalence__0.1pct/final_test/`, `results/prevalence__1pct/final_test/`; leads `robustness/summary_amendment1.csv` |
 | What the application adds (4.4.2, Table 4.4B) | training folds: `comparison/v1_full/folds.csv` (`ref` against `A1_activity`); the month-5 runs are not committed, and `src/evaluation/compare.py` describes how to rebuild them |
 | False alarms by age (4.4.3, Table 4.4C) | `results/v1_full/final_test/by_age_w26.csv` |
 | Bank labels and label-free detectors (Appendix C.1) | `outlier/v1_full/report.md` |
 | Alert budget check (Appendix C.2) | `results/v1_full/budget_check_m5/report.md` |
-| Rule thresholds (Appendix C.3) | branch `budget-curve` (PR #61): `budget_curve/v1_full/curve.csv` |
-| Review at account opening (Appendix C.4) | branch `opening-topk` (PR #62): `opening_topk/v1_full/table.csv` |
+| Rule thresholds (Appendix C.3) | `budget_curve/v1_full/report.md`, `curve.csv` |
+| Review at account opening (Appendix C.4) | `opening_topk/v1_full/report.md`, `table.csv` |
 | Money stopped before it left (Appendix C.5) | `results/v1_full/month5_cost/summary.csv` |
 | Stronger rule scorecard (5.2) | `scorecard/PLAN.md`, `results/v1_full/month5_scorecard/report.md` |
 | The model of record | `models/v1_full/frozen_tuned_avg5/` (5 tree files, application score, calibration) |
@@ -90,7 +89,7 @@ to run again (`final_test/LOCK.json`). Their outputs are committed (table above)
 PYTHONPATH=src BAF_PATH=data/raw/BAF_Base.csv python -m pytest -q tests
 ```
 
-231 tests: the data checks, an independent re-computation of the weekly features, a no-look-ahead test, a guard that
+244 tests: the data checks, an independent re-computation of the weekly features, a no-look-ahead test, a guard that
 no model code reads the hidden label files, and checks on the committed results. Tests that need a built dataset
 skip when it is missing.
 
