@@ -1,0 +1,19 @@
+{
+  "method": "B2_catboost",
+  "learner": "catboost",
+  "params": {
+    "depth": 6,
+    "iterations": 850,
+    "l2_leaf_reg": 8.914914112873694,
+    "learning_rate": 0.01819126623611786,
+    "rsm": 0.5090376818077604,
+    "subsample": 0.7469468575917173
+  },
+  "trial": 38,
+  "weekly_recall_cv": 0.4023685344797932,
+  "trials": 40,
+  "tune_seed": 42,
+  "version": "1.2.10",
+  "date": "2026-11-16",
+  "git_commit": "b33d76335782327d6772cec399728996a23989fa"
+}

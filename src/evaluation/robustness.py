@@ -7,8 +7,11 @@ with a paired bootstrap over the mules (1,000 resamples, 95% interval). Also pri
 
   PYTHONPATH=src python -m evaluation.robustness            # the plan's 7 runs -> summary.csv
   PYTHONPATH=src python -m evaluation.robustness seed__44 in_window_mix__1   # a subset: printed, not saved
+  PYTHONPATH=src python -m evaluation.robustness --amendment  # Amendment 2 runs -> summary_amendments.csv
 
 summary.csv is the committed record, so it is written only for the plan's full list (or to --to PATH).
+Amendment 2 (19 Nov 2026) runs go to their own table, summary_amendments.csv (same columns, same chance band from
+the headline and seed__44, one row per amendment run whose final test exists); summary.csv is never touched by them.
 """
 import argparse
 import math
@@ -23,6 +26,8 @@ HEADLINE = "v1_full"
 YARDSTICK = "seed__44"
 PLAN_RUNS = ["seed__44", "in_window_mix__1", "bursts_per_launderer__1", "fake_start_days__2", "fake_start_days__1",
              "out_transfer_mean__1", "fake_age_rule__1"]          # the plan's order
+AMENDMENT_RUNS = ["variant_II", "forward_delay_shares__1"]     # plan, Amendment 2 (19 Nov 2026)
+AMENDMENT_OUT = "outputs/modelling/robustness/summary_amendments.csv"
 HORIZON = 26
 MIN_HALF_BAND = 0.05
 
@@ -95,6 +100,17 @@ def table(runs: list[str]) -> pd.DataFrame:
     return t
 
 
+def has_final_test(run: str) -> bool:
+    return os.path.exists(os.path.join(RESULTS, run, "final_test", "launderers.csv"))
+
+
+def amendment_table(runs: list[str]) -> pd.DataFrame:
+    """The amendment runs' rows of table(): same columns, same band (headline and seed__44) and verdict rule, without
+    the headline and yardstick rows. Each run's interval does not depend on the others (bootstrap seed 0 per run)."""
+    t = table([YARDSTICK, *runs])
+    return t[t.run.isin(runs)].reset_index(drop=True)
+
+
 def fpr_ratio(run: str, horizon: int = HORIZON) -> pd.DataFrame:
     """Fairness (closing plan item 2): per policy, the share of normal accounts flagged in each age band and the
     lowest rate divided by the highest (1.0 = equal treatment), for the harness's three bands and for BAF's two
@@ -122,10 +138,24 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("runs", nargs="*", default=PLAN_RUNS, help="default: the plan's 7 runs")
     ap.add_argument("--to", help=f"write the table here (default: {OUT}, only for the plan's full list)")
+    ap.add_argument("--amendment", action="store_true",
+                    help=f"Amendment 2 runs {AMENDMENT_RUNS} with a final test -> {AMENDMENT_OUT}")
     a = ap.parse_args()
-    t = table(a.runs)
+    if a.amendment:
+        if a.runs != PLAN_RUNS:
+            raise SystemExit("--amendment takes no run names: it uses AMENDMENT_RUNS")
+        missing = [r for r in AMENDMENT_RUNS if not has_final_test(r)]
+        a.runs = [r for r in AMENDMENT_RUNS if r not in missing]
+        if missing:
+            print(f"skipped, no final test yet: {', '.join(missing)}")
+        if not a.runs:
+            raise SystemExit("no amendment run has a final test yet: nothing written")
+        t = amendment_table(a.runs)
+        to = a.to or AMENDMENT_OUT
+    else:
+        t = table(a.runs)
+        to = a.to or (OUT if a.runs == PLAN_RUNS else None)
     print(t.round(3).to_string(index=False))
-    to = a.to or (OUT if a.runs == PLAN_RUNS else None)
     if to:
         t.to_csv(to, index=False)
         print(f"written: {to}")

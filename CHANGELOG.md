@@ -6,6 +6,53 @@ Assumptions and Use" doc.
 
 
 
+## 19 Nov 2026 — Methods comparison: interim paired tests now include group B (B1 XGBoost, B2 CatBoost)
+
+No change to the data, the store, the feature list or the model of record; folds 1-3 only (months 0-4), computed from
+the committed `first_flags.csv`. `python -m models.comparison --interim` (new; the table was first made by hand on
+19 Nov) rewrites `comparison/v1_full/interim_paired_tests_folds.csv` for every rival in `first_flags.csv`: the 13
+earlier rows keep the same gain, interval and p. B1 XGBoost: gain -0.003 (95% -0.017 to +0.010, p 0.60), ahead in 1 of
+3 folds. B2 CatBoost: -0.049 (-0.076 to -0.024). No rival wins. With 15 rivals instead of 13, Holm's bar is stricter:
+A4c (p 0.009) no longer passes it, so it is no longer counted as significantly worse than ours (its gain is unchanged).
+`wins_on_folds` is now written down in code: gain above 0.012, passes Holm, ahead in at least 2 of the 3 folds (the
+plan's "3 of 4 cohorts" read for the folds alone).
+
+## 19 Nov 2026 — New sensitivity dataset `forward_delay_shares__1` (patient launderers); Variant II scored
+
+- New dataset `data/sensitivity/forward_delay_shares__1` (robustness plan Amendment 2): forwarding-delay shares
+  0.05 / 0.10 / 0.35 / 0.50 instead of RUSI's 0.28 / 0.25 / 0.32 / 0.15, set with `--set` only. An unsourced
+  assumption, approved 19 Nov 2026 by Kee Chee Pheng; `configs/sim.yaml` unchanged. 244,000 accounts, seed 42, rules
+  frozen at 1.516, built from commit c4e47d8; 10/10 checks pass. Rules: 3,572 alerts, 94.4% false alarms, 199 of 732
+  launderers alerted (27%), median 8 days. Store, cleaned tables and `robust_avg5` built; months 6-7 scored once
+  (locked). The folder is kept whole, like the 7 robustness runs (the amendment said large files would be deleted).
+- `data/variant_II`: no data change; `robust_avg5` trained on its months 0-4 and months 6-7 scored once (locked).
+- No change to v1_full, the main data or the model of record.
+
+## 19 Nov 2026 — Methods comparison: G1_graphsage and A4c_logistic_inter on the training folds (Keith Tan)
+
+No change to the data, the store, the feature list or the model of record. Two rivals added to
+`outputs/modelling/comparison/PLAN.md` as dated amendments (G1 approved by Kee Chee Pheng; A4c labelled post hoc) and
+run on folds 1-3 only (months 0-4; months 5-7 untouched). G1 (2-layer GraphSAGE on payment links): `catch_rules`
+0.434 / 0.451 / 0.465 vs ref 0.473 / 0.450 / 0.440, pooled gain -0.004 (95% -0.035 to +0.025). A4c (logistic with 4
+share x money interactions): 0.447 / 0.412 / 0.392, gain -0.038 (-0.066 to -0.010). Interim paired tests of every
+rival vs ref (folds only): `comparison/v1_full/interim_paired_tests_folds.csv`; no rival wins. Out-of-fold scores in
+`data/v1_full/comparison/` (not committed).
+
+## 16 Nov 2026 — Methods comparison, group B: B1 XGBoost and B2 CatBoost on the 3 training folds
+
+No data, simulator, setting, feature store or model-of-record change; months 0-4 only (month 5 and months 6-7 not
+read). `requirements.txt` gains xgboost 3.4.1 and catboost 1.2.10 (team decision, Kee Chee Pheng 16 Nov). Plan
+amendment committed before any fit (`outputs/modelling/comparison/PLAN.md`, 16 Nov, commit 839bed6): same rows,
+label, folds, 38 inputs and app score as `ref`; balanced row weights; 40-trial random search each on top-1% weekly
+recall (seed 42, trial 0 = defaults, no early stopping); final fit seeds 1-5 averaged. Code `models.comparison --tune`,
+run 16 Nov 02:56-05:32 on this Mac (commit b33d763). Winners: XGBoost trial 34 (weekly recall 0.423; 100 trees,
+15 leaves, both the smallest values searched), CatBoost trial 38 (0.402). `catch_rules` per fold at the rules'
+budget, `ref` 0.473 / 0.450 / 0.440: B1 0.466 / 0.460 / 0.427 (caught 179 of 210, `ref` 180), B2 0.397 / 0.423 /
+0.396 (163 of 210). Win rule not applied: it is pooled with month 5 under Holm, at the comparison gate. Outputs:
+`outputs/modelling/comparison/v1_full/folds.csv`, `first_flags.csv`, `tuning/<method>_trials.csv` + `_best.json`;
+scores in `data/v1_full/comparison/` (not committed).
+
+
 ## 16 Nov 2026 — Fake-mix stress plan closed (no run)
 
 No data, model or result change. The draft plan `outputs/modelling/stress/PLAN.md` (5 Nov, never agreed, never run)
@@ -37,6 +84,23 @@ their `run_manifest.json` where needed, each gets its own feature store, cleaned
 - Runs 3-7 (6 Nov; rebuilt, 10/10 checks, summaries identical), lead (95%): repeated bursts 0.46 (0.37-0.54) holds;
   fakes start 150-210 days 0.37 (0.30-0.45) holds; fakes start 15-45 days 0.39 (0.31-0.49) holds; GBP 1,500 transfers
   0.17 (0.10-0.24) shrinks (rules 120 of 163); young fake ages 0.50 (0.42-0.58) holds. No scenario fails.
+
+## 3 Nov 2026 — GraphSAGE on the payment graph: code and tests only (Keith Tan; proposal, not pre-registered)
+
+No data change, no model change, no result. `src/models/gnn.py` + `tests/test_gnn.py` (8 tests on hand-made graphs).
+- **What:** a 2-layer GraphSAGE (mean aggregator, plain PyTorch) on account-weeks. Links = payments between two
+  accounts of the bank (`features/graph_edges.parquet`) on or before the focal week's cut-off; a neighbour enters as
+  its own latest week with a cut-off no later than that (never later). Neighbours may have opened in any month
+  (decided 3 Nov 2026); only their public inputs are read, never a label. Node inputs = the 38 frozen inputs;
+  fixed settings in `gnn.DEFAULTS` (not tuned). `gnn.method(out)` is the methods comparison's `fit(train, valid)`.
+- **Tests:** neighbour rules equal a plain-Python version; payments after day D change no state with a cut-off on or
+  before D, at either level; preprocessing fitted on training rows only; learns a signal only the neighbours carry
+  (AUC ~0.99 with links, ~0.51 without); same seed gives identical scores; validation labels never read.
+- **Plumbing check on `data/v1` (no labels, random-label timing only):** `python -m features graph --out data/v1`
+  93 s. 76% of focal account-weeks (months 0-4, weeks 0-26) have at least one neighbour (median 3, max 19); a
+  third of neighbour accounts opened in months 5-7. One epoch, one seed, fold-3 size: 75 s, so the full method
+  (4 epochs x 5 seeds x 3 folds) is ~1 h on v1 and ~4-5 h on v1_full.
+- **Next:** runs on the folds only after the methods comparison adds it as a dated amendment; judged on catch_rules.
 
 ## 2 Nov 2026 — Counted re-tests of the test months (decision by Kee Chee Pheng)
 
@@ -109,6 +173,45 @@ No data change, no model change, no change to any existing result value.
   `by_month`; a second run, by model or by `--scores` file, is refused. Records: `outputs/modelling/results/v1/final_test/`,
   `outputs/modelling/models/v1/rehearsal_tuned/`. Numbers there are a code check only (22 mules), not a result.
   For 5 Nov: commit first (`settings.json` records `git_uncommitted_changes`).
+
+## 30 Oct 2026 — Feature selection for the report appendix (notebook 13)
+
+No data change, no feature-store change, **no change to the 38 frozen inputs** (decision 28 Oct 2026). Report-appendix
+evidence: does each frozen input earn its place? (Keith Tan)
+- `notebooks/13_feature_selection.ipynb` (`python -m features select [--out D]`, helpers `src/models/feature_selection.py`)
+  -> `outputs/modelling/feature_selection/`. The tuned model (tuning step 2's `tuned_params.json`), months 0–4, the
+  lab's 3 folds: single-feature AUCs, near-duplicate groups (|Spearman| >= 0.8 for every pair, an assumption),
+  grouped permutation importance on **weekly recall and catch_rules** (same shuffles, 3 per fold; single inputs,
+  near-duplicate groups, families), gain and mean |SHAP|. Label per input: needed (a shuffle costs at least 0.005
+  weekly recall or 0.010 catch_rules in all 3 folds; assumptions, catch_rules' line twice as high because its measured
+  noise is about twice as large) / covered by a near-copy / mixed / weak.
+- v1_full: 15 needed, 9 covered by a near-copy, 14 weak. Most relied on: `app_score` (weekly recall −0.157 when
+  shuffled; catch_rules −0.032), `out_1h_share_4wk` (−0.085; **−0.260 at the rules' budget**, where it carries the
+  model), `n_payers_cum`, `weeks_since_open`, `internal_out_share_cum`, the running totals; `money_in_4wk` and
+  `n_rows_4wk` matter at the rules' budget. Baseline per fold: weekly recall 0.428 / 0.397 / 0.470, catch_rules
+  0.464 / 0.455 / 0.436 (the rules' own alerts 0.146 / 0.132 / 0.143).
+- Refit checks (`feature_lab --drop ... --together --params tuned_params.json`, v1_full, vs the tuned 38-input model:
+  weekly recall 0.426 pooled, catch_rules 0.452, PR-AUC 0.876, first catch within 2 weeks 0.966):
+  - without the 14 weak inputs (24 left): weekly recall 0.431 (+0.009 / +0.005 / −0.000), catch_rules 0.452
+    (+0.009 / +0.002 / −0.010), both 'no clear change'; first catch within 2 weeks unchanged; PR-AUC 0.838, 'worse'
+    (−0.041 / −0.039 / −0.034); one unwitting mule fewer caught at the rules' budget (15 vs 16 of 18).
+  - also without 8 spare near-copies (16 left): weekly recall 0.421, 'worse' (−0.001 / −0.001 / −0.006);
+    catch_rules 0.446 (no clear change); first catch within 2 weeks 0.942 (−0.016 / −0.057 / 0.000); PR-AUC 0.848.
+  - Reading: the 14 weak inputs add nothing to earliness at either budget but carry account-level ranking (PR-AUC);
+    the near-copies add early catching. Dropping inputs gains nothing measurable, which supports keeping all 38.
+    The weekly-recall and catch_rules differences above are the size of the tuned model's seed spread (5 seeds, SD
+    0.004–0.008 and 0.005–0.010 per fold; `outputs/modelling/models/v1_full/stability/exp2_seed_spread.csv`), so
+    they are chance-level; only the PR-AUC fall (0.034–0.041 in every fold) is larger. All numbers here are from one
+    Windows machine's copy of `data/v1_full` (the stability notebook's advice: compare runs on one machine).
+    The analysis uses the tuned single-seed LightGBM (seed 42); the model of record since 2 Nov 2026 averages
+    5 seeds (`frozen_tuned_avg5`), which leaves the inputs, and so this appendix's question, unchanged.
+- Earlier runs on the untuned model (27 Oct, notebook then numbered 07; trials `drop-weak-v1_full`,
+  `drop-weak-and-copies-v1_full` in the ledger) gave the same picture; the 50k copy was not rerun.
+- Code: `feature_lab --drop NAME... [--together]` (families or single inputs left out) and `--params FILE` (LightGBM
+  settings, as `models train`; defaults unchanged); `feature_selection.permutation_drop` scores several measures on the
+  same shuffles; `run_notebook(..., timeout=)` (12 h for `select`; the notebook saves each finished fold under
+  `<data>/features/feature_selection_cache/` and resumes); the ledger writer handles CRLF line ends (Windows);
+  `tests/test_hidden_files.py` reads files as UTF-8 (Windows). Tests: `tests/test_feature_selection.py`.
 
 ## 30 Oct 2026 — Harness gaps closed (Phase 5, approved by Kee Chee Pheng)
 

@@ -107,6 +107,38 @@ def test_subset_does_not_overwrite_the_committed_summary(fake_results, tmp_path,
     assert len(pd.read_csv(tmp_path / "sub.csv")) == 3 and out.read_text() == "the committed record"
 
 
+def test_amendment_rows_use_the_plan_band(fake_results):
+    """An amendment run gets the row it would have in table(): same columns, band from the headline and seed__44."""
+    a = rb.amendment_table(["good", "bad"])
+    full = rb.table(["seed__44", "good", "bad"])
+    assert a.run.tolist() == ["good", "bad"] and a.columns.tolist() == full.columns.tolist()
+    pd.testing.assert_frame_equal(a, full.iloc[2:].reset_index(drop=True))
+    assert a.verdict.tolist() == ["holds", "fails"] and a.band_lo.tolist() == pytest.approx([0.3, 0.3])
+
+
+def test_amendment_cli_skips_missing_runs(fake_results, tmp_path, monkeypatch, capsys):
+    out, summary = tmp_path / "summary_amendments.csv", tmp_path / "summary.csv"
+    summary.write_text("the committed record")
+    monkeypatch.setattr(rb, "AMENDMENT_RUNS", ["not_run_yet", "good"])
+    monkeypatch.setattr(rb, "AMENDMENT_OUT", str(out))
+    monkeypatch.setattr(rb, "OUT", str(summary))
+    monkeypatch.setattr("sys.argv", ["robustness", "--amendment"])
+    rb.main()
+    assert "skipped, no final test yet: not_run_yet" in capsys.readouterr().out
+    t = pd.read_csv(out, keep_default_na=False)
+    assert t.run.tolist() == ["good"] and t.verdict.tolist() == ["holds"]
+    assert summary.read_text() == "the committed record"
+
+
+def test_amendment_cli_writes_nothing_without_runs(fake_results, tmp_path, monkeypatch):
+    monkeypatch.setattr(rb, "AMENDMENT_RUNS", ["not_run_yet"])
+    monkeypatch.setattr(rb, "AMENDMENT_OUT", str(tmp_path / "summary_amendments.csv"))
+    monkeypatch.setattr("sys.argv", ["robustness", "--amendment"])
+    with pytest.raises(SystemExit):
+        rb.main()
+    assert not (tmp_path / "summary_amendments.csv").exists()
+
+
 def test_fpr_ratio_on_a_made_up_table(tmp_path, monkeypatch):
     d = tmp_path / "run" / "final_test"
     d.mkdir(parents=True)
@@ -160,6 +192,23 @@ def test_headline_is_120_vs_50_of_163():
 def test_committed_summary_is_reproduced():
     saved = pd.read_csv(rb.OUT, keep_default_na=False)
     pd.testing.assert_frame_equal(rb.table(rb.PLAN_RUNS), saved, check_exact=False, rtol=1e-12)
+
+
+amended = [r for r in rb.AMENDMENT_RUNS if rb.has_final_test(r)]
+
+
+@pytest.mark.skipif(not amended or not os.path.exists(rb.AMENDMENT_OUT), reason="no amendment run scored yet")
+def test_committed_amendment_summary_is_reproduced():
+    saved = pd.read_csv(rb.AMENDMENT_OUT, keep_default_na=False)
+    pd.testing.assert_frame_equal(rb.amendment_table(amended), saved, check_exact=False, rtol=1e-12)
+
+
+@pytest.mark.parametrize("run", amended)
+def test_amendment_counts_equal_the_harness(run):
+    h = pd.read_csv(os.path.join(rb.RESULTS, run, "final_test", f"summary_w{rb.HORIZON}.csv")).set_index("policy")
+    r = rb.lead(run)
+    assert (r["mules"], r["model_caught"], r["rules_caught"]) == (h.mules["model"], h.caught["model"],
+                                                                 h.caught["rules"])
 
 
 @committed

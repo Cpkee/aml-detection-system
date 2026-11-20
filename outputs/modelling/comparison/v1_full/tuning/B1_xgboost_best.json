@@ -1,0 +1,21 @@
+{
+  "method": "B1_xgboost",
+  "learner": "xgboost",
+  "params": {
+    "colsample_bytree": 0.776382483417745,
+    "learning_rate": 0.07003987625800531,
+    "max_leaves": 15,
+    "min_child_weight": 1,
+    "n_estimators": 100,
+    "reg_alpha": 7.117017708017735e-06,
+    "reg_lambda": 3.353009007953809e-07,
+    "subsample": 0.7784006312291751
+  },
+  "trial": 34,
+  "weekly_recall_cv": 0.4234706490505138,
+  "trials": 40,
+  "tune_seed": 42,
+  "version": "3.4.1",
+  "date": "2026-11-16",
+  "git_commit": "b33d76335782327d6772cec399728996a23989fa"
+}

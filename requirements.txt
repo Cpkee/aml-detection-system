@@ -13,3 +13,5 @@ torch>=2.2
 nbformat>=5.10
 nbclient>=0.10
 ipykernel>=6
+xgboost==3.4.1
+catboost==1.2.10
