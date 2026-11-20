@@ -94,6 +94,31 @@ PYTHONPATH=src BAF_PATH=data/raw/BAF_Base.csv python -m pytest -q tests
 no model code reads the hidden label files, and checks on the committed results. Tests that need a built dataset
 skip when it is missing.
 
+**6. Re-run a notebook (optional).** The notebooks in `notebooks/` are committed with their outputs (all but 09), so
+they can be read on GitHub without running anything. To re-run one, build the data first (steps 2-3); notebook 12
+needs only committed files. Four notebooks have a command that runs the whole notebook and saves the executed copy:
+
+```bash
+PYTHONPATH=src python -m features eda            # notebooks/01_eda_train.ipynb
+PYTHONPATH=src python -m features preprocess     # notebooks/02_preprocess.ipynb (also writes the cleaned tables)
+PYTHONPATH=src python -m features store-check    # notebooks/03_feature_store.ipynb
+PYTHONPATH=src python -m features select         # notebooks/13_feature_selection.ipynb
+```
+
+Each takes `--out` for another data folder (default `data/v1_full`). Run the others with Run All, in Jupyter
+(`pip install jupyterlab`, then `jupyter lab`; Jupyter is not in `requirements.txt`) or in VS Code with the Jupyter
+extension. Each notebook finds the repository folder itself, so no `PYTHONPATH` is needed. It reads `data/v1_full`
+unless the `EDA_DATA` environment variable names another folder (for example `EDA_DATA=data/v1 jupyter lab` for the
+50,000-account dataset), and writes to `outputs/modelling/`, where results for another data folder go to a
+sub-folder named after it.
+
+- Re-running a notebook on `data/v1_full` overwrites the committed results it wrote; `git diff` shows any change.
+- Notebook 09 does not retrain by default (`RETRAIN = False`): it loads the committed single-seed model
+  `frozen_tuned` and re-runs its month-5 dry run. The model of record, `frozen_tuned_avg5`, is never retrained
+  (`python -m models train` refuses its name).
+- The tuning notebooks (06, 08, 15) and the stability notebook (10) refit many models and take much longer than the
+  others.
+
 **Where the rest is.** Analysis notebooks in `notebooks/` (01 EDA, 02 preprocessing, 03 feature store, 04-09
 models and tuning, 10-13 and 15 appendices); every modelling result in `outputs/modelling/` (see its README);
 decisions and data changes in `CHANGELOG.md`.
