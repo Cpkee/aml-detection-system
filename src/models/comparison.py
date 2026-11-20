@@ -6,6 +6,7 @@
     PYTHONPATH=src python -m models.comparison --out data/v1_full --f2
     PYTHONPATH=src python -m models.comparison --out data/v1_full --tune B1_xgboost B2_catboost \
         --methods B1_xgboost B2_catboost         # group B (amendment 16 Nov 2026): 40 trials each, then seeds 1-5
+    PYTHONPATH=src python -m models.comparison --out data/v1_full --interim   # every rival vs ref, folds 1-3 only
 
 Plan, decided and pre-registered 2 Nov 2026: outputs/modelling/comparison/PLAN.md. Every method sees the lab's rows,
 label, folds and app score (stability.lab_setup) and is judged by catch_rules: permanent flags at the rules' weekly
@@ -13,7 +14,8 @@ alert count, the share of each week's mules already flagged, averaged over weeks
 the scores of seeds 1-5 per account-week before flagging, as the model of record does.
 
 Writes outputs/modelling/comparison/<run>/folds.csv (a method's rows are replaced when it is re-run),
-first_flags.csv (first flag week per account at the rules' budget: the paired bootstrap's input) and MDE.json;
+first_flags.csv (first flag week per account at the rules' budget: the paired bootstrap's input), MDE.json and
+interim_paired_tests_folds.csv;
 out-of-fold scores go to <out>/comparison/<method>.parquet. Month 5 and test months 6-7 are never read here.
 """
 from __future__ import annotations
@@ -390,6 +392,18 @@ def first_flags(out: str, method: str) -> pd.Series:
     return t[t.method == method].set_index("account_id")["week"].astype(float)
 
 
+def interim_tests(out: str, cohorts: list[pd.DataFrame]) -> pd.DataFrame:
+    """Every rival in first_flags.csv vs ref on the folds only (month 5 joins at the gate): the paired test, Holm over
+    the rivals present, and the win rule read for 3 cohorts (gain above NOISE, passes Holm, leads in 2 of 3)."""
+    t = pd.read_csv(os.path.join(report_dir(out), "first_flags.csv"), usecols=["method"])
+    rivals = sorted(m for m in t["method"].unique() if m != "ref")
+    ref = first_flags(out, "ref")
+    r = pd.DataFrame([{"method": m, **paired_test(first_flags(out, m), ref, cohorts)} for m in rivals])
+    r["holm_pass"] = holm(r.set_index("method")["p"]).to_numpy()
+    r["wins_on_folds"] = (r["gain"] > NOISE) & r["holm_pass"] & (r["cohorts_ahead"] >= 2)
+    return r
+
+
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", default="data/v1_full")
@@ -398,6 +412,7 @@ def main(argv=None) -> None:
     ap.add_argument("--mde", action="store_true", help="smallest detectable gain from ref's flags")
     ap.add_argument("--tune", nargs="*", default=[], choices=list(B_METHODS),
                     help="random search (40 trials) for group-B methods; run before --methods B1_xgboost ...")
+    ap.add_argument("--interim", action="store_true", help="paired tests of every rival vs ref on the folds only")
     a = ap.parse_args(argv)
     rep = report_dir(a.out)
     stamp = {"run_at": datetime.datetime.now().isoformat(timespec="seconds"), "git_commit": git_commit()}
@@ -422,6 +437,10 @@ def main(argv=None) -> None:
         m = mde(first_flags(a.out, "ref"), cohorts) | {"cohorts": "folds 1-3 (month 5 added at the gate)", **stamp}
         json.dump(m, open(os.path.join(rep, "MDE.json"), "w"), indent=2)
         print(json.dumps(m, indent=2))
+    if a.interim:
+        r = interim_tests(a.out, cohorts)
+        r.to_csv(os.path.join(rep, "interim_paired_tests_folds.csv"), index=False)
+        print(r.to_string(index=False))
 
 
 if __name__ == "__main__":

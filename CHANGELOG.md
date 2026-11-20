@@ -6,6 +6,17 @@ Assumptions and Use" doc.
 
 
 
+## 19 Nov 2026 — Methods comparison: interim paired tests now include group B (B1 XGBoost, B2 CatBoost)
+
+No change to the data, the store, the feature list or the model of record; folds 1-3 only (months 0-4), computed from
+the committed `first_flags.csv`. `python -m models.comparison --interim` (new; the table was first made by hand on
+19 Nov) rewrites `comparison/v1_full/interim_paired_tests_folds.csv` for every rival in `first_flags.csv`: the 13
+earlier rows keep the same gain, interval and p. B1 XGBoost: gain -0.003 (95% -0.017 to +0.010, p 0.60), ahead in 1 of
+3 folds. B2 CatBoost: -0.049 (-0.076 to -0.024). No rival wins. With 15 rivals instead of 13, Holm's bar is stricter:
+A4c (p 0.009) no longer passes it, so it is no longer counted as significantly worse than ours (its gain is unchanged).
+`wins_on_folds` is now written down in code: gain above 0.012, passes Holm, ahead in at least 2 of the 3 folds (the
+plan's "3 of 4 cohorts" read for the folds alone).
+
 ## 19 Nov 2026 — New sensitivity dataset `forward_delay_shares__1` (patient launderers); Variant II scored
 
 - New dataset `data/sensitivity/forward_delay_shares__1` (robustness plan Amendment 2): forwarding-delay shares
