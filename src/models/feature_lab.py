@@ -2,8 +2,15 @@
 
     PYTHONPATH=src python -m models.feature_lab --out data/v1 --groups lag1 roll2 roll4 running_max --name item1
     PYTHONPATH=src python -m models.feature_lab --out data/v1_full --groups roll2 --name item1-confirm --views app activity
+    PYTHONPATH=src python -m models.feature_lab --out data/v1 --drop mix peer --name drop-mix-peer
+    PYTHONPATH=src python -m models.feature_lab --out data/v1 --drop n_out_wk card_items_wk --together --name drop-weak
+    PYTHONPATH=src python -m models.feature_lab --out data/v1_full --drop mix --name drop-mix-tuned \
+        --params outputs/modelling/models/v1_full/lgbm_tuning_step2/tuned_params.json
 
-Candidates come from src/features/candidates.py. For each trial:
+Candidates come from src/features/candidates.py. `--drop` runs the opposite trial: each named family of the model's
+own inputs (models.feature_selection.FAMILIES) or single input is left out in turn (and all of them together when
+there are several); with `--together` only the all-at-once variant ('-set') is fitted. For a drop, 'better' means the model improved without the family, 'no clear change' means it can go
+without a measurable loss, and 'worse' means the model needs it. For each trial:
   screen    each new feature's AUC against started_by_day (launderers whose laundering has begun vs normal
             accounts) at weeks 8, 12 and 26, with a 95% bootstrap interval over launderers; 0.5 = no signal
   model     LightGBM as in notebooks/06_lgbm_tuning.ipynb (same rows, folds, seed and settings), refitted with each
@@ -53,6 +60,7 @@ from features import candidates, manifest
 from features.weekly import FEATURES as WEEKLY
 from evaluation import budget as rules_budget
 from models import lgbm_baseline as base
+from models.feature_selection import ALL_INPUTS, FAMILIES
 from models.tuning import app_score, app_score_split
 
 ROOT = "outputs/modelling/feature_lab"
@@ -273,17 +281,38 @@ def with_fold_columns(df: pd.DataFrame, f: int, scores=None, fold_extra=None) ->
     return d
 
 
+def read_params(path: str | None) -> dict:
+    """LightGBM settings from a JSON file (e.g. tuning step 2's tuned_params.json), integer settings as int, as
+    `python -m models train --params` reads them. None -> {} (LightGBM defaults)."""
+    if not path:
+        return {}
+    import json
+    with open(path) as f:
+        p = json.load(f)
+    for k in ("n_estimators", "num_leaves", "min_child_samples", "subsample_freq", "max_depth"):
+        if k in p:
+            p[k] = int(p[k])
+    return p
+
+
+def lgbm_settings(seed: int, params: dict | None = None) -> dict:
+    """The lab's LightGBM settings: balanced classes, the seed, deterministic, plus `params` merged over them."""
+    return {"class_weight": "balanced", "random_state": seed, "n_jobs": -1, "verbose": -1, "deterministic": True,
+            "force_row_wise": True, **(params or {})}
+
+
 def fit_folds(df, cols, prof, start, scores, seed, ctx=None, fold_extra=None,
-              curves=None) -> tuple[pd.DataFrame, pd.DataFrame]:
+              curves=None, params=None, make_model=None) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Per-fold measures and the out-of-fold scores of one variant. ctx (rules_context) adds the catch measures;
-    curves, a list, collects their per-week curves."""
+    curves, a list, collects their per-week curves. params: LightGBM settings over the lab's defaults.
+    make_model: a function returning an unfitted model with fit / predict_proba (e.g. models.logreg.MuleLogit),
+    in place of LightGBM; the rows, folds and measures stay the same."""
     import lightgbm as lgb
     rows, oof = [], []
     for f, (train_m, valid_m) in enumerate(base.FOLDS, start=1):
         d = with_fold_columns(df, f, scores, fold_extra)
         train, valid = d[d.open_month.isin(train_m)], d[d.open_month == valid_m]
-        model = lgb.LGBMClassifier(class_weight="balanced", random_state=seed, n_jobs=-1, verbose=-1,
-                                   deterministic=True, force_row_wise=True)
+        model = make_model() if make_model else lgb.LGBMClassifier(**lgbm_settings(seed, params))
         model.fit(train[cols], train["mule_by_day"])
         score = model.predict_proba(valid[cols])[:, 1]
         m = base.evaluate(valid, score, prof)
@@ -328,6 +357,27 @@ def git_commit() -> str:
         return "unknown"
 
 
+def drop_variants(names: list[str], together: bool = False) -> dict[str, list[str]]:
+    """Columns each '-' variant leaves out. A name is a family (all its inputs) or one input of the model.
+    One variant per name, plus '-all' when there are several; together=True gives the single variant '-set'."""
+    unknown = [n for n in names if n not in FAMILIES and n not in ALL_INPUTS]
+    if unknown:
+        raise ValueError(f"unknown families or inputs {unknown}; families: {', '.join(FAMILIES)}")
+    cols = {n: FAMILIES.get(n, [n]) for n in names}
+    every = list(dict.fromkeys(c for g in cols.values() for c in g))
+    if not names:
+        return {}
+    if together:
+        return {"-set": every}
+    return {f"-{n}": g for n, g in cols.items()} | ({"-all": every} if len(names) > 1 else {})
+
+
+def variant_columns(base_cols: list[str], extra: list[str], drop: list[str]) -> list[str]:
+    """Input columns of one variant: the baseline without `drop`, plus `extra`. Dropped columns the view lacks
+    (e.g. app_score in the activity view) are ignored."""
+    return [c for c in base_cols if c not in drop] + list(extra)
+
+
 def append_ledger(rows: pd.DataFrame):
     """Add rows to the ledger. Earlier rows are kept byte for byte: a new column is added to the header and earlier
     lines only gain empty fields at their end (their values are never re-read and re-written)."""
@@ -339,7 +389,7 @@ def append_ledger(rows: pd.DataFrame):
     if extra:
         import csv
         with open(LEDGER, newline="") as f:
-            text = f.read()
+            text = f.read().replace("\r\n", "\n")     # Windows checkouts may hold CRLF line ends
         lines = text.rstrip("\n").split("\n")
         with open(LEDGER, newline="") as f:
             n_records = sum(1 for _ in csv.reader(f))
@@ -390,6 +440,11 @@ def main(argv=None):
     ap.add_argument("--out", default="data/v1", help="data folder (default data/v1, the fast 50k run)")
     ap.add_argument("--groups", nargs="*", default=[],
                     help=f"candidate groups: {', '.join(candidates.GROUPS)}; special: {', '.join(SPECIAL)}")
+    ap.add_argument("--drop", nargs="+", default=[],
+                    help="families (models.feature_selection.FAMILIES) or single inputs of the model to leave out, "
+                         "one at a time")
+    ap.add_argument("--together", action="store_true",
+                    help="with --drop: one variant only, everything named left out at once ('-set')")
     ap.add_argument("--name", required=True, help="trial name, used for the report folder and the ledger")
     ap.add_argument("--views", nargs="+", default=["app"], choices=["app", "activity"],
                     help="app = activity + application score (default, the tuned model); activity = store features only")
@@ -401,6 +456,10 @@ def main(argv=None):
                     help=f"measure whose verdict decides (default {MAIN}; proposal 28 Oct 2026: catch_rules)")
     ap.add_argument("--placebo", type=int, default=0, help="add N placebo groups (shuffled columns) to measure noise")
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--params", default=None,
+                    help="JSON file of LightGBM settings merged over the lab's defaults (e.g. tuning step 2's "
+                         "outputs/modelling/models/v1_full/lgbm_tuning_step2/tuned_params.json); default: LightGBM "
+                         "defaults, as notebook 06")
     ap.add_argument("--scratch", default=None,
                     help="development run: write the report to this folder and do not touch the ledger")
     a = ap.parse_args(argv)
@@ -408,10 +467,15 @@ def main(argv=None):
     unknown = set(a.groups) - set(candidates.GROUPS) - set(SPECIAL)
     if unknown:
         raise SystemExit(f"unknown groups {sorted(unknown)}")
-    if not a.groups and not a.placebo:
-        raise SystemExit("give --groups and/or --placebo N")
+    if not a.groups and not a.placebo and not a.drop:
+        raise SystemExit("give --groups, --drop and/or --placebo N")
     if "app_split" in a.groups and a.views != ["app"]:
         raise SystemExit("app_split replaces app_score, so it needs --views app")
+    try:
+        left_out = drop_variants(a.drop, a.together)
+    except ValueError as e:
+        raise SystemExit(str(e))
+    params = read_params(a.params)
 
     t0 = time.time()
     data = os.path.basename(os.path.normpath(a.out))
@@ -443,20 +507,25 @@ def main(argv=None):
     new = [c for g in groups for c in names[g]]
     print(f"{len(df):,} account-weeks, {len(new)} candidate columns ({time.time() - t0:.0f}s)")
 
-    shown = with_fold_columns(df, len(base.FOLDS), scores, fold_extra)     # fold-fitted columns: last fold's values
-    scr = screen(a.out, shown, new)
-    del shown
+    if new:
+        shown = with_fold_columns(df, len(base.FOLDS), scores, fold_extra)     # fold-fitted columns: last fold's values
+        scr = screen(a.out, shown, new)
+        del shown
+    else:
+        scr = pd.DataFrame(columns=["feature", "week", "auc", "lo", "hi"])
     adds = {f"+{g}": (names[g], drops[g]) for g in groups}
     if len(groups) > 1 and not a.placebo:
         adds["+all"] = (new, [c for g in groups for c in drops[g]])
+    adds |= {v: ([], cols) for v, cols in left_out.items()}      # --drop: the model's own inputs left out
     res, summary, curves = [], [], []
     for view in a.views:
         base_cols = WEEKLY + adopted + ["weeks_since_open"] + (["app_score"] if view == "app" else [])
         b = None
         for v, (extra, drop) in {"baseline": ([], []), **adds}.items():
-            cols = [c for c in base_cols if c not in drop] + extra
+            cols = variant_columns(base_cols, extra, drop)
             cv = []
-            r, oof = fit_folds(df, cols, prof, start, scores if view == "app" else None, a.seed, ctx, fold_extra, cv)
+            r, oof = fit_folds(df, cols, prof, start, scores if view == "app" else None, a.seed, ctx, fold_extra, cv,
+                               params)
             r = r.assign(view=view, variant=v, n_features=len(cols))
             res.append(r)
             curves.append(pd.concat(cv).assign(view=view, variant=v))
@@ -486,26 +555,30 @@ def main(argv=None):
     stamp = {"date": datetime.date.today().isoformat(), "commit": git_commit(), "data": data, "trial": a.name,
              "hypothesis": a.hypothesis, "seed": a.seed,
              "baseline": f"store + {candidates.ADOPTED_GROUP}" if adopted else "store", "decides": a.decide}
+    if a.params:                                   # the ledger gains this column only once a trial uses it
+        stamp["lgbm_params"] = os.path.basename(a.params)
     if a.scratch:
         print(f"-> {report} (scratch run, ledger untouched)  ({time.time() - t0:.0f}s)")
         return
     led = summary[summary.variant != "baseline"].assign(**stamp)
-    led["features"] = led.variant.map(lambda v: " ".join(adds[v][0]) + "".join(f" -{c}" for c in adds[v][1]))
+    led["features"] = led.variant.map(lambda v: " ".join(adds[v][0] + [f"-{c}" for c in adds[v][1]]))
     append_ledger(led[list(stamp) + [c for c in led.columns if c not in stamp]])
     print(f"-> {report}, ledger {LEDGER}  ({time.time() - t0:.0f}s)")
 
 
 def write_report(report, a, data, summary, scr, curves, noise, groups):
-    wide = scr.assign(v=scr.apply(lambda r: f"{r.auc:.3f} ({r.lo:.2f}-{r.hi:.2f})", axis=1)) \
-              .pivot(index="feature", columns="week", values="v")
-    wide.columns = [f"week {w}" for w in wide.columns]
     lines = [f"# Feature lab: {a.name}", "",
-             f"data `{data}`, groups {', '.join(groups)}, views {', '.join(a.views)}, seed {a.seed}, "
-             f"decides `{a.decide}`, commit {git_commit()}", "", f"Hypothesis: {a.hypothesis or '(none given)'}", ""]
+             f"data `{data}`, groups added {', '.join(groups) or '(none)'}, left out {', '.join(a.drop) or '(none)'}, "
+             f"views {', '.join(a.views)}, seed {a.seed}, decides `{a.decide}`, LightGBM settings "
+             f"{('`' + a.params + '`') if a.params else 'defaults'}, commit {git_commit()}", "",
+             f"Hypothesis: {a.hypothesis or '(none given)'}", ""]
+    if a.drop:
+        lines += ["Variants starting with `-` leave inputs out. For them, 'better' = the model improved without them, "
+                  "'no clear change' = they can go without a measurable loss, 'worse' = the model needs them.", ""]
     order = [a.decide] + [m for m in NOISE if m != a.decide]
     for view in a.views:
         s = summary[summary.view == view]
-        lines += [f"## View `{view}`: baseline vs baseline + candidates (3 folds, months 0-4)", ""]
+        lines += [f"## View `{view}`: baseline vs each variant (3 folds, months 0-4)", ""]
         for m in order:
             cols = ["variant", "n_features"] + (["weekly_recall_pooled"] if m == "weekly_recall" else []) + \
                    (["rules"] if m.startswith("catch") else []) + [m, f"d_{m}", f"d_{m}_folds", f"{m}_verdict"]
@@ -546,8 +619,12 @@ def write_report(report, a, data, summary, scr, curves, noise, groups):
         f"- verdict 'better' = all 3 folds improve and the mean gain is at least the noise level: "
         f"{', '.join(f'{m} {n}' for m, n in NOISE.items())} (PR-AUC: team rule; the others: assumptions or placebo "
         "measurements, see the comments in feature_lab.py).",
-        "- Real-customer mules in the account-level top 1% per fold (witting / unwitting) are in folds.csv.",
-        "", "## Screen: AUC vs started launderers (95% interval over launderers)", "", wide.to_markdown(), ""]
+        "- Real-customer mules in the account-level top 1% per fold (witting / unwitting) are in folds.csv.", ""]
+    if len(scr):
+        wide = scr.assign(v=scr.apply(lambda r: f"{r.auc:.3f} ({r.lo:.2f}-{r.hi:.2f})", axis=1)) \
+                  .pivot(index="feature", columns="week", values="v")
+        wide.columns = [f"week {w}" for w in wide.columns]
+        lines += ["## Screen: AUC vs started launderers (95% interval over launderers)", "", wide.to_markdown(), ""]
     with open(os.path.join(report, "report.md"), "w") as f:
         f.write("\n".join(lines) + "\n")
 

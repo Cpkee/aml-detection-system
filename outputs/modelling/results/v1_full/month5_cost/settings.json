@@ -1,0 +1,36 @@
+{
+  "data": "v1_full",
+  "cohort_months": [
+    5
+  ],
+  "horizon_weeks": 26,
+  "mules": 78,
+  "policies": {
+    "rules": "month5_dryrun_frozen_tuned_avg5/launderers.csv:rules_first_alert_week",
+    "model": "month5_dryrun_frozen_tuned_avg5/launderers.csv:model_flag_week_w26",
+    "scorecard": "month5_scorecard/launderers.csv:model_flag_week_w26"
+  },
+  "inputs_sha256": {
+    "month5_dryrun_frozen_tuned_avg5/launderers.csv": "de049133deb2b6dfde73f56666242aebae2c89fbbc27090e3408c5633fc4eda5",
+    "month5_dryrun_frozen_tuned_avg5/summary_w26.csv": "bbc8bc69277f60acf073f44d96a8ebb82488227cdcd6682694fe1b0773e357c4",
+    "month5_scorecard/launderers.csv": "87b38b53015a1ad2158efc967c4c73d16be71e5e28103d5a179767f6eae69d6e",
+    "month5_scorecard/summary_w26.csv": "0ea8ca5eaf250481060aafa0a23e027f2a462619181b093e57aa949fc3b9b1db"
+  },
+  "run_manifest_sha256": "4ce1c4fb593a8ae5f40e9acb082f1969655095c5a4977dc81f58c9026c62d7ba",
+  "paid_out": "direction = 'out' and is_laundering = 1",
+  "flag_day": "rules: first alert day; model / scorecard: end of the flag week (open_day + 7w + 6); rows on the flag day count as gone",
+  "closed_by_week26_and_not_flagged_before_closure": {
+    "model": 2,
+    "scorecard": 1
+  },
+  "bootstrap": {
+    "n": 10000,
+    "seed": 0,
+    "unit": "mule",
+    "interval": "2.5-97.5 percentile",
+    "of": "sum over mules of (gone_rules - gone_policy)"
+  },
+  "git_commit": "e7a3a77ab9876ef50823aca363792ebbb0cc9962",
+  "git_uncommitted_changes": false,
+  "seconds": 1
+}

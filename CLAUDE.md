@@ -1,6 +1,6 @@
 # CLAUDE.md — aml-detection-system
 
-BT4102 group project (NUS). Question: can account-opening data plus early activity catch money-laundering
+BT4012 group project (NUS). Question: can account-opening data plus early activity catch money-laundering
 (mule) accounts **earlier** than a bank's existing rules? No public data links applications to later
 transactions, so we **simulate** one: real BAF applications -> hidden profiles -> 18 months of simulated UK
 banking -> laundering planted from published evidence -> the bank's 6 rules as the benchmark.
@@ -49,10 +49,20 @@ the 8 four-week-window features (`candidates.ADOPTED`, group `roll4`), added at 
 LightGBM inputs are the 28 store features + the 8 `roll4` features + `weeks_since_open` + the application score
 (`app_score`): 38, the lab's baseline. Changed only by team decision. Feature-lab trials and `/feature-round` run only on
 explicit request and are report-appendix work; re-checking `roll4` on Variant II / IV is a robustness check, not a
-reopening of the list. Tuning step 2 and later models use them;
+reopening of the list. `python -m models.frozen_importance` (~30 s) refits that baseline and writes each input's share
+of split gain to `outputs/modelling/models/v1_full/frozen_importance/importance.csv` (v1_full: `app_score` 51%, top 5
+80%, top 10 89%); `tests/test_feature_lab.py` pins the 38. Tuning step 2 and later models use them;
 the lab's baseline includes them (`--baseline store` to re-check them). Notebooks 05/06 stay the records of the store-only
 runs. The lab also splits each gain by phase (`pre_start_recall`, `start_recall`, `later_recall`) and reports
-`first_caught_2wk` with permanent flags: weekly recall rewards re-flagging mules already found (26 Oct 2026 finding). The `feature-engineer` agent (`.claude/agents/`) runs propose -> implement -> verify -> evaluate
+`first_caught_2wk` with permanent flags: weekly recall rewards re-flagging mules already found (26 Oct 2026 finding).
+Feature selection (report appendix, under the freeze): `python -m features select [--out D]` runs
+`notebooks/13_feature_selection.ipynb` (helpers `src/models/feature_selection.py`: `FAMILIES` of the 38 inputs,
+near-duplicate groups, grouped permutation importance, SHAP) -> `outputs/modelling/feature_selection[/<run>]`; it labels
+each input needed / covered by a near-copy / mixed / weak. `python -m models.feature_lab --drop NAME... [--together]`
+leaves families or single inputs out; `--params FILE` refits with given LightGBM settings (e.g. tuning step 2's
+`tuned_params.json`). v1_full, tuned model (30 Oct 2026): 15 needed, 9 near-copies, 14 weak; dropping the 14 weak
+leaves weekly recall (0.426 -> 0.431) and catch_rules (0.452) unchanged but costs PR-AUC (0.876 -> 0.838); also
+dropping 8 near-copies costs earliness (first catch within 2 weeks 0.966 -> 0.942). Supports keeping all 38. The `feature-engineer` agent (`.claude/agents/`) runs propose -> implement -> verify -> evaluate
 trials; it never changes the store, which stays a team decision.
 Agent trials 26 Oct 2026 (v1_full, vs the adopted model; groups `new_cp4`, `self4`, `speed_cum` in `candidates.py`,
 merged from the agent worktree 27 Oct 2026): `self4` (last 4 weeks vs the account's own earlier average)
@@ -105,6 +115,16 @@ manifest, store untouched) and `graph_nb` (neighbours' scores from a two-stage m
 `<out>/features/graph_nb/`); `--scratch DIR` for development runs that skip the ledger. Report-appendix work under the
 freeze: v1_full results (catch_rules: rules 0.141, frozen model 0.457; `roll4` holds at the rules' budget, `app_split` and the
 graph groups no clear gain) agree with the frozen 38 inputs; measured refit noise 0.012 (catch_rules), 0.006 (weekly recall).
+GNN proposal (3 Nov 2026, Keith Tan; code + tests only, not pre-registered): `src/models/gnn.py` is a 2-layer GraphSAGE
+(plain PyTorch) on account-weeks linked by payments between accounts of the bank (`python -m features graph` first), up to
+each week's cut-off; neighbours from any month, never their labels; the 38 inputs; fixed `gnn.DEFAULTS`. `gnn.method(out)`
+gives the comparison's `fit(train, valid)`. Added to the methods comparison as `G1_graphsage` (amendment, approved by
+Kee Chee Pheng, 19 Nov 2026) with the post hoc `A4c_logistic_inter` (`models.logreg`, interactions). Folds 1-3, 19 Nov:
+G1 `catch_rules` 0.434 / 0.451 / 0.465 vs ref 0.473 / 0.450 / 0.440, pooled gain -0.004 (95% -0.035 to +0.025, p 0.77);
+A4c 0.447 / 0.412 / 0.392, gain -0.038 (-0.066 to -0.010). Group B (PR #58, merged 19 Nov): B1 XGBoost 0.466 / 0.460 /
+0.427, gain -0.003 (-0.017 to +0.010, p 0.60); B2 CatBoost gain -0.049 (-0.076 to -0.024). No rival wins on the folds
+(`python -m models.comparison --interim` -> `comparison/v1_full/interim_paired_tests_folds.csv`, Holm over the 15 rivals
+present). G1 takes 22-40 min per fold. Month 5 with the other rivals at the gate.
 Phase 5 (28 Oct 2026): `python -m models train [--out D --params FILE]` fits the frozen model on months 0-4 ->
 `data/<run>/models/frozen/`; `python -m evaluation.score [--months 5]` runs the fixed-cohort harness at the rules' weekly
 budget -> `outputs/modelling/results/<run>/month5_dryrun/`; test months only with `--final-test`, once (lock file).
@@ -151,6 +171,32 @@ vs the rules' 4.4; with young fakes the excess moves to under-30s). **Fake-mix s
 (decision 16 Nov 2026, Kee Chee Pheng):** `outputs/modelling/stress/PLAN.md` was a draft that never ran; its Stress 1
 (`in_window_mix__1`) is robustness run 2, reported under the robustness plan's rule. `in_window_mix__2` and `seed__43`
 are not run (plan, Amendment 1).
+**Closing plan items 1-4 (19 Nov 2026; `outputs/modelling/closing/PLAN.md`, only committed final-test outputs read):**
+(1) McNemar on the same mules (`robustness.mcnemar`): v1_full both 43, model only 77, rules only 7, neither 36, chi2
+56.68, exact p 5.1e-16; significant in all 7 robustness runs (smallest `out_transfer_mean__1`, 30 vs 2, p 2.5e-07); mules
+only, says nothing about false alarms. (2) Fairness (`robustness.fpr_ratio`, rate = normal flagged / (accounts - mules
+by week 26) as `score.by_age`): lowest / highest false-positive rate over 3 age bands model 0.31 vs rules 0.94 (under 50
+vs 50+: 0.43 vs 0.96); fewer false alarms (160 vs 214) but 50+ flagged ~3x as often as under-30; a cost of the model,
+nothing tuned. Both printed by `python -m evaluation.robustness`, `summary.csv` unchanged. (3) The model of record's
+importance is `frozen_tuned_avg5/importance.csv` (rebuilds exactly from the 5 seed files): `app_score` 50.7%, store
+24.5%, `roll4` 22.1%; PR #39's table is the lab's untuned 3-fold baseline (Spearman 0.96), branch
+`frozen-importance-update` brings it up to date with `main`, unmerged. Scoring month 5 weeks 0-26 (786,240
+account-weeks) takes a median 5.6 s on an Apple M5 Pro (~140,000 account-weeks/s; machine busy). (4) Inputs vs
+simulator assumptions table, ordered by gain share: forwarding speed (14.6%) untested for the model (item 5), money
+amounts (12.9%) the one tested group whose lead shrinks (0.17).
+**Closing plan items 5-7 (19 Nov 2026, Kee Chee Pheng approved all three; robustness plan Amendment 2 committed before
+any run):** (5) Patient launderers `data/sensitivity/forward_delay_shares__1` (`--set laundering.forward_delay_shares=
+{under_15min: 0.05, 15_to_60min: 0.10, 1_to_24h: 0.35, over_24h: 0.50}`, an unsourced assumption; 244k, seed 42, rules
+1.516, 10/10 checks; rules 94.4% false alarms, 27% caught): model 117 vs rules 38 of 163, lead 0.48 (0.40-0.56),
+**holds**; the expected shrink did not happen: the speed inputs fell from 14.4% to 4.8% of gain, but the rules lost more
+(likely R4's same-week pass-through). (6) `variant_II` (not rebuilt): model 134 vs rules 57 of 152, lead 0.51
+(0.42-0.59), holds; false-positive-rate ratio model / rules 0.19 / 0.48 (3 bands), 0.52 / 0.69 (under 50 vs 50+); its
+cohort is half 50+. Both have their own `robust_avg5`, months 6-7 scored once (`results/<run>/final_test/`, locked);
+`python -m evaluation.robustness --amendment` writes `robustness/summary_amendments.csv` (`summary.csv` unchanged).
+(7) `python -m evaluation.cost` -> `results/v1_full/month5_cost/` (month 5 only, 78 mules, weeks 0-26; laundering paid
+out on or before the first flag): of GBP 310,207 the rules prevent 8.4%, the rule scorecard 15.2%, the model of record
+32.9% (GBP 76k more than the rules, 95% 48k-107k); caught mules have already paid out about two thirds. Investigator
+cost left out.
 **Budget curve appendix (19 Nov 2026, Kee Chee Pheng; plan and result `outputs/modelling/budget_curve/PLAN.md`,
 committed before the run):** did the model win only because of the rules' one threshold? `python -m evaluation.budget_curve`
 (`src/evaluation/budget_curve.py`, `tests/test_budget_curve.py`; refuses months 6-7) re-applies `sim.rules` to the
@@ -175,6 +221,12 @@ code and model files, and runs once). D4 (31 Oct): no autoencoder. Frozen 31 Oct
 M1 63, M1b 63, M2 54, M3 16, M3s 39, M4 16; never-confirmed (62): rules 3, M1 50, M2 42. Write-up:
 `notebooks/12_outlier_detection.ipynb` (reads only the committed look outputs) -> `outputs/modelling/outlier/v1_full/
 report.md`; draft appendix text `outputs/modelling/outlier/APPENDIX.md`. On this Mac run commands with `venv/bin/python`.
+**Rule scorecard appendix (18 Nov 2026, Kee Chee Pheng; plan and results `outputs/modelling/scorecard/PLAN.md`):** would a
+stronger rule set close the gap? Three hand-written scenarios on the store (fast forwarding, new payers, pass-through;
+starting values are assumptions), scored as points at the rules' budget (`python -m models scorecard`,
+`src/models/rule_scorecard.py`; refuses months 6-7). Scale chosen on months 0-4 (1.0: 178 vs rules 109 of 361), then
+month 5 scored **once** (spent; settings never change): rules 16, scorecard 34, model of record 65 of 78. Written with
+hindsight (the model leans on forwarding speed), so generous to the rules; stated as a limitation.
 Sensitivity runs (rules frozen, 244k, one `test` value each): `python -m sim.sensitivity --list | --run [--only NAME]
 | --summarise` -> `data/sensitivity/<name>/` (large files deleted) and `outputs/sensitivity/summary.csv`.
 Single steps: `accounts`, `normal --batches 3-3`, `laundering`, `rules`, `finalize`. Use `--out` for another

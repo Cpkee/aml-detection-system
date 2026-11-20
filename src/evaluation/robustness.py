@@ -2,14 +2,19 @@
 
 Reads each run's committed harness output (results/<run>/final_test/launderers.csv) and gives its lead:
 mules caught by the model minus mules caught by the rules, weeks 0-26, as a share of the cohort's mules,
-with a paired bootstrap over the mules (1,000 resamples, 95% interval).
+with a paired bootstrap over the mules (1,000 resamples, 95% interval). Also prints McNemar's test per run
+(mcnemar: mules caught by exactly one method; printed only, not in summary.csv).
 
   PYTHONPATH=src python -m evaluation.robustness            # the plan's 7 runs -> summary.csv
   PYTHONPATH=src python -m evaluation.robustness seed__44 in_window_mix__1   # a subset: printed, not saved
+  PYTHONPATH=src python -m evaluation.robustness --amendment  # Amendment 2 runs -> summary_amendments.csv
 
 summary.csv is the committed record, so it is written only for the plan's full list (or to --to PATH).
+Amendment 2 (19 Nov 2026) runs go to their own table, summary_amendments.csv (same columns, same chance band from
+the headline and seed__44, one row per amendment run whose final test exists); summary.csv is never touched by them.
 """
 import argparse
+import math
 import os
 
 import numpy as np
@@ -21,6 +26,8 @@ HEADLINE = "v1_full"
 YARDSTICK = "seed__44"
 PLAN_RUNS = ["seed__44", "in_window_mix__1", "bursts_per_launderer__1", "fake_start_days__2", "fake_start_days__1",
              "out_transfer_mean__1", "fake_age_rule__1"]          # the plan's order
+AMENDMENT_RUNS = ["variant_II", "forward_delay_shares__1"]     # plan, Amendment 2 (19 Nov 2026)
+AMENDMENT_OUT = "outputs/modelling/robustness/summary_amendments.csv"
 HORIZON = 26
 MIN_HALF_BAND = 0.05
 
@@ -33,6 +40,22 @@ def mules(run: str, horizon: int = HORIZON) -> pd.DataFrame:
     m["model"] = m[f"model_flag_week_w{horizon}"].notna().astype(int)
     m["rules"] = (m.rules_first_alert_week <= horizon).astype(int)
     return m
+
+
+def mcnemar(run: str) -> dict:
+    """McNemar's paired test on the same mules: model vs rules, weeks 0-26. Only the mules that exactly one
+    method caught count. chi2 has the continuity correction; p_exact is the two-sided exact binomial test
+    (each discordant mule is a fair coin if the two methods are equally good). Mules only: says nothing about
+    false alarms."""
+    m = mules(run)
+    b = int(((m.model == 1) & (m.rules == 0)).sum())
+    c = int(((m.model == 0) & (m.rules == 1)).sum())
+    n = b + c
+    tail = sum(math.comb(n, k) for k in range(min(b, c) + 1))
+    return {"both": int(((m.model == 1) & (m.rules == 1)).sum()), "model_only": b, "rules_only": c,
+            "neither": int(((m.model == 0) & (m.rules == 0)).sum()),
+            "chi2": (abs(b - c) - 1) ** 2 / n if n else float("nan"),
+            "p_exact": min(1.0, 2 * tail / 2 ** n)}
 
 
 def lead(run: str, n_boot: int = 1000, seed: int = 0) -> dict:
@@ -77,19 +100,73 @@ def table(runs: list[str]) -> pd.DataFrame:
     return t
 
 
+def has_final_test(run: str) -> bool:
+    return os.path.exists(os.path.join(RESULTS, run, "final_test", "launderers.csv"))
+
+
+def amendment_table(runs: list[str]) -> pd.DataFrame:
+    """The amendment runs' rows of table(): same columns, same band (headline and seed__44) and verdict rule, without
+    the headline and yardstick rows. Each run's interval does not depend on the others (bootstrap seed 0 per run)."""
+    t = table([YARDSTICK, *runs])
+    return t[t.run.isin(runs)].reset_index(drop=True)
+
+
+def fpr_ratio(run: str, horizon: int = HORIZON) -> pd.DataFrame:
+    """Fairness (closing plan item 2): per policy, the share of normal accounts flagged in each age band and the
+    lowest rate divided by the highest (1.0 = equal treatment), for the harness's three bands and for BAF's two
+    groups, under 50 vs 50+. Reads results/<run>/final_test/by_age_w<horizon>.csv.
+
+    The harness (score.by_age) divides normal_flagged by the band's normal accounts = accounts - mules, where a mule
+    is a mule by the end of the horizon (max 1). Under 50 pools the counts of 'under 30' and '30-49' the same way,
+    after checking that rule gives back the file's own three rates."""
+    d = pd.read_csv(os.path.join(RESULTS, run, "final_test", f"by_age_w{horizon}.csv"))
+    rate = lambda x: x.normal_flagged / np.maximum(x.accounts - x.mules, 1)
+    assert np.allclose(rate(d), d.false_positive_rate, rtol=1e-9), f"{run}: rates not rebuilt from the counts"
+    rows = []
+    for policy, p in d.groupby("policy", sort=False):
+        p = p.set_index("age")
+        under50 = p.loc[["under 30", "30-49"], ["accounts", "mules", "normal_flagged"]].sum()
+        three = p.loc[["under 30", "30-49", "50+"], "false_positive_rate"]
+        two = pd.Series([rate(under50), p.loc["50+", "false_positive_rate"]])
+        rows.append({"run": run, "policy": policy, "fpr_under30": three.iloc[0], "fpr_30_49": three.iloc[1],
+                     "fpr_50plus": three.iloc[2], "ratio_3band": three.min() / three.max(),
+                     "fpr_under50": two.iloc[0], "ratio_2group": two.min() / two.max()})
+    return pd.DataFrame(rows)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("runs", nargs="*", default=PLAN_RUNS, help="default: the plan's 7 runs")
     ap.add_argument("--to", help=f"write the table here (default: {OUT}, only for the plan's full list)")
+    ap.add_argument("--amendment", action="store_true",
+                    help=f"Amendment 2 runs {AMENDMENT_RUNS} with a final test -> {AMENDMENT_OUT}")
     a = ap.parse_args()
-    t = table(a.runs)
+    if a.amendment:
+        if a.runs != PLAN_RUNS:
+            raise SystemExit("--amendment takes no run names: it uses AMENDMENT_RUNS")
+        missing = [r for r in AMENDMENT_RUNS if not has_final_test(r)]
+        a.runs = [r for r in AMENDMENT_RUNS if r not in missing]
+        if missing:
+            print(f"skipped, no final test yet: {', '.join(missing)}")
+        if not a.runs:
+            raise SystemExit("no amendment run has a final test yet: nothing written")
+        t = amendment_table(a.runs)
+        to = a.to or AMENDMENT_OUT
+    else:
+        t = table(a.runs)
+        to = a.to or (OUT if a.runs == PLAN_RUNS else None)
     print(t.round(3).to_string(index=False))
-    to = a.to or (OUT if a.runs == PLAN_RUNS else None)
     if to:
         t.to_csv(to, index=False)
         print(f"written: {to}")
     else:
         print(f"not written: {OUT} holds the plan's full list only (use --to PATH to save a subset)")
+    print("\nMcNemar's test, model vs rules on the same mules (mules only, not false alarms):")
+    mc = pd.DataFrame([{"run": r, **mcnemar(r)} for r in [HEADLINE, *a.runs]])
+    print(mc.to_string(index=False, formatters={"chi2": "{:.2f}".format, "p_exact": "{:.2g}".format}))
+    print("\nFairness: false-positive rate by age, lowest / highest (printed only)")
+    f = pd.concat([fpr_ratio(r) for r in [HEADLINE, *a.runs]])
+    print(f[f.policy.isin(["model", "rules"])].round(5).to_string(index=False))
 
 
 if __name__ == "__main__":
