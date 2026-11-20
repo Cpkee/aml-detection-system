@@ -1,6 +1,7 @@
 # Imbalance check: model vs rules at 0.1%, 0.3% and 1% prevalence (plan, drafted 19 Nov 2026)
 
-**Status: draft for the team. Nothing has been run.** This closes the open half of the professor's comment 1
+**Status: both runs approved 19 Nov 2026 (Kee Chee Pheng); added to the robustness plan as Amendment 1 and
+committed before any run. **Both runs done 19 Nov 2026: result below.** This closes the open half of the professor's comment 1
 (`docs/professor_feedback.md`). It changes nothing in the simulator, `configs/sim.yaml`, the main data, the frozen
 feature list or the model of record, and it never re-reads months 6–7 of v1_full.
 
@@ -79,6 +80,48 @@ percentages above are a different basis and are not mixed in.)
 | Lead shrinks at one prevalence | Reported as a dependence on prevalence, with the numbers |
 | Model's false-alarm share above the rules' at some prevalence, or lead fails | Reported plainly as the main limit of the result |
 
+## Result: both runs scored once (19 Nov 2026)
+
+Fixed test cohort (accounts opened in months 6–7), weeks 0–26, the rules' weekly budget. Each dataset was rebuilt
+from its manifest, equalled its committed sensitivity summary exactly and passed all 10 checks before scoring.
+Results: `outputs/modelling/results/prevalence__1pct/final_test/` and `prevalence__0.1pct/final_test/` (locked);
+leads and verdicts in `outputs/modelling/robustness/summary_amendment1.csv`.
+
+| | 0.1% | 0.3% (headline) | 1% |
+|---|---|---|---|
+| Test-cohort accounts | 149,992 | 50,061 | 50,061 |
+| Mules by week 26 | 172 | 163 | 524 |
+| Rules: flagged / caught | 665 / 40 | 264 / 50 | 352 / 138 |
+| Model: flagged / caught | 740 / 151 | 280 / 120 | 369 / 297 |
+| Rules: precision | 0.06 | 0.19 | 0.39 |
+| Model: precision | 0.20 | 0.43 | 0.81 |
+| **Rules: false-alarm share of flags** | **94%** | **81%** | **61%** |
+| **Model: false-alarm share of flags** | **80%** | **57%** | **20%** |
+| Rules: normal accounts flagged per 1,000 | 4.2 | 4.3 | 4.3 |
+| Model: normal accounts flagged per 1,000 | 3.9 | 3.2 | 1.5 |
+| Lead (95% interval) | 0.65 (0.57–0.72) | 0.43 (0.35–0.52) | 0.30 (0.25–0.36) |
+| Verdict (chance band 0.31–0.55) | holds (above the band) | – | shrinks |
+| McNemar: model only / rules only | 114 / 3 | 77 / 7 | 207 / 48 |
+
+**Reading, by the table decided above:**
+
+- **Do false positives spike?** The false-alarm share rises as mules get rarer for both methods, as expected
+  (model 20% → 57% → 80%; rules 61% → 81% → 94%). The model's share is below the rules' at all three
+  prevalences. The model also flags fewer normal accounts per 1,000 than the rules at all three.
+- **Lead:** holds at 0.1% (above the band) and **shrinks at 1%** (0.30, just under the band's lower edge of 0.31;
+  the model still catches more than twice as many mules, 297 vs 138). By the plan's rule this is reported as a
+  dependence on prevalence.
+- **One explanation of the 1% result, worked out after seeing it (so not a pre-registered claim):** the budget is
+  the rules' alert count, which barely moves with prevalence (369 flags at 1% against 280 at 0.3%) while the mules
+  more than triple (524 against 163). With 369 flags a perfect model could catch at most 369 of 524 (0.70), so
+  the lead as a share of mules is capped by the budget. At 0.1% the opposite holds: 740 flags for 172 mules.
+- **Fairness, beside the result:** the model's false alarms stay uneven across ages at every prevalence (lowest ÷
+  highest rate 0.31 / 0.31 / 0.32); the rules stay near even (0.83 / 0.94 / 0.93).
+
+**Not done as planned:** the rebuilt large files were kept, not deleted (8 GB and 25 GB under `data/sensitivity/`,
+git-ignored), like the other robustness datasets. Compute was 14 min (1%) and 39 min (0.1%), well under the
+estimates. These runs are spent: nothing is re-scored and no setting changes.
+
 ## Cost and risks
 
 | Run | Compute (estimate) | Disk while running | Risk |
@@ -110,5 +153,5 @@ twice. Not part of the main plan.
 
 ## Decisions for the team
 
-1. Run both, or only the 1% run?
+1. ~~Run both, or only the 1% run?~~ Both (19 Nov 2026, Kee Chee Pheng).
 2. Add the optional extra?

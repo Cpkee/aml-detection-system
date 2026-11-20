@@ -1,0 +1,65 @@
+{
+  "data": "/Users/cheepheng/aml-detection-system/data/sensitivity/prevalence__1pct",
+  "cohort_months": [
+    6,
+    7
+  ],
+  "horizons": [
+    26,
+    77
+  ],
+  "model": "robust_avg5",
+  "model_params_source": "file",
+  "model_git_commit": "9ab7838ff1f8d6b4450e525f2a7db285f80be8a9",
+  "model_machine": {
+    "os": "macOS-26.5.1-arm64-arm-64bit",
+    "processor": "arm",
+    "cpu_count": 15,
+    "python": "3.12.15"
+  },
+  "machine": {
+    "os": "macOS-26.5.1-arm64-arm-64bit",
+    "processor": "arm",
+    "cpu_count": 15,
+    "python": "3.12.15"
+  },
+  "cohort_accounts": 50061,
+  "launderers": 611,
+  "budget_per_horizon": {
+    "26": 369,
+    "77": 834
+  },
+  "score_source": "model:robust_avg5",
+  "scores_sha256": null,
+  "run_manifest_sha256": "b9924a67fdc210e653993df06e1e99cec6e4a30d26fbc9b91d5e116e65568c23",
+  "git_commit": "9ab7838ff1f8d6b4450e525f2a7db285f80be8a9",
+  "git_uncommitted_changes": false,
+  "retest_reason": null,
+  "seconds": 25,
+  "head_to_head": {
+    "26": {
+      "mules": 524,
+      "both": 90,
+      "model_only": 207,
+      "rules_only": 48,
+      "either": 345,
+      "neither": 179,
+      "median_days_model_earlier_when_both": 0.0,
+      "model_first_when_both": 39,
+      "rules_first_when_both": 36,
+      "median_min_days_earlier_model_only": 70.0
+    },
+    "77": {
+      "mules": 611,
+      "both": 109,
+      "model_only": 268,
+      "rules_only": 61,
+      "either": 438,
+      "neither": 173,
+      "median_days_model_earlier_when_both": 0.0,
+      "model_first_when_both": 48,
+      "rules_first_when_both": 43,
+      "median_min_days_earlier_model_only": 413.0
+    }
+  }
+}

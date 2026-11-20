@@ -234,6 +234,13 @@ weeks 0-7 of month 5, ~1 catch expected, 0 seen). `python -m evaluation.opening_
 day. Month 5, 97 launderers, top 25 / 50 / 100 / 200 / 500: 2 / 2 / 4 / 12 / **24** launderers (chance 1.67 at 500, 14x),
 all fake (24 of 70, 0 of 27 real-customer mules), ~12-25 reviews per mule vs ~2 for the model's activity flags, head
 start ~74-89 days before laundering starts. Run once (spent).
+**Prevalence runs (19 Nov 2026, Kee Chee Pheng; robustness plan Amendment 1; plan and results
+`outputs/modelling/prevalence/PLAN.md`, leads in `robustness/summary_amendment1.csv`):** the open half of the professor's
+comment 1. `prevalence__1pct` (244k) and `prevalence__0.1pct` (732k) through the robustness recipe, months 6-7 scored once
+each (locked; never re-run). Test cohort, weeks 0-26, 0.1% / 0.3% / 1%: model caught 151 of 172 / 120 of 163 / 297 of 524,
+rules 40 / 50 / 138; false-alarm share of flags model 80% / 57% / 20%, rules 94% / 81% / 61% (model below the rules at all
+three; use this cohort basis, not the whole-dataset 97.8 / 93.4 / 81.3%). Lead 0.65 holds at 0.1%; **shrinks at 1%** (0.30,
+0.25-0.36): the budget barely grows while mules triple (369 flags for 524 mules), an after-the-fact explanation.
 Sensitivity runs (rules frozen, 244k, one `test` value each): `python -m sim.sensitivity --list | --run [--only NAME]
 | --summarise` -> `data/sensitivity/<name>/` (large files deleted) and `outputs/sensitivity/summary.csv`.
 Single steps: `accounts`, `normal --batches 3-3`, `laundering`, `rules`, `finalize`. Use `--out` for another
